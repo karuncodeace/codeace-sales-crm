@@ -1,0 +1,145 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useMemo } from "react";
+import { useTheme } from "../../context/themeContext"; 
+
+const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
+
+export default function weeklyLineChart() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  const baseOptions = useMemo(
+    () => ({
+      chart: {
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        foreColor: isDark ? "#CBD5E1" : "#475467",
+        background: "transparent",
+      },
+      stroke: {
+        curve: "smooth",
+        width: 3,
+      },
+      dataLabels: {
+        enabled: false,
+      },
+      legend: {
+        horizontalAlign: "left",
+        fontSize: "14px",
+        labels: {
+          colors: isDark ? "#E2E8F0" : "#1E293B",
+        },
+        markers: { radius: 12 },
+      },
+      grid: {
+        borderColor: isDark
+          ? "rgba(255,255,255,0.12)"
+          : "rgba(148,163,184,0.25)",
+        strokeDashArray: 4,
+        padding: { left: 12, right: 12 },
+      },
+      tooltip: {
+        theme: isDark ? "dark" : "light",
+      },
+    }),
+    [isDark]
+  );
+
+  const chartCards = useMemo(
+    () => [
+      {
+        id: "revenue-trend",
+        title: "Monthly Revenue vs Target",
+        subtitle: "Thousands USD",
+        type: "line",
+        height: 400,
+        series: [
+          { name: "Actual Revenue", data: [120, 138, 150, 165, 172, 190] },
+          { name: "Forecast", data: [110, 130, 155, 170, 185, 200] },
+        ],
+        options: {
+          ...baseOptions,
+
+          // 🔥 Red traveling line in dark mode
+          colors: isDark
+            ? ["#ef4444", "#a3a3a3"] // red + muted gray
+            : ["#22c55e", "#a1a1aa"], // normal green theme in light
+
+          xaxis: {
+            categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            labels: {
+              style: {
+                colors: isDark ? "#E2E8F0" : "#475467",
+              },
+            },
+          },
+          yaxis: {
+            labels: {
+              style: {
+                colors: isDark ? "#E2E8F0" : "#475467",
+              },
+              formatter: (val) => `$${val}k`,
+            },
+          },
+
+          stroke: {
+            curve: "straight",
+            width: [4, 2],
+            dashArray: isDark ? [0, 6] : [0, 6], // same but primary will be red in dark mode
+          },
+
+          markers: {
+            size: [5, 0],
+            colors: isDark ? "#ef4444" : "#22c55e",
+          },
+        },
+      },
+    ],
+    [baseOptions, isDark]
+  );
+
+  return (
+    <div className="grid gap-6 grid-cols-1 sm:grid-cols-1 xl:grid-cols-1">
+      {chartCards.map((card) => (
+        <div
+          key={card.id}
+          className={`rounded-2xl p-5 border ${
+            isDark
+              ? "bg-[#262626] border-gray-700 text-gray-300"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div className="mb-4">
+            <h3
+              className={`text-lg font-semibold ${
+                isDark ? "text-gray-200" : "text-gray-900"
+              }`}
+            >
+              {card.title}
+            </h3>
+            <p
+              className={`text-sm ${
+                isDark ? "text-gray-400" : "text-gray-500/50"
+              }`}
+            >
+              {card.subtitle}
+            </p>
+          </div>
+
+          {/* 🔄 forces rerender when theme changes */}
+          <ApexChart
+            key={theme}
+            options={card.options}
+            series={card.series}
+            type={card.type}
+            height={card.height}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}

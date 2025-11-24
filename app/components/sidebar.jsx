@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {useTheme} from "../context/themeContext"
 
 const TooltipIcon = ({ label, className = "", children }) => (
 
@@ -23,9 +24,12 @@ export default function Sidebar() {
   const handleIconClick = (page) => {
     router.push(page);
   }
+  const {theme} = useTheme();
   return (
     <div className="flex flex-col  items-center pt-10   space-y-10 px-7">
-      <div className="flex flex-col items-center space-y-10 bg-white p-3 py-4 rounded-full">
+      <div className={`flex flex-col items-center space-y-10  p-3 py-4 rounded-full
+        ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}
+        `}>
         <TooltipIcon
           label="Dashboard"
           className="bg-orange-500 p-2 rounded-full flex items-center justify-center"
@@ -66,7 +70,9 @@ export default function Sidebar() {
           </svg>
           </div>
         </TooltipIcon>
-        <TooltipIcon label="Leads" className="flex items-center justify-center" >
+        <TooltipIcon label="Leads" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `} >
           <div onClick={() => handleIconClick("/leads")} className="cursor-pointer">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -78,21 +84,21 @@ export default function Sidebar() {
           >
             <path
               d="M11.5 5C14.3284 5 15.7426 5 16.6213 5.87868C17.5 6.75736 17.5 8.17157 17.5 11C17.5 19 21.5 19 21.5 19H7.23863C6.91067 19 6.74668 19 6.37485 18.9032C6.00302 18.8063 5.94387 18.7733 5.82558 18.7072C4.6855 18.0702 2.5 16.1742 2.5 11C2.5 8.17157 2.5 6.75736 3.37868 5.87868C4.25736 5 5.67157 5 8.5 5"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M2.5 10V16C2.5 18.8284 2.5 20.2426 3.37868 21.1213C4.25736 22 5.67157 22 8.5 22H11.5761C14.4045 22 15.8188 22 16.6974 21.1213C17.1873 20.6314 17.4041 19.9751 17.5 19"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M11.5 3.5V6.5C11.5 6.96594 11.5 7.19891 11.4239 7.38268C11.3224 7.62771 11.1277 7.82239 10.8827 7.92388C10.6989 8 10.4659 8 10 8C9.53406 8 9.30109 8 9.11732 7.92388C8.87229 7.82239 8.67761 7.62771 8.57612 7.38268C8.5 7.19891 8.5 6.96594 8.5 6.5V3.5C8.5 3.03406 8.5 2.80109 8.57612 2.61732C8.67761 2.37229 8.87229 2.17761 9.11732 2.07612C9.30109 2 9.53406 2 10 2C10.4659 2 10.6989 2 10.8827 2.07612C11.1277 2.17761 11.3224 2.37229 11.4239 2.61732C11.5 2.80109 11.5 3.03406 11.5 3.5Z"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -100,7 +106,9 @@ export default function Sidebar() {
           </svg>  
           </div>
         </TooltipIcon>
-        <TooltipIcon label="Prospect" className="flex items-center justify-center">
+        <TooltipIcon label="Prospect" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -111,20 +119,22 @@ export default function Sidebar() {
           >
             <path
               d="M21 21H10C6.70017 21 5.05025 21 4.02513 19.9749C3 18.9497 3 17.2998 3 14V3"
-              stroke="#141B34"
+              stroke="curretColor"
               strokeWidth="1.5"
               strokeLinecap="round"
             />
             <path
               d="M7.99707 16.999C11.5286 16.999 18.9122 15.5348 18.6979 6.43269M16.4886 8.04302L18.3721 6.14612C18.5656 5.95127 18.8798 5.94981 19.0751 6.14286L20.9971 8.04302"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </TooltipIcon>
-        <TooltipIcon label="Tasks" className="flex items-center justify-center">
+        <TooltipIcon label="Tasks" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -163,7 +173,9 @@ export default function Sidebar() {
             ></path>
           </svg>
         </TooltipIcon>
-        <TooltipIcon label="Calendar" className="flex items-center justify-center">
+        <TooltipIcon label="Calendar" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -202,7 +214,9 @@ export default function Sidebar() {
             ></path>
           </svg>
         </TooltipIcon>
-        <TooltipIcon label="Proposals" className="flex items-center justify-center">
+        <TooltipIcon label="Proposals" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -246,8 +260,12 @@ export default function Sidebar() {
           </svg>
         </TooltipIcon>
       </div>
-      <div className="flex flex-col items-center space-y-5 bg-white p-3 py-4 rounded-full">
-        <TooltipIcon label="Help Center" className="bg-gray-100 p-2 rounded-full">
+      <div className={`flex flex-col items-center space-y-5  p-3 py-4 rounded-full
+        ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}
+        `}>
+        <TooltipIcon label="Help Center" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -260,28 +278,30 @@ export default function Sidebar() {
               cx="12"
               cy="12"
               r="10"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M12 16V11.5"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M12 8.01172V8.00172"
-              stroke="#141B34"
+              stroke="currentColor"
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </TooltipIcon>
-        <TooltipIcon label="Log Out" className="">
+        <TooltipIcon label="Log Out" className={`flex items-center justify-center
+          ${theme === "dark" ? "text-gray-400" : "text-black"}
+          `}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
