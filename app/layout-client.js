@@ -14,9 +14,9 @@ function LayoutStructure({ children, fonts }) {
         className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
         suppressHydrationWarning
       >
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-screen ">
           <TopHeader />
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden ">
             <Sidebar />
             <main className="flex-1 overflow-y-auto">{children}</main>
           </div>

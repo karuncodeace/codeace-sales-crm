@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {useTheme} from "../context/themeContext"
 import Header from "../components/header";
 const statusStyles = {
   New: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-100",
@@ -212,6 +213,8 @@ export default function LeadsPage() {
   const [recentlyMovedLead, setRecentlyMovedLead] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const {theme} = useTheme();
+
   const statusDefinitions = useMemo(
     () => [
       { id: "New", name: "New", style: "border-l-4 border-[#3B82F6]" },
@@ -360,13 +363,13 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="mt-8 bg-white border border-gray-200 rounded-xl shadow-2xs  overflow-x-hidden ">
+      <div className={`mt-8  rounded-xl shadow-2xs  overflow-x-hidden ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} `}>
         {/* Header */}
         <div className="px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b border-gray-200">
           {/* LEFT SIDE — Title + Search */}
           <div className="flex  gap-2 w-full md:w-auto">
             {/* Search Bar */}
-            <div className="relative w-full md:w-80  flex items-center border border-gray-200 rounded-[10px] pl-4">
+            <div className={`relative w-full md:w-80  flex items-center rounded-[10px] pl-4 ${theme === "dark" ? " border border-gray-700" : " border border-gray-200"}`}>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -391,7 +394,9 @@ export default function LeadsPage() {
             </div>
             <div className="flex items-center">
               {/* Filter Button */}
-              <button className=" py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-100">
+              <button className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg   hover:bg-gray-100
+                ${theme === "dark" ? "border border-gray-700 bg-orange-500" : "border border-gray-200 text-gray-700 bg-white"}
+                `}>
                 <svg
                   className="size-4"
                   xmlns="http://www.w3.org/2000/svg"
@@ -410,7 +415,9 @@ export default function LeadsPage() {
           {/* RIGHT SIDE — Buttons */}
           <div className="flex flex-wrap items-center gap-3 pt-1 md:pt-0">
             {/* View Toggle */}
-            <div className="inline-flex items-center bg-white border border-gray-200 rounded-[10px] p-1">
+            <div className={`inline-flex items-center  border  rounded-[10px] p-1
+              ${theme === "dark" ? "bg-transparent border-gray-700" : "bg-white border-gray-200"}
+              `}>
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
@@ -418,7 +425,9 @@ export default function LeadsPage() {
                   viewMode === "table"
                     ? "bg-gray-100 text-black shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                }
+                ${theme === "dark" ? "bg-gray-100/10 text-white" :" bg-gray-100 text-black"}
+              `}
                 aria-pressed={viewMode === "table"}
                 aria-label="Switch to table view"
               >
@@ -459,9 +468,11 @@ export default function LeadsPage() {
                 onClick={() => setViewMode("kanban")}
                 className={`px-3 py-1.5 text-sm rounded-full focus:outline-hidden transition ${
                   viewMode === "kanban"
-                    ? "bg-gray-100 text-black shadow-sm"
+                    ? "bg-gray-100  shadow-sm text-black"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                }
+                
+                `}
                 aria-pressed={viewMode === "kanban"}
                 aria-label="Switch to Kanban view"
               >
@@ -474,28 +485,28 @@ export default function LeadsPage() {
                 >
                   <path
                     d="M15.75 19.75V7.75C15.75 7.28501 15.75 7.05252 15.6989 6.86177C15.5602 6.34413 15.1559 5.93981 14.6382 5.80111C14.4475 5.75 14.215 5.75 13.75 5.75C13.285 5.75 13.0525 5.75 12.8618 5.80111C12.3441 5.93981 11.9398 6.34413 11.8011 6.86177C11.75 7.05252 11.75 7.28501 11.75 7.75V19.75C11.75 20.215 11.75 20.4475 11.8011 20.6382C11.9398 21.1559 12.3441 21.5602 12.8618 21.6989C13.0525 21.75 13.285 21.75 13.75 21.75C14.215 21.75 14.4475 21.75 14.6382 21.6989C15.1559 21.5602 15.5602 21.1559 15.6989 20.6382C15.75 20.4475 15.75 20.215 15.75 19.75Z"
-                    stroke="#141B34"
+                    stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M22.75 9.75V7.75C22.75 7.28501 22.75 7.05252 22.6989 6.86177C22.5602 6.34413 22.1559 5.93981 21.6382 5.80111C21.4475 5.75 21.215 5.75 20.75 5.75C20.285 5.75 20.0525 5.75 19.8618 5.80111C19.3441 5.93981 18.9398 6.34413 18.8011 6.86177C18.75 7.05252 18.75 7.28501 18.75 7.75V9.75C18.75 10.215 18.75 10.4475 18.8011 10.6382C18.9398 11.1559 19.3441 11.5602 19.8618 11.6989C20.0525 11.75 20.285 11.75 20.75 11.75C21.215 11.75 21.4475 11.75 21.6382 11.6989C22.1559 11.5602 22.5602 11.1559 22.6989 10.6382C22.75 10.4475 22.75 10.215 22.75 9.75Z"
-                    stroke="#141B34"
+                    stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M8.75 13.75V7.75C8.75 7.28501 8.75 7.05252 8.69889 6.86177C8.56019 6.34413 8.15587 5.93981 7.63823 5.80111C7.44748 5.75 7.21499 5.75 6.75 5.75C6.28501 5.75 6.05252 5.75 5.86177 5.80111C5.34413 5.93981 4.93981 6.34413 4.80111 6.86177C4.75 7.05252 4.75 7.28501 4.75 7.75V13.75C4.75 14.215 4.75 14.4475 4.80111 14.6382C4.93981 15.1559 5.34413 15.5602 5.86177 15.6989C6.05252 15.75 6.28501 15.75 6.75 15.75C7.21499 15.75 7.44748 15.75 7.63823 15.6989C8.15587 15.5602 8.56019 15.1559 8.69889 14.6382C8.75 14.4475 8.75 14.215 8.75 13.75Z"
-                    stroke="#141B34"
+                    stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M23.9195 2.58058C25.75 4.41117 25.75 7.35745 25.75 13.25C25.75 19.1425 25.75 22.0888 23.9195 23.9195C22.0888 25.75 19.1425 25.75 13.25 25.75C7.35745 25.75 4.41117 25.75 2.58058 23.9195C0.75 22.0888 0.75 19.1425 0.75 13.25C0.75 7.35745 0.75 4.41117 2.58058 2.58058C4.41117 0.75 7.35745 0.75 13.25 0.75C19.1425 0.75 22.0888 0.75 23.9195 2.58058Z"
-                    stroke="#141B34"
+                    stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -509,17 +520,17 @@ export default function LeadsPage() {
         {viewMode === "table" ? (
           <>
             {/* Table */}
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className={`min-w-full divide-y  ${theme === "dark" ? "divide-[#3f3f3f]" : "divide-gray-200"}`}>
+              <thead className={`  ${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
                 <tr>
                   <th scope="col" className="ps-6 py-3 text-start">
                     <label htmlFor="lead-select-all" className="flex">
                       <input
                         type="checkbox"
-                        className="shrink-0 border-gray-300 rounded-sm text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none"
+                        className={`shrink-0 border-gray-200 bg-blue-600 rounded-sm text-yellow-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none`}
                         id="lead-select-all"
                       />
-                      <span className="sr-only">Select all leads</span>
+                     
                     </label>
                   </th>
 
@@ -541,7 +552,7 @@ export default function LeadsPage() {
                       className="px-6 py-3 text-start"
                     >
                       <div className="flex items-center  gap-x-2">
-                        <span className="text-xs font-semibold uppercase text-gray-800 ">
+                        <span className="text-xs font-semibold uppercase  ">
                           {column}
                         </span>
                       </div>
@@ -796,7 +807,9 @@ export default function LeadsPage() {
             {/* End Footer */}
           </>
         ) : (
-          <div className="px-6 py-6 overflow-x-auto divide-y-3 divide-gray-200 ">
+          <div className={`px-6 py-6 overflow-x-auto divide-y-3 
+          ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}
+          `}>
             <div className="flex items-start gap-4 ">
               {kanbanStatuses.map((status) => {
                 const statusMeta =

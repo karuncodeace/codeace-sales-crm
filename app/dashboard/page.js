@@ -34,7 +34,7 @@ export default function DashboardPage() {
         </div>
       </div>
       <div className="mt-10 pb-10">
-        <RevenueAreaChart />
+        
       </div>
     </div>
   );

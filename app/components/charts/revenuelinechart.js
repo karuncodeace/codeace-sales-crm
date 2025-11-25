@@ -62,7 +62,7 @@ export default function weeklyLineChart() {
         options: {
           ...baseOptions,
 
-          // 🔥 Red traveling line in dark mode
+          //  Red traveling line in dark mode
           colors: isDark
             ? ["#ef4444", "#a3a3a3"] // red + muted gray
             : ["#22c55e", "#a1a1aa"], // normal green theme in light

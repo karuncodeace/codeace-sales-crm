@@ -22,6 +22,7 @@ export default function weeklyLineChart() {
       stroke: {
         curve: "smooth",
         width: 3,
+        color : isDark ? "#ef4444" : "#3b82f6",
       },
       dataLabels: {
         enabled: false,
