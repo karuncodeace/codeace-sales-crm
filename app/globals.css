@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "react-datepicker/dist/react-datepicker.css";
+
 
 :root {
   --background-light: #F6F6F6;
@@ -63,5 +65,89 @@ body {
 
 .animate-card-drop {
   animation: card-drop 300ms ease-out;
+}
+
+/* Custom Scrollbar Styles */
+/* Light mode - Webkit browsers (Chrome, Safari, Edge) */
+.light ::-webkit-scrollbar,
+body.light ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.light ::-webkit-scrollbar-track,
+body.light ::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 10px;
+}
+
+.light ::-webkit-scrollbar-thumb,
+body.light ::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 10px;
+  border: 2px solid #e5e7eb;
+}
+
+.light ::-webkit-scrollbar-thumb:hover,
+body.light ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar,
+body.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dark ::-webkit-scrollbar-track,
+body.dark ::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+body.dark ::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 10px;
+  border: 2px solid #374151;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+body.dark ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Firefox */
+.light, body.light {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #e5e7eb;
+}
+
+.dark, body.dark {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #374151;
+}
+
+/* Apply to all scrollable children */
+.light *, body.light * {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #e5e7eb;
+}
+
+.dark *, body.dark * {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #374151;
+}
+
+/* Corner piece */
+.light ::-webkit-scrollbar-corner,
+body.light ::-webkit-scrollbar-corner {
+  background: #e5e7eb;
+}
+
+.dark ::-webkit-scrollbar-corner,
+body.dark ::-webkit-scrollbar-corner {
+  background: #374151;
 }
 

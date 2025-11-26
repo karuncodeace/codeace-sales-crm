@@ -33,7 +33,7 @@ export default function DashboardPage() {
           <SalesPersonComparisonChart />
         </div>
       </div>
-      <div className="mt-10 pb-10">
+      <div className="mt-10 pb-1">
         
       </div>
     </div>

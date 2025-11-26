@@ -1,21 +1,56 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {useTheme} from "../context/themeContext"
+import { useTheme } from "../context/themeContext"
 import Header from "../components/header";
+import StatusDropdown from "../components/statusTooglebtn";
+import PriorityDropdown from "../components/priorityTooglebtn";
+import FilterBtn from "../components/filterbtn";
+
 const statusStyles = {
-  New: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-100",
-  Contacted: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
-  "Follow-up": "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
-  Qualified:
-    "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
+  New: {
+    light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-100",
+    dark: "text-blue-500 bg-blue-900/40 ring-1 ring-inset ring-blue-700",
+  },
+  Contacted: {
+    light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
+    dark: "text-amber-500 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
+  },
+  "Follow-up": {
+    light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
+    dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
+  },
+  Qualified: {
+    light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
+    dark: "text-emerald-500 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
+  },
+  Proposal: {
+    light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
+    dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
+  },
+  Noresponse: {
+    light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-200",
+    dark: "text-gray-300 bg-gray-900/40 ring-1 ring-inset ring-gray-700",
+  },
 };
 
 const priorityStyles = {
-  Hot: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-100",
-  Warm: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
-  Cold: "text-slate-600 bg-slate-50 ring-1 ring-inset ring-slate-200",
+  Hot: {
+    light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-200",
+    dark: "text-red-300 bg-red-900/40 ring-1 ring-inset ring-red-800",
+  },
+  Warm: {
+    light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-200",
+    dark: "text-orange-300 bg-orange-900/40 ring-1 ring-inset ring-orange-800",
+  },
+  Cold: {
+    light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-200",
+    dark: "text-blue-300 bg-blue-900/40 ring-1 ring-inset ring-blue-800",
+  },
 };
+
+
+
 
 const initialLeads = [
   {
@@ -92,7 +127,7 @@ const initialLeads = [
     phone: "+1 (555) 410-9981",
     email: "support@pioneerlogi.com",
     source: "Cold Outreach",
-    status: "No Response",
+    status: "Noresponse",
     assignedTo: "Rachel Kim",
     lastActivity: "Voicemail left · 2 days ago",
     createdAt: "Nov 10, 2025",
@@ -163,19 +198,7 @@ const initialLeads = [
     createdAt: "Oct 27, 2025",
     priority: "Warm",
   },
-  {
-    id: "LD-1168",
-    name: "Maple Ridge Farms",
-    initials: "MR",
-    phone: "+1 (555) 473-0001",
-    email: "hello@mapleridge.farm",
-    source: "Organic Search",
-    status: "New",
-    assignedTo: "Sarah Lin",
-    lastActivity: "Site visit · 2h ago",
-    createdAt: "Oct 20, 2025",
-    priority: "Cold",
-  },
+
   {
     id: "LD-1165",
     name: "UrbanKite Designs",
@@ -212,8 +235,21 @@ export default function LeadsPage() {
   const [dragOverStatus, setDragOverStatus] = useState(null);
   const [recentlyMovedLead, setRecentlyMovedLead] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [openFilter, setOpenFilter] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    source: "",
+    status: "",
+    assignedTo: "",
+    priority: "",
+    type: "",
+  });
+  const handleApplyFilters = (filters) => {
+    setAdvancedFilters(filters);
+  };
 
-  const {theme} = useTheme();
+
+  const { theme } = useTheme();
 
   const statusDefinitions = useMemo(
     () => [
@@ -248,24 +284,44 @@ export default function LeadsPage() {
   );
 
   const filteredLeads = useMemo(() => {
-    if (!searchTerm.trim()) return leadData;
-    const query = searchTerm.trim().toLowerCase();
-    return leadData.filter((lead) => {
-      const haystack = [
-        lead.name,
-        lead.email,
-        lead.phone,
-        lead.id,
-        lead.status,
-        lead.assignedTo,
-        lead.source,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [leadData, searchTerm]);
+    let result = leadData;
+
+    // Apply advanced filters
+    if (advancedFilters.source) {
+      result = result.filter((lead) => lead.source === advancedFilters.source);
+    }
+    if (advancedFilters.status) {
+      result = result.filter((lead) => lead.status === advancedFilters.status);
+    }
+    if (advancedFilters.assignedTo) {
+      result = result.filter((lead) => lead.assignedTo === advancedFilters.assignedTo);
+    }
+    if (advancedFilters.priority) {
+      result = result.filter((lead) => lead.priority === advancedFilters.priority);
+    }
+
+    // Apply search
+    if (searchTerm.trim()) {
+      const query = searchTerm.trim().toLowerCase();
+      result = result.filter((lead) => {
+        const haystack = [
+          lead.name,
+          lead.email,
+          lead.phone,
+          lead.id,
+          lead.status,
+          lead.assignedTo,
+          lead.source,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    return result;
+  }, [leadData, searchTerm, advancedFilters]);
 
   const groupedLeads = useMemo(() => {
     return kanbanStatuses.reduce((acc, status) => {
@@ -310,6 +366,22 @@ export default function LeadsPage() {
     setDragOverStatus((prev) => (prev === status ? null : prev));
   };
 
+  const handleStatusUpdate = (leadId, newStatus) => {
+    setLeadData((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId ? { ...lead, status: newStatus } : lead
+      )
+    );
+  };
+
+  const handlePriorityUpdate = (leadId, newPriority) => {
+    setLeadData((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId ? { ...lead, priority: newPriority } : lead
+      )
+    );
+  };
+
   useEffect(() => {
     if (!recentlyMovedLead) return;
     const timeout = setTimeout(() => setRecentlyMovedLead(null), 350);
@@ -336,8 +408,8 @@ export default function LeadsPage() {
   }, [openActions]);
 
   return (
-    <div className="pl-5 pr-8 w-full pb-10">
-      <div className="mt-10 flex justify-between items-center">
+    <div className="pl-5 md:pl-0 2xl:pl-0  w-[98%]">
+      <div className="mt-10  flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-bold mb-1">Leads Management</h1>
         </div>
@@ -363,20 +435,23 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className={`mt-8  rounded-xl shadow-2xs  overflow-x-hidden ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} `}>
+      <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
         {/* Header */}
-        <div className="px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b border-gray-200">
+        <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
           {/* LEFT SIDE — Title + Search */}
           <div className="flex  gap-2 w-full md:w-auto">
             {/* Search Bar */}
-            <div className={`relative w-full md:w-80  flex items-center rounded-[10px] pl-4 ${theme === "dark" ? " border border-gray-700" : " border border-gray-200"}`}>
+            <div className={`relative w-full md:w-80 flex items-center rounded-[10px] px-4 py-2 ${theme === "dark"
+                ? "border border-gray-700 bg-gray-800/50"
+                : "border border-gray-200 bg-white"
+              }`}>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={1.5}
                 stroke="currentColor"
-                className="w-5 h-5 text-gray-500"
+                className={`w-5 h-5 shrink-0 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
               >
                 <path
                   strokeLinecap="round"
@@ -386,17 +461,21 @@ export default function LeadsPage() {
               </svg>
               <input
                 type="text"
-                placeholder="Search leads,id's..."
+                placeholder="Search leads, id's..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full pl-2 pr-4 text-sm focus:outline-none"
+                className={`w-full pl-2 pr-4 text-sm bg-transparent focus:outline-none ${theme === "dark"
+                    ? "text-gray-200 placeholder:text-gray-500"
+                    : "text-gray-900 placeholder:text-gray-400"
+                  }`}
               />
             </div>
-            <div className="flex items-center">
-              {/* Filter Button */}
-              <button className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg   hover:bg-gray-100
-                ${theme === "dark" ? "border border-gray-700 bg-orange-500" : "border border-gray-200 text-gray-700 bg-white"}
-                `}>
+            <div>
+              <button
+                onClick={() => setOpenFilter(true)}
+                className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg transition
+                            ${theme === "dark" ? " bg-orange-500 hover:bg-orange-600 text-gray-300" : "border border-gray-200 text-gray-700 bg-white hover:bg-gray-100"}
+                        `}>
                 <svg
                   className="size-4"
                   xmlns="http://www.w3.org/2000/svg"
@@ -409,25 +488,26 @@ export default function LeadsPage() {
                 </svg>
                 Filter
               </button>
+              <FilterBtn open={openFilter} onClose={() => setOpenFilter(false)} onApply={handleApplyFilters} />
             </div>
           </div>
 
           {/* RIGHT SIDE — Buttons */}
           <div className="flex flex-wrap items-center gap-3 pt-1 md:pt-0">
             {/* View Toggle */}
-            <div className={`inline-flex items-center  border  rounded-[10px] p-1
-              ${theme === "dark" ? "bg-transparent border-gray-700" : "bg-white border-gray-200"}
-              `}>
+            <div className={`inline-flex items-center border rounded-[10px] p-1 ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-100 border-gray-200"
+              }`}>
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`px-3 py-1.5 text-sm rounded-full focus:outline-hidden transition ${
-                  viewMode === "table"
-                    ? "bg-gray-100 text-black shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }
-                ${theme === "dark" ? "bg-gray-100/10 text-white" :" bg-gray-100 text-black"}
-              `}
+                className={`px-3 py-1.5 text-sm rounded-lg focus:outline-hidden transition ${viewMode === "table"
+                    ? theme === "dark"
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : theme === "dark"
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
                 aria-pressed={viewMode === "table"}
                 aria-label="Switch to table view"
               >
@@ -466,13 +546,14 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("kanban")}
-                className={`px-3 py-1.5 text-sm rounded-full focus:outline-hidden transition ${
-                  viewMode === "kanban"
-                    ? "bg-gray-100  shadow-sm text-black"
-                    : "text-gray-600 hover:text-gray-900"
-                }
-                
-                `}
+                className={`px-3 py-1.5 text-sm rounded-lg focus:outline-hidden transition ${viewMode === "kanban"
+                    ? theme === "dark"
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : theme === "dark"
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
                 aria-pressed={viewMode === "kanban"}
                 aria-label="Switch to Kanban view"
               >
@@ -520,249 +601,256 @@ export default function LeadsPage() {
         {viewMode === "table" ? (
           <>
             {/* Table */}
-            <table className={`min-w-full divide-y  ${theme === "dark" ? "divide-[#3f3f3f]" : "divide-gray-200"}`}>
-              <thead className={`  ${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
-                <tr>
-                  <th scope="col" className="ps-6 py-3 text-start">
-                    <label htmlFor="lead-select-all" className="flex">
-                      <input
-                        type="checkbox"
-                        className={`shrink-0 border-gray-200 bg-blue-600 rounded-sm text-yellow-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none`}
-                        id="lead-select-all"
-                      />
-                     
-                    </label>
-                  </th>
-
-                  {[
-                    "Lead Name",
-                    "Phone",
-                    "Email",
-                    "Lead Source",
-                    "Status",
-                    "Assigned To",
-                    "Last Activity",
-                    "Created At",
-                    "Priority",
-                    "Actions",
-                  ].map((column) => (
-                    <th
-                      key={column}
-                      scope="col"
-                      className="px-6 py-3 text-start"
-                    >
-                      <div className="flex items-center  gap-x-2">
-                        <span className="text-xs font-semibold uppercase  ">
-                          {column}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-200 overflow-y-auto ">
-                {filteredLeads.length === 0 ? (
+            <div className="flex-1 overflow-y-auto overflow-x-auto">
+              <table className={`min-w-full divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+                <thead className={`  ${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
                   <tr>
-                    <td
-                      colSpan={11}
-                      className="px-6 py-10 text-center text-sm text-gray-500"
-                    >
-                      No leads match “{searchTerm.trim()}”. Try a different search.
-                    </td>
+                    <th scope="col" className="ps-6 py-3 text-start">
+                      <label htmlFor="lead-select-all" className="flex">
+                        <input
+                          type="checkbox"
+                          className="shrink-0 size-4 accent-red-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                          id="lead-select-all"
+                        />
+                      </label>
+                    </th>
+
+                    {[
+                      "Lead Name",
+                      "Phone",
+                      "Email",
+                      "Lead Source",
+                      "Status",
+                      "Assigned To",
+                      "Last Activity",
+                      "Created At",
+                      "Priority",
+                      "Actions",
+                    ].map((column) => (
+                      <th
+                        key={column}
+                        scope="col"
+                        className="px-6 py-3 text-start"
+                      >
+                        <div className="flex items-center  gap-x-2">
+                          <span className="text-xs font-semibold uppercase  ">
+                            {column}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  filteredLeads.map((lead) => (
-                    <tr key={lead.id}>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="ps-6 py-2">
-                        <label
-                          htmlFor={`lead-${lead.id}`}
-                          className="flex"
-                        >
-                          <input
-                            type="checkbox"
-                            className="shrink-0 border-gray-300 rounded-sm text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none"
-                            id={`lead-${lead.id}`}
-                          />
-                          <span className="sr-only">
-                            Select {lead.name}
-                          </span>
-                        </label>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <div className="flex items-center gap-x-3">
-                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-700">
-                            {lead.initials}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">
-                              {lead.name}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {lead.id}
+                </thead>
+
+                <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+                  {filteredLeads.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={11}
+                        className="px-6 py-10 text-center text-sm text-gray-500"
+                      >
+                        No leads match “{searchTerm.trim()}”. Try a different search.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLeads.map((lead) => (
+                      <tr key={lead.id}>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="ps-6 py-2">
+                            <label
+                              htmlFor={`lead-${lead.id}`}
+                              className="flex"
+                            >
+                              <input
+                                type="checkbox"
+                                className="shrink-0 size-4 accent-red-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                                id={`lead-${lead.id}`}
+                              />
+                              <span className="sr-only">
+                                Select {lead.name}
+                              </span>
+                            </label>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <div className="flex items-center gap-x-3">
+
+                              <div className="flex flex-col">
+                                <span className={`text-sm font-medium  ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                  {lead.name}
+                                </span>
+                                <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                  {lead.id}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <a
+                              href={`tel:${lead.phone.replace(
+                                /[^0-9+]/g,
+                                ""
+                              )}`}
+                              className={`text-sm font-medium  
+                            ${theme === "dark" ? " text-gray-300 hover:text-orange-400" : " text-gray-900 hover:text-orange-800"}
+                            `}
+                            >
+                              {lead.phone}
+                            </a>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <a
+                              href={`mailto:${lead.email}`}
+                              className={`text-sm font-medium  
+                            ${theme === "dark" ? " text-gray-300   hover:text-blue-400" : " text-gray-900 hover:text-blue-600"}
+                            `}
+                            >
+                              {lead.email}
+                            </a>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              {lead.source}
                             </span>
                           </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <a
-                          href={`tel:${lead.phone.replace(
-                            /[^0-9+]/g,
-                            ""
-                          )}`}
-                          className="text-sm font-medium text-gray-600 hover:text-orange-800"
-                        >
-                          {lead.phone}
-                        </a>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <a
-                          href={`mailto:${lead.email}`}
-                          className="text-sm font-medium text-gray-900 hover:text-blue-600"
-                        >
-                          {lead.email}
-                        </a>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span className="text-sm text-gray-600">
-                          {lead.source}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                            statusStyles[lead.status] ||
-                            "text-gray-700 bg-gray-100 ring-1 ring-inset ring-gray-200"
-                          }`}
-                        >
-                          {lead.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span className="text-sm text-gray-600">
-                          {lead.assignedTo}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span className="text-sm text-gray-600">
-                          {lead.lastActivity}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span className="text-sm text-gray-600">
-                          {lead.createdAt}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                            priorityStyles[lead.priority] ||
-                            "text-gray-700 bg-gray-100 ring-1 ring-inset ring-gray-200"
-                          }`}
-                        >
-                          {lead.priority}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="size-px whitespace-nowrap">
-                      <div className="px-6 py-2">
-                        <div
-                          className="relative"
-                          data-actions-menu="true"
-                        >
-                          <button
-                            type="button"
-                            aria-label="Open actions menu"
-                            onClick={() => handleToggleActions(lead.id)}
-                            className="inline-flex items-center justify-center rounded-full border border-gray-200 p-2 text-gray-500 hover:text-gray-900 hover:border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              width="20"
-                              height="20"
-                              fill="none"
-                              className="text-gray-700"
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <StatusDropdown
+                              value={lead.status}
+                              theme={theme}
+                              onChange={(newStatus) => handleStatusUpdate(lead.id, newStatus)}
+                            />
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              {lead.assignedTo}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              {lead.lastActivity}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              {lead.createdAt}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <PriorityDropdown
+                              value={lead.priority}
+                              theme={theme}
+                              onChange={(newPriority) => handlePriorityUpdate(lead.id, newPriority)}
+                            />
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <div
+                              className="relative"
+                              data-actions-menu="true"
                             >
-                              <path
-                                d="M11.9967 11.5C12.549 11.5 12.9967 11.9477 12.9967 12.5C12.9967 13.0523 12.549 13.5 11.9967 13.5C11.4444 13.5 10.9967 13.0523 10.9967 12.5C10.9967 11.9477 11.4444 11.5 11.9967 11.5Z"
-                                stroke="#141B34"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path
-                                d="M11.9967 5.5C12.549 5.5 12.9967 5.94772 12.9967 6.5C12.9967 7.05228 12.549 7.5 11.9967 7.5C11.4444 7.5 10.9967 7.05228 10.9967 6.5C10.9967 5.94772 11.4444 5.5 11.9967 5.5Z"
-                                stroke="#141B34"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path
-                                d="M11.9967 17.5C12.549 17.5 12.9967 17.9477 12.9967 18.5C12.9967 19.0523 12.549 19.5 11.9967 19.5C11.4444 19.5 10.9967 19.0523 10.9967 18.5C10.9967 17.9477 11.4444 17.5 11.9967 17.5Z"
-                                stroke="#141B34"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </button>
+                              <button
+                                type="button"
+                                aria-label="Open actions menu"
+                                onClick={() => handleToggleActions(lead.id)}
+                                className={`inline-flex items-center justify-center rounded-full border p-2 text-gray-500 hover:text-gray-900  focus:outline-hidden 
+                                ${theme === "dark" ? "border-gray-700 text-gray-400" : "border-gray-200 hover:border-gray-300 text-gray-700 "}
+                                `}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  width="20"
+                                  height="20"
+                                  fill="none"
+                                  className="currentColor"
 
-                          {openActions === lead.id && (
-                            <div className="absolute right-0 z-10 mt-2 w-36 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 shadow-xl">
-                              {["View", "Edit", "Convert"].map(
-                                (action) => (
-                                  <button
-                                    key={action}
-                                    type="button"
-                                    className="flex w-full items-center px-4 py-2 hover:bg-gray-50"
-                                  >
-                                    {action}
-                                  </button>
-                                )
+                                >
+                                  <path
+                                    d="M11.9967 11.5C12.549 11.5 12.9967 11.9477 12.9967 12.5C12.9967 13.0523 12.549 13.5 11.9967 13.5C11.4444 13.5 10.9967 13.0523 10.9967 12.5C10.9967 11.9477 11.4444 11.5 11.9967 11.5Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M11.9967 5.5C12.549 5.5 12.9967 5.94772 12.9967 6.5C12.9967 7.05228 12.549 7.5 11.9967 7.5C11.4444 7.5 10.9967 7.05228 10.9967 6.5C10.9967 5.94772 11.4444 5.5 11.9967 5.5Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M11.9967 17.5C12.549 17.5 12.9967 17.9477 12.9967 18.5C12.9967 19.0523 12.549 19.5 11.9967 19.5C11.4444 19.5 10.9967 19.0523 10.9967 18.5C10.9967 17.9477 11.4444 17.5 11.9967 17.5Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </button>
+
+                              {openActions === lead.id && (
+                                <div className={`absolute right-0 z-10 mt-2 w-36 rounded-lg border  text-sm font-medium  shadow-xl
+                                ${theme === "dark" ? "bg-gray-800 text-gray-200 border-gray-700" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"}
+                                `}>
+                                  {["View", "Edit"].map(
+                                    (action) => (
+                                      <button
+                                        key={action}
+                                        type="button"
+                                        className={`flex w-full items-center px-4 py-2 
+                                        ${theme === "dark" ? " hover:bg-gray-700  " : " hover:bg-gray-100  "}
+                                      `}
+                                      >
+                                        {action}
+                                      </button>
+                                    )
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
             {/* End Table */}
 
             {/* Footer */}
-            <div className="px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t border-gray-200">
+            <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
               <div className="inline-flex items-center gap-x-2">
-                <p className="text-sm text-gray-600">Showing:10 of 20</p>
+                <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>Showing:10 of 20</p>
               </div>
 
               <div>
                 <div className="inline-flex gap-x-2">
                   <button
                     type="button"
-                    className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+                    className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
+                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
+                      : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
+                      }`}
                   >
                     <svg
                       className="shrink-0 size-4"
@@ -783,7 +871,10 @@ export default function LeadsPage() {
 
                   <button
                     type="button"
-                    className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+                    className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
+                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
+                      : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
+                      }`}
                   >
                     Next
                     <svg
@@ -819,32 +910,33 @@ export default function LeadsPage() {
                 return (
                   <div
                     key={status}
-                    className={`flex min-w-[350px] flex-col r bg-white  transition-all duration-200 ease-out ring-offset-2 ${
-                      dragOverStatus === status
-                        ? "ring-1  shadow-sm scale-[1.01]"
-                        : "ring-1 ring-transparent"
-                    }`}
+                    className={`flex min-w-[350px] flex-col r ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
+                      ? "ring-1  shadow-sm scale-[1.01]"
+                      : "ring-1 ring-transparent"
+                      }`}
                     onDragOver={handleDragOver}
                     onDragEnter={() => handleDragEnter(status)}
                     onDragLeave={() => handleDragLeave(status)}
                     onDrop={() => handleDrop(status)}
                   >
                     <div
-                      className={`flex items-center justify-between p-2 bg-gray-100/50 rounded-lg ${
-                        statusMeta?.style || "border-l-4 border-[#d4d4d8]"
-                      }`}
+                      className={`flex items-center justify-between p-2 ${theme === "dark" ? "bg-gray-800/10" : "bg-gray-100/50"} rounded-lg ${statusMeta?.style || "border-l-4 border-[#d4d4d8]"
+                        }`}
                     >
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className={`text-sm font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
                           {statusMeta?.name || status}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
                           {groupedLeads[status]?.length || 0} Leads
                         </p>
                       </div>
                       <button
                         type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-orange-200"
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border focus:outline-hidden focus:ring-2 focus:ring-orange-200 ${theme === "dark"
+                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                          }`}
                         aria-label={`Add lead to ${status}`}
                       >
                         <svg
@@ -863,56 +955,61 @@ export default function LeadsPage() {
                         </svg>
                       </button>
                     </div>
-                    <div className="mt-4 space-y-3">
+                    <div
+                      className="mt-4 space-y-3 min-h-[100px]"
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(status)}
+                    >
                       {groupedLeads[status] && groupedLeads[status].length > 0 ? (
                         groupedLeads[status].map((lead) => (
                           <div
                             key={lead.id}
-                            className={`rounded-lg border border-dashed border-gray-200 bg-white p-3 shadow-2xs cursor-move transition-all duration-200 ease-out transform-gpu hover:-translate-y-0.5 hover:shadow-xs ${
-                              draggedLeadId === lead.id
+                            className={`rounded-lg border border-dashed p-3 shadow-2xs cursor-move transition-all duration-200 ease-out transform-gpu hover:-translate-y-0.5 hover:shadow-xs ${theme === "dark"
+                                ? "border-gray-600 bg-gray-800/10"
+                                : "border-gray-200 bg-white"
+                              } ${draggedLeadId === lead.id
                                 ? "opacity-70 scale-[0.97]"
                                 : ""
-                            } ${
-                              recentlyMovedLead === lead.id
+                              } ${recentlyMovedLead === lead.id
                                 ? "animate-card-drop ring-1 ring-orange-200"
                                 : ""
-                            }`}
+                              }`}
                             draggable
                             aria-grabbed={draggedLeadId === lead.id}
                             onDragStart={() => handleDragStart(lead.id)}
                             onDragEnd={handleDragEnd}
+                            onDragOver={handleDragOver}
                           >
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-md font-bold text-gray-900">
+                                <p className={`text-md font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
                                   {lead.name}
                                 </p>
-                                <p className="text-xs text-gray-500">{lead.id}</p>
+                                <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{lead.id}</p>
                               </div>
                               <span
-                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                  priorityStyles[lead.priority] ||
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${priorityStyles[lead.priority]?.[theme === "dark" ? "dark" : "light"] ||
                                   "text-gray-700 bg-gray-100 ring-1 ring-inset ring-gray-200"
-                                }`}
+                                  }`}
                               >
                                 {lead.priority}
                               </span>
                             </div>
-                            <div className="mt-5 space-y-2 text-xs text-gray-600">
+                            <div className={`mt-5 space-y-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
                               <div className="flex items-center justify-between">
-                                <span className="font-medium text-gray-700">
+                                <span className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                                   Assigned to
                                 </span>
                                 <span>{lead.assignedTo}</span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="font-medium text-gray-700">
+                                <span className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                                   Activity
                                 </span>
                                 <span>{lead.lastActivity}</span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="font-medium text-gray-700">
+                                <span className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                                   Created
                                 </span>
                                 <span>{lead.createdAt}</span>
@@ -921,7 +1018,10 @@ export default function LeadsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="rounded-lg border border-dashed border-gray-300 bg-white p-3 text-center text-sm text-gray-500">
+                        <p className={`rounded-lg border border-dashed p-3 text-center text-sm ${theme === "dark"
+                            ? "border-gray-600 bg-gray-800/10 text-gray-400"
+                            : "border-gray-300 bg-white text-gray-500"
+                          }`}>
                           No leads yet
                         </p>
                       )}
