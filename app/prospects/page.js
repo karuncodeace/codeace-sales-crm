@@ -377,7 +377,7 @@ const handleApplyFilters = (filters) => {
                                     "Prospect Name",
                                     "Phone",
                                     "Email",
-                                    "Source",
+                                    "Lead Source",
                                     "Status",
                                     "Assigned To",
                                     "Last Activity",

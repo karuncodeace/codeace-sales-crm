@@ -14,18 +14,18 @@ export default function DashboardPage() {
       <div>
         <Cards/>
       </div>
-      <div className="grid  grid-cols-3  gap-4 mt-10">
+      <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-10">
         <div className="">
             <WeeklyLineChart />
         </div>
-        <div>
+        <div className="">
           <RevenueLineChart/>
         </div>
-        <div className="">
+        <div className="lg:col-span-2 xl:col-span-1">
             <DonutChart />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-2 gap-4 mt-10">
+      <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-2 gap-4 mt-10">
         <div>
           <BarChart />
         </div>

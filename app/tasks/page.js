@@ -409,12 +409,12 @@ export default function TasksPage() {
                     </div>
 
                     {/* RIGHT SIDE — Tab Filters */}
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="grid grid-cols-4 items-center overflow-x-auto  ">
                             {["all","overdue", "rescheduled", "completed"].map((f) => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
-                                    className={`px-3 py-1.5 text-sm font-medium transition ${
+                                    className={`px-3 py-1.5   text-sm font-medium transition  ${
                                         filter === f
                                             ? "text-white border-b border-orange-500"
                                             : theme === "dark"

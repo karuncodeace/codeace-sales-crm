@@ -19,7 +19,7 @@ export default function ToggleBtn() {
 
   return (
     <div
-      className={`px-4 py-3 rounded-full flex items-center gap-5 transition-all
+      className={`px-4 py-3 rounded-full flex items-center gap-5 transition-all md:px-3 md:py-1.5 xl:py-3
       ${theme === "light" ? "bg-white border border-gray-200 " : "bg-[#262626] border border-gray-700"}
     `}
     >

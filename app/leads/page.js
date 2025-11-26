@@ -430,7 +430,7 @@ export default function LeadsPage() {
               <path d="M5 12h14" />
               <path d="M12 5v14" />
             </svg>
-            Create
+            Add Lead
           </button>
         </div>
       </div>
