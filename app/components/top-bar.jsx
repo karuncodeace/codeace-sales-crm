@@ -23,7 +23,7 @@ export default function Header() {
         {/* Brand Logo and Name */}
         <div className="bg-white px-4 py-4 rounded-full flex items-center gap-3">
           <div className="">
-            <Image src="/Codeace logo.png" alt="logo" width={40} height={40} />
+            <Image src="/codeace-logo.png" alt="logo" width={40} height={40} />
           </div>
           <span className="text-gray-800 font-semibold text-lg">CodeAce</span>
         </div>

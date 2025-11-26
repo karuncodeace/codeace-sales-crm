@@ -410,20 +410,20 @@ export default function TasksPage() {
 
                     {/* RIGHT SIDE — Tab Filters */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {["overdue", "rescheduled", "completed"].map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`px-3 py-1.5 text-sm font-medium transition ${
-                                    filter === f
-                                        ? "text-white border-b border-orange-500"
-                                        : theme === "dark"
-                                            ? "text-gray-300"
-                                            : "text-gray-600"
-                                }`}
-                            >
-                                {f.charAt(0).toUpperCase() + f.slice(1)}
-                            </button>
+                            {["all","overdue", "rescheduled", "completed"].map((f) => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`px-3 py-1.5 text-sm font-medium transition ${
+                                        filter === f
+                                            ? "text-white border-b border-orange-500"
+                                            : theme === "dark"
+                                                ? "text-gray-300"
+                                                : "text-gray-600"
+                                    }`}
+                                >
+                                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                                </button>
                         ))}
                     </div>
                 </div>
