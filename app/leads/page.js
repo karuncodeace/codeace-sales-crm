@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { useTheme } from "../context/themeContext"
 import Header from "../components/header";
 import StatusDropdown from "../components/statusTooglebtn";
@@ -9,7 +10,12 @@ import PriorityDropdown from "../components/priorityTooglebtn";
 import FilterBtn from "../components/filterbtn";
 import AddLeadModal from "../components/addLeadModal";
 
-import { supabaseBrowser } from "../../lib/supabase/browserClient";
+// Fetcher function for SWR - calls the API route
+const fetchLeads = async () => {
+  const res = await fetch("/api/leads");
+  if (!res.ok) throw new Error("Failed to fetch leads");
+  return res.json();
+};
 
 
 const statusStyles = {
@@ -21,7 +27,7 @@ const statusStyles = {
     light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
     dark: "text-amber-500 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
   },
-  "Follow-up": {
+  "Follow-Up": {
     light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
     dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
   },
@@ -60,7 +66,13 @@ const priorityStyles = {
 
 export default function LeadsPage() {
   const router = useRouter();
-  const [leadData, setLeadData] = useState([]);
+  
+  // SWR for cached data fetching - data persists across navigations
+  const { data: leadData = [], mutate } = useSWR("leads", fetchLeads, {
+    revalidateOnFocus: false,      // Don't refetch when window regains focus
+    revalidateOnReconnect: false,  // Don't refetch on reconnect
+    dedupingInterval: 60000,       // Dedupe requests within 60 seconds
+  });
   const [openActions, setOpenActions] = useState(null);
   const [viewMode, setViewMode] = useState("table");
   const [draggedLeadId, setDraggedLeadId] = useState(null);
@@ -82,7 +94,8 @@ export default function LeadsPage() {
   };
 
   const handleAddLead = (newLead) => {
-    setLeadData((prev) => [newLead, ...prev]);
+    // Add new lead and revalidate from server
+    mutate([newLead, ...leadData], true);
   };
 
   const handleLeadClick = (leadId) => {
@@ -95,7 +108,7 @@ export default function LeadsPage() {
     () => [
       { id: "New", name: "New", style: "border-l-4 border-[#3B82F6]" },
       { id: "Contacted", name: "Contacted", style: "border-l-4 border-[#10B981]" },
-      { id: "Follow-up", name: "Follow-up", style: "border-l-4 border-[#EAB308]" },
+      { id: "Follow-Up", name: "Follow-Up", style: "border-l-4 border-[#EAB308]" },
       { id: "Qualified", name: "Qualified", style: "border-l-4 border-[#F97316]" },
       { id: "Proposal", name: "Proposal", style: "border-l-4 border-[#8B5CF6]" },
       { id: "Won", name: "Won", style: "border-l-4 border-[#22C55E]" },
@@ -179,19 +192,45 @@ export default function LeadsPage() {
     setDragOverStatus(null);
   };
 
-  const handleDrop = (status) => {
+  const handleDrop = async (status) => {
     if (!draggedLeadId) return;
 
-    setLeadData((prev) =>
-      prev.map((lead) =>
-        lead.id === draggedLeadId && lead.status !== status
-          ? { ...lead, status }
-          : lead
-      )
+    const leadId = draggedLeadId;
+    const currentLead = leadData.find((lead) => lead.id === leadId);
+    
+    // Skip if status hasn't changed
+    if (currentLead?.status === status) {
+      setDraggedLeadId(null);
+      setDragOverStatus(null);
+      return;
+    }
+
+    // Optimistically update via SWR cache
+    mutate(
+      leadData.map((lead) =>
+        lead.id === leadId ? { ...lead, status } : lead
+      ),
+      false
     );
-    setRecentlyMovedLead(draggedLeadId);
+    setRecentlyMovedLead(leadId);
     setDraggedLeadId(null);
     setDragOverStatus(null);
+
+    // Persist to backend
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, status }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update status");
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      // Revalidate to restore correct state on error
+      mutate();
+    }
   };
 
   const handleDragOver = (event) => {
@@ -206,51 +245,57 @@ export default function LeadsPage() {
     setDragOverStatus((prev) => (prev === status ? null : prev));
   };
 
-  const handleStatusUpdate = (leadId, newStatus) => {
-    setLeadData((prev) =>
-      prev.map((lead) =>
+  const handleStatusUpdate = async (leadId, newStatus) => {
+    // Optimistically update the UI
+    mutate(
+      leadData.map((lead) =>
         lead.id === leadId ? { ...lead, status: newStatus } : lead
-      )
+      ),
+      false // Don't revalidate
     );
+
+    // Persist to backend
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, status: newStatus }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update status");
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      // Revalidate to restore correct state on error
+      mutate();
+    }
   };
 
-  const handlePriorityUpdate = (leadId, newPriority) => {
-    setLeadData((prev) =>
-      prev.map((lead) =>
+  const handlePriorityUpdate = async (leadId, newPriority) => {
+    // Optimistically update the UI
+    mutate(
+      leadData.map((lead) =>
         lead.id === leadId ? { ...lead, priority: newPriority } : lead
-      )
+      ),
+      false // Don't revalidate
     );
-  };
-  useEffect(() => {
-    supabaseBrowser
-      .from("leads_table")
-      .select("*")
-      .then((res) => {
-       
-        if (res.data && res.data.length > 0) {
-          console.log("Raw data from Supabase:", res.data);
-          const mappedLeads = res.data.map((lead) => ({
-            id: lead.id,
-            name: lead.lead_name,
-            phone: lead.phone || "",
-            email: lead.email || "",
-            contactName: lead.contact_name || "",
-            source: lead.lead_source,
-            status: lead.status,
-            priority: lead.priority,
-            assignedTo: lead.assigned_to,
-            createdAt: lead.created_at 
-              ? new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : "",
-            lastActivity: lead.last_activity,
-          }));
-          console.log("Mapped leads:", mappedLeads);
-          setLeadData(mappedLeads);
-        } else {
-          console.log("No data returned from Supabase");
-        }
+
+    // Persist to backend
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, priority: newPriority }),
       });
-  }, []);
+      if (!res.ok) {
+        throw new Error("Failed to update priority");
+      }
+    } catch (error) {
+      console.error("Error updating priority:", error);
+      // Revalidate to restore correct state on error
+      mutate();
+    }
+  };
   useEffect(() => {
     if (!recentlyMovedLead) return;
     const timeout = setTimeout(() => setRecentlyMovedLead(null), 350);

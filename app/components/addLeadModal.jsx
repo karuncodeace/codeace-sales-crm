@@ -14,13 +14,13 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
     contactName: "",
     source: "",
     status: "New",
-    assignedTo: "",
     lastActivity: "",
     createdAt: new Date().toISOString().split("T")[0],
     priority: "Warm",
   });
 
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -41,66 +41,60 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
     }
     if (!formData.contactName.trim()) newErrors.contactName = "Contact name is required";
     if (!formData.source) newErrors.source = "Lead source is required";
-    if (!formData.assignedTo.trim()) newErrors.assignedTo = "Assigned to is required";
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    // Generate a unique ID
-    const newId = `LD-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    // Generate initials from lead name
-    const initials = formData.name
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+    setIsSubmitting(true);
 
-    // Format the created date
-    const createdDate = new Date(formData.createdAt);
-    const formattedDate = createdDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          contactName: formData.contactName,
+          source: formData.source,
+          status: formData.status,
+          priority: formData.priority,
+        }),
+      });
 
-    const newLead = {
-      id: newId,
-      name: formData.name,
-      initials,
-      phone: formData.phone,
-      email: formData.email,
-      contactName: formData.contactName,
-      source: formData.source,
-      status: formData.status,
-      assignedTo: formData.assignedTo,
-      lastActivity: formData.lastActivity || "Lead added · Just now",
-      createdAt: formattedDate,
-      priority: formData.priority,
-    };
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to create lead");
+      }
 
-    onAdd(newLead);
-    
-    // Reset form
-    setFormData({
-      name: "",
-      phone: "",
-      email: "",
-      contactName: "",
-      source: "",
-      status: "New",
-      assignedTo: "",
-      lastActivity: "",
-      createdAt: new Date().toISOString().split("T")[0],
-      priority: "Warm",
-    });
-    setErrors({});
-    onClose();
+      const { lead: newLead } = await res.json();
+      
+      onAdd(newLead);
+      
+      // Reset form
+      setFormData({
+        name: "",
+        phone: "",
+        email: "",
+        contactName: "",
+        source: "",
+        status: "New",
+        lastActivity: "",
+        createdAt: new Date().toISOString().split("T")[0],
+        priority: "Warm",
+      });
+      setErrors({});
+      onClose();
+    } catch (error) {
+      console.error("Error creating lead:", error);
+      setErrors({ submit: error.message });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -288,26 +282,6 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
               </select>
             </div>
 
-            {/* Assigned To */}
-            <div>
-              <label className={labelClass}>
-                Assigned To <span className="text-red-500">*</span>
-              </label>
-              <select
-                className={selectClass("assignedTo")}
-                value={formData.assignedTo}
-                onChange={(e) => updateField("assignedTo", e.target.value)}
-              >
-                <option value="">Select team member</option>
-                <option value="Sarah Lin">Sarah Lin</option>
-                <option value="Jorge Patel">Jorge Patel</option>
-                <option value="Priya Nair">Priya Nair</option>
-                <option value="Rachel Kim">Rachel Kim</option>
-                <option value="David Chen">David Chen</option>
-              </select>
-              {errors.assignedTo && <p className="mt-1 text-xs text-red-500">{errors.assignedTo}</p>}
-            </div>
-
             {/* Last Activity */}
             <div>
               <label className={labelClass}>Last Activity</label>
@@ -348,37 +322,56 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
         </div>
 
         {/* Footer */}
-        <div className={`flex justify-end gap-3 px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-          <button
-            onClick={handleClose}
-            className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isDark
-                ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div className={`flex flex-col gap-3 px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+          {errors.submit && (
+            <p className="text-sm text-red-500 text-center">{errors.submit}</p>
+          )}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isDark
+                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
-            Add Lead
-          </button>
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                  </svg>
+                  Add Lead
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
