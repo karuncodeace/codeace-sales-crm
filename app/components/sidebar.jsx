@@ -26,7 +26,7 @@ export default function Sidebar() {
   }
   const { theme } = useTheme();
   return (
-    <div className="flex flex-col  items-center pt-10   space-y-10 px-7 md:px-4 lg:px-5 xl:px-6">
+    <div className="flex flex-col   items-center pt-10   space-y-10 px-7 md:px-4 lg:px-5 xl:px-6 ">
       <div className={`flex flex-col items-center space-y-10  p-3 py-4 rounded-full
         ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}
         `}>

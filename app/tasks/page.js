@@ -5,6 +5,7 @@ import { useTheme } from "../context/themeContext";
 import PriorityDropdown from "../components/priorityTooglebtn";
 import RescheduleButton from "../components/RescheduleButton";
 import FilterBtn from "../components/filterbtn";
+import AddTaskModal from "../components/addTaskbtn";
 
 // Custom Icon Components
 const PhoneIcon = ({ className }) => (
@@ -191,6 +192,7 @@ export default function TasksPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
+    const [openAddTask, setOpenAddTask] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState({
         source: "",
         status: "",
@@ -202,6 +204,10 @@ export default function TasksPage() {
 
     const handleApplyFilters = (filters) => {
         setAdvancedFilters(filters);
+    };
+
+    const handleAddTask = (newTask) => {
+        setTasksData((prev) => [newTask, ...prev]);
     };
 
     const filteredTasks = useMemo(() => {
@@ -326,23 +332,11 @@ export default function TasksPage() {
                 <div>
                     <h1 className="text-4xl font-bold mb-1">Tasks</h1>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-orange-500 text-white hover:bg-orange-600 focus:outline-hidden focus:bg-orange-600 disabled:opacity-50 disabled:pointer-events-none">
-                        <svg
-                            className="shrink-0 size-4"
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <path d="M5 12h14" />
-                            <path d="M12 5v14" />
-                        </svg>
+                <div className="flex items-center gap-3 ">
+                    <AddTaskModal open={openAddTask} onClose={() => setOpenAddTask(false)} onAdd={handleAddTask} />
+                    <button 
+                        onClick={() => setOpenAddTask(true)}
+                        className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-orange-500 text-white hover:bg-orange-600 focus:outline-hidden focus:bg-orange-600 disabled:opacity-50 disabled:pointer-events-none">
                         Add Task
                     </button>
                 </div>
@@ -414,13 +408,16 @@ export default function TasksPage() {
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
-                                    className={`px-3 py-1.5   text-sm font-medium transition  ${
-                                        filter === f
-                                            ? "text-white border-b border-orange-500"
+                                    className={`px-3 py-1.5 text-sm font-medium transition 
+                                        ${filter === f
+                                            ? theme === "dark"
+                                                ? "text-white border-b border-orange-500"
+                                                : "text-black border-b border-orange-500"
                                             : theme === "dark"
                                                 ? "text-gray-300"
-                                                : "text-gray-600"
-                                    }`}
+                                                : "text-gray-700"
+                                        }`}
+                                    
                                 >
                                     {f.charAt(0).toUpperCase() + f.slice(1)}
                                 </button>
@@ -672,7 +669,7 @@ export default function TasksPage() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span className={`text-xs italic ${theme === "dark" ? "text-gray-600" : "text-gray-400"}`}>
+                                                    <span className={`text-xs italic ${theme === "dark" ? "text-gray-300" : "text-gray-400"}`}>
                                                         No comments
                                                     </span>
                                                 )}

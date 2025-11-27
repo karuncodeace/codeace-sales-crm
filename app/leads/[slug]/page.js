@@ -19,7 +19,7 @@ export default function LeadDetailPage() {
     ];
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6  pl-0 pt-10">
             {/* BACK BUTTON */}
             <button
                 onClick={() => router.back()}
@@ -337,7 +337,9 @@ export default function LeadDetailPage() {
                                     Add Note
                                 </button>
                             </div>
-                            <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                            <div className={`p-4 rounded-lg ${theme === "dark" ? "" : "bg-gray-50"}`}>
+                                <li>
+                                <ul>
                                 <p className={`text-sm leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
                                     Client is interested in our enterprise plan. They need integration with their existing Salesforce CRM. 
                                     Budget approved by their finance team. Decision maker is the CTO - schedule a demo call next week.
@@ -348,6 +350,8 @@ export default function LeadDetailPage() {
                                     </div>
                                     <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Arun Kumar • Nov 25, 2025</span>
                                 </div>
+                                </ul>
+                                </li>
                             </div>
                         </div>
                     </div>

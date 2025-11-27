@@ -9,8 +9,10 @@ import RevenueAreaChart from "../components/charts/areachart";
 import Header from "../components/header";
 export default function DashboardPage() {
   return (
+    <>
     <div className="pl-5 md:pl-0 2xl:pl-0  w-[98%]">
       <Header name="John Doe" currentPage="Dashboard" />
+
       <div>
         <Cards/>
       </div>
@@ -37,5 +39,6 @@ export default function DashboardPage() {
         
       </div>
     </div>
+  </>
   );
 }

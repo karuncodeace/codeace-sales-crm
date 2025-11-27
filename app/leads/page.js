@@ -7,6 +7,10 @@ import Header from "../components/header";
 import StatusDropdown from "../components/statusTooglebtn";
 import PriorityDropdown from "../components/priorityTooglebtn";
 import FilterBtn from "../components/filterbtn";
+import AddLeadModal from "../components/addLeadModal";
+
+import { supabaseBrowser } from "../../lib/supabase/browserClient";
+
 
 const statusStyles = {
   New: {
@@ -53,213 +57,10 @@ const priorityStyles = {
 
 
 
-const initialLeads = [
-  {
-    id: "LD-1203",
-    name: "Guideline Labs",
-    initials: "GL",
-    phone: "+1 (555) 204-8890",
-    email: "amanda@site.com",
-  
-    contactName: "John Doe",
-    source: "Meta Ads",
-    status: "New",
-    assignedTo: "Sarah Lin",
-    lastActivity: "Call done · 45m ago",
-    createdAt: "Nov 12, 2025",
-    priority: "Hot",
-  },
-  {
-    id: "LD-1188",
-    name: "Northwind Foods",
-    initials: "NF",
-    phone: "+1 (555) 449-1100",
-    email: "matthew@northwind.io",
-    
-    contactName: "Matthew Johnson",
-    source: "Google Ads",
-    status: "Contacted",
-    assignedTo: "Jorge Patel",
-    lastActivity: "Meeting done · Yesterday",
-    createdAt: "Nov 3, 2025",
-    priority: "Warm",
-  },
-  {
-    id: "LD-1172",
-    name: "Lumina Studio",
-    initials: "LS",
-    phone: "+1 (555) 300-7770",
-    email: "hello@lumina.studio",
-    contactName: "Priya Nair",
-    source: "Referral",
-    status: "Follow-up",
-    assignedTo: "Priya Nair",
-    lastActivity: "Call scheduled · Tomorrow",
-    createdAt: "Oct 27, 2025",
-    priority: "Cold",
-  },
-
-  // --- Additional 12 Leads ---
-  {
-    id: "LD-1210",
-    name: "Evergreen Solutions",
-    initials: "ES",
-    phone: "+1 (555) 980-3321",
-    email: "contact@evergreensol.com",
-    contactName: "Emily Wilson",
-    source: "LinkedIn",
-    status: "New",
-    assignedTo: "Sarah Lin",
-    lastActivity: "Form submitted · 10m ago",
-    createdAt: "Nov 18, 2025",
-    priority: "Hot",
-  },
-  {
-    id: "LD-1208",
-    name: "Brightwave Media",
-    initials: "BM",
-    phone: "+1 (555) 722-5541",
-    email: "team@brightwave.media",
-    contactName: "David Brown",
-    source: "Google Ads",
-    status: "Contacted",
-    assignedTo: "Jorge Patel",
-    lastActivity: "Email sent · 1h ago",
-    createdAt: "Nov 15, 2025",
-    priority: "Warm",
-  },
-  {
-    id: "LD-1201",
-    name: "Pioneer Logistics",
-    initials: "PL",
-    phone: "+1 (555) 410-9981",
-    email: "support@pioneerlogi.com",
-    contactName: "Olivia Davis",
-    source: "Cold Outreach",
-    status: "Noresponse",
-    assignedTo: "Rachel Kim",
-    lastActivity: "Voicemail left · 2 days ago",
-    createdAt: "Nov 10, 2025",
-    priority: "Cold",
-  },
-  {
-    id: "LD-1196",
-    name: "Zenith Apparel",
-    initials: "ZA",
-    phone: "+1 (555) 201-4420",
-    email: "info@zenithapparel.co",
-    contactName: "James Miller",
-    source: "Meta Ads",
-    status: "New",
-    assignedTo: "Sarah Lin",
-    lastActivity: "Form submitted · 30m ago",
-    createdAt: "Nov 7, 2025",
-    priority: "Hot",
-  },
-  {
-    id: "LD-1190",
-    name: "Harbor Tech",
-    initials: "HT",
-    phone: "+1 (555) 662-9910",
-    email: "contact@harbortech.dev",
-    contactName: "Sophia Martinez",
-    source: "Referral",
-    status: "Qualified",
-    assignedTo: "Priya Nair",
-    lastActivity: "Proposal sent · Today",
-    createdAt: "Nov 1, 2025",
-    priority: "Warm",
-  },
-  {
-    id: "LD-1182",
-    name: "Orbit Consultancy",
-    initials: "OC",
-    phone: "+1 (555) 389-6541",
-    email: "hello@orbit.consult",
-    contactName: "Daniel Anderson",
-    source: "Google Ads",
-    status: "Follow-up",
-    assignedTo: "Jorge Patel",
-    lastActivity: "Follow-up email · 3h ago",
-    createdAt: "Oct 29, 2025",
-    priority: "Cold",
-  },
-  {
-    id: "LD-1179",
-    name: "Silverline Fintech",
-    initials: "SF",
-    phone: "+1 (555) 520-7333",
-    email: "team@silverlinefin.com",
-    contactName: "Isabella Rodriguez",
-    source: "LinkedIn",
-    status: "New",
-    assignedTo: "Rachel Kim",
-    lastActivity: "Lead added · Today",
-    createdAt: "Oct 28, 2025",
-    priority: "Hot",
-  },
-  {
-    id: "LD-1175",
-    name: "Crestwood Realty",
-    initials: "CR",
-    phone: "+1 (555) 300-1129",
-    email: "contact@crestwoodrealty.us",
-    contactName: "William Wilson",
-    source: "Cold Outreach",
-    status: "Contacted",
-    assignedTo: "Priya Nair",
-    lastActivity: "Call done · 4h ago",
-    createdAt: "Oct 27, 2025",
-    priority: "Warm",
-  },
-
-  {
-    id: "LD-1165",
-    name: "UrbanKite Designs",
-    initials: "UD",
-    phone: "+1 (555) 299-7728",
-    email: "design@urbankite.co",
-    contactName: "Ethan Garcia",
-    source: "Referral",
-    status: "Qualified",
-    assignedTo: "Jorge Patel",
-    lastActivity: "Meeting scheduled · Tomorrow",
-    createdAt: "Oct 18, 2025",
-    priority: "Warm",
-  },
-  {
-    id: "LD-1162",
-    name: "Summit Accounting",
-    initials: "SA",
-    phone: "+1 (555) 930-4417",
-    email: "info@summitacct.com",
-    contactName: "Ava Martinez",
-    source: "LinkedIn",
-    status: "No Response",
-    assignedTo: "Rachel Kim",
-    lastActivity: "Email opened · 2 days ago",
-    createdAt: "Oct 15, 2025",
-    priority: "Cold",
-  },
-  {
-    id: "LD-1160",
-    name: "Evergreen Solutions",
-    initials: "ES",
-    phone: "+1 (555) 300-7770",
-    email: "contact@evergreensol.com",
-    contactName: "Emily Wilson",
-    source: "Referral",
-    status: "New",
-    assignedTo: "Priya Nair",
-    lastActivity: "Lead added · Today",
-    createdAt: "Oct 27, 2025",
-    priority: "Hot",
-  }
-];
 
 export default function LeadsPage() {
   const router = useRouter();
-  const [leadData, setLeadData] = useState(initialLeads);
+  const [leadData, setLeadData] = useState([]);
   const [openActions, setOpenActions] = useState(null);
   const [viewMode, setViewMode] = useState("table");
   const [draggedLeadId, setDraggedLeadId] = useState(null);
@@ -268,6 +69,7 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [openFilter, setOpenFilter] = useState(false);
+  const [openAddLead, setOpenAddLead] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({
     source: "",
     status: "",
@@ -277,6 +79,10 @@ export default function LeadsPage() {
   });
   const handleApplyFilters = (filters) => {
     setAdvancedFilters(filters);
+  };
+
+  const handleAddLead = (newLead) => {
+    setLeadData((prev) => [newLead, ...prev]);
   };
 
   const handleLeadClick = (leadId) => {
@@ -415,7 +221,36 @@ export default function LeadsPage() {
       )
     );
   };
-
+  useEffect(() => {
+    supabaseBrowser
+      .from("leads_table")
+      .select("*")
+      .then((res) => {
+       
+        if (res.data && res.data.length > 0) {
+          console.log("Raw data from Supabase:", res.data);
+          const mappedLeads = res.data.map((lead) => ({
+            id: lead.id,
+            name: lead.lead_name,
+            phone: lead.phone || "",
+            email: lead.email || "",
+            contactName: lead.contact_name || "",
+            source: lead.lead_source,
+            status: lead.status,
+            priority: lead.priority,
+            assignedTo: lead.assigned_to,
+            createdAt: lead.created_at 
+              ? new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : "",
+            lastActivity: lead.last_activity,
+          }));
+          console.log("Mapped leads:", mappedLeads);
+          setLeadData(mappedLeads);
+        } else {
+          console.log("No data returned from Supabase");
+        }
+      });
+  }, []);
   useEffect(() => {
     if (!recentlyMovedLead) return;
     const timeout = setTimeout(() => setRecentlyMovedLead(null), 350);
@@ -448,7 +283,9 @@ export default function LeadsPage() {
           <h1 className="text-4xl font-bold mb-1">Leads Management</h1>
         </div>
         <div>
-          <button className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-orange-500 text-white hover:bg-orange-600 focus:outline-hidden focus:bg-orange-600 disabled:opacity-50 disabled:pointer-events-none">
+          <button 
+            onClick={() => setOpenAddLead(true)}
+            className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-orange-500 text-white hover:bg-orange-600 focus:outline-hidden focus:bg-orange-600 disabled:opacity-50 disabled:pointer-events-none">
             <svg
               className="shrink-0 size-4"
               xmlns="http://www.w3.org/2000/svg"
@@ -523,6 +360,7 @@ export default function LeadsPage() {
                 Filter
               </button>
               <FilterBtn open={openFilter} onClose={() => setOpenFilter(false)} onApply={handleApplyFilters} />
+              <AddLeadModal open={openAddLead} onClose={() => setOpenAddLead(false)} onAdd={handleAddLead} />
             </div>
           </div>
 
