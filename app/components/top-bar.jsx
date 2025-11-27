@@ -25,7 +25,7 @@ export default function Header() {
     <div className={`w-full transition-colors duration-300 bg-transparent`}>
       <div className="max-w-[1900px] mx-auto flex justify-between items-center pt-4 md:pt-6 pb-2 px-3 sm:px-4 md:px-3 gap-2 sm:gap-3 md:gap-3 ">
         {/* Brand Logo and Name */}
-        <div className="bg-white px-3 py-3 md:px-4 md:py-4 rounded-full flex items-center gap-2 md:gap-3 shrink-0">
+        <div className="bg-white px-3 py-3 md:px-4 md:py-2 rounded-full flex items-center gap-2 md:gap-3 shrink-0">
           <div>
             <Image src="/codeace-logo.png" alt="logo" width={40} height={40} className="w-8 h-8 md:w-10 md:h-10" />
           </div>
@@ -56,7 +56,7 @@ export default function Header() {
         </button>
 
         {/* Search Bar - Hidden on mobile, shown on lg+ */}
-        <div className={`hidden lg:flex px-4 py-3 xl:py-4 rounded-full items-center gap-3 flex-1 max-w-2xl mx-4
+        <div className={`hidden lg:flex px-4 py-3 xl:py-3 rounded-full items-center gap-3 flex-1 max-w-2xl mx-4
           ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-white" 
             : "bg-white border border-gray-200 text-gray-700"
           }
@@ -112,7 +112,7 @@ export default function Header() {
           </div>
 
           {/* Utility Icons */}
-          <div className={`px-3 py-3 md:px-4 md:py-3  xl:py-4.5 rounded-full flex items-center gap-3 md:gap-5 md:px-3 
+          <div className={`px-3 py-3 md:px-4 md:py-3  xl:py-3 rounded-full flex items-center gap-3 md:gap-5 md:px-3 
             ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
             {/* Notifications Icon */}
             <button className={`transition-colors relative
@@ -178,7 +178,7 @@ export default function Header() {
           </div>
 
           {/* User Profile */}
-          <div className={`px-2 py-2 sm:px-3 md:px-4 md:py-1.5 xl:py-3 rounded-full flex items-center gap-2 md:gap-3
+          <div className={`px-2 py-2 sm:px-3 md:px-4 md:py-1.5 xl:py-1.5 rounded-full flex items-center gap-2 md:gap-3
             ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}
           `}>
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-200 flex items-center justify-center text-white font-semibold overflow-hidden shrink-0">

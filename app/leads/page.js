@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "../context/themeContext"
 import Header from "../components/header";
 import StatusDropdown from "../components/statusTooglebtn";
@@ -59,6 +60,8 @@ const initialLeads = [
     initials: "GL",
     phone: "+1 (555) 204-8890",
     email: "amanda@site.com",
+  
+    contactName: "John Doe",
     source: "Meta Ads",
     status: "New",
     assignedTo: "Sarah Lin",
@@ -72,6 +75,8 @@ const initialLeads = [
     initials: "NF",
     phone: "+1 (555) 449-1100",
     email: "matthew@northwind.io",
+    
+    contactName: "Matthew Johnson",
     source: "Google Ads",
     status: "Contacted",
     assignedTo: "Jorge Patel",
@@ -85,6 +90,7 @@ const initialLeads = [
     initials: "LS",
     phone: "+1 (555) 300-7770",
     email: "hello@lumina.studio",
+    contactName: "Priya Nair",
     source: "Referral",
     status: "Follow-up",
     assignedTo: "Priya Nair",
@@ -100,6 +106,7 @@ const initialLeads = [
     initials: "ES",
     phone: "+1 (555) 980-3321",
     email: "contact@evergreensol.com",
+    contactName: "Emily Wilson",
     source: "LinkedIn",
     status: "New",
     assignedTo: "Sarah Lin",
@@ -113,6 +120,7 @@ const initialLeads = [
     initials: "BM",
     phone: "+1 (555) 722-5541",
     email: "team@brightwave.media",
+    contactName: "David Brown",
     source: "Google Ads",
     status: "Contacted",
     assignedTo: "Jorge Patel",
@@ -126,6 +134,7 @@ const initialLeads = [
     initials: "PL",
     phone: "+1 (555) 410-9981",
     email: "support@pioneerlogi.com",
+    contactName: "Olivia Davis",
     source: "Cold Outreach",
     status: "Noresponse",
     assignedTo: "Rachel Kim",
@@ -139,6 +148,7 @@ const initialLeads = [
     initials: "ZA",
     phone: "+1 (555) 201-4420",
     email: "info@zenithapparel.co",
+    contactName: "James Miller",
     source: "Meta Ads",
     status: "New",
     assignedTo: "Sarah Lin",
@@ -152,6 +162,7 @@ const initialLeads = [
     initials: "HT",
     phone: "+1 (555) 662-9910",
     email: "contact@harbortech.dev",
+    contactName: "Sophia Martinez",
     source: "Referral",
     status: "Qualified",
     assignedTo: "Priya Nair",
@@ -165,6 +176,7 @@ const initialLeads = [
     initials: "OC",
     phone: "+1 (555) 389-6541",
     email: "hello@orbit.consult",
+    contactName: "Daniel Anderson",
     source: "Google Ads",
     status: "Follow-up",
     assignedTo: "Jorge Patel",
@@ -178,6 +190,7 @@ const initialLeads = [
     initials: "SF",
     phone: "+1 (555) 520-7333",
     email: "team@silverlinefin.com",
+    contactName: "Isabella Rodriguez",
     source: "LinkedIn",
     status: "New",
     assignedTo: "Rachel Kim",
@@ -191,6 +204,7 @@ const initialLeads = [
     initials: "CR",
     phone: "+1 (555) 300-1129",
     email: "contact@crestwoodrealty.us",
+    contactName: "William Wilson",
     source: "Cold Outreach",
     status: "Contacted",
     assignedTo: "Priya Nair",
@@ -205,6 +219,7 @@ const initialLeads = [
     initials: "UD",
     phone: "+1 (555) 299-7728",
     email: "design@urbankite.co",
+    contactName: "Ethan Garcia",
     source: "Referral",
     status: "Qualified",
     assignedTo: "Jorge Patel",
@@ -218,6 +233,7 @@ const initialLeads = [
     initials: "SA",
     phone: "+1 (555) 930-4417",
     email: "info@summitacct.com",
+    contactName: "Ava Martinez",
     source: "LinkedIn",
     status: "No Response",
     assignedTo: "Rachel Kim",
@@ -225,9 +241,24 @@ const initialLeads = [
     createdAt: "Oct 15, 2025",
     priority: "Cold",
   },
+  {
+    id: "LD-1160",
+    name: "Evergreen Solutions",
+    initials: "ES",
+    phone: "+1 (555) 300-7770",
+    email: "contact@evergreensol.com",
+    contactName: "Emily Wilson",
+    source: "Referral",
+    status: "New",
+    assignedTo: "Priya Nair",
+    lastActivity: "Lead added · Today",
+    createdAt: "Oct 27, 2025",
+    priority: "Hot",
+  }
 ];
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [leadData, setLeadData] = useState(initialLeads);
   const [openActions, setOpenActions] = useState(null);
   const [viewMode, setViewMode] = useState("table");
@@ -248,6 +279,9 @@ export default function LeadsPage() {
     setAdvancedFilters(filters);
   };
 
+  const handleLeadClick = (leadId) => {
+    router.push(`/leads/${leadId}`);
+  };
 
   const { theme } = useTheme();
 
@@ -435,7 +469,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
+      <div className={`h-[calc(100vh-120px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
         {/* Header */}
         <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
           {/* LEFT SIDE — Title + Search */}
@@ -619,6 +653,7 @@ export default function LeadsPage() {
                       "Lead Name",
                       "Phone",
                       "Email",
+                      "Contact Name",
                       "Lead Source",
                       "Status",
                       "Assigned To",
@@ -676,8 +711,11 @@ export default function LeadsPage() {
                           <div className="px-6 py-2">
                             <div className="flex items-center gap-x-3">
 
-                              <div className="flex flex-col">
-                                <span className={`text-sm font-medium  ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                              <div 
+                                className="flex flex-col cursor-pointer"
+                                onClick={() => handleLeadClick(lead.id)}
+                              >
+                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                                   {lead.name}
                                 </span>
                                 <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
@@ -712,6 +750,13 @@ export default function LeadsPage() {
                             >
                               {lead.email}
                             </a>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                              {lead.contactName || "—"}
+                            </span>
                           </div>
                         </td>
                         <td className="size-px whitespace-nowrap">
@@ -811,19 +856,23 @@ export default function LeadsPage() {
                                 <div className={`absolute right-0 z-10 mt-2 w-36 rounded-lg border  text-sm font-medium  shadow-xl
                                 ${theme === "dark" ? "bg-gray-800 text-gray-200 border-gray-700" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"}
                                 `}>
-                                  {["View", "Edit"].map(
-                                    (action) => (
-                                      <button
-                                        key={action}
-                                        type="button"
-                                        className={`flex w-full items-center px-4 py-2 
-                                        ${theme === "dark" ? " hover:bg-gray-700  " : " hover:bg-gray-100  "}
-                                      `}
-                                      >
-                                        {action}
-                                      </button>
-                                    )
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLeadClick(lead.id)}
+                                    className={`flex w-full items-center px-4 py-2 
+                                    ${theme === "dark" ? " hover:bg-gray-700  " : " hover:bg-gray-100  "}
+                                  `}
+                                  >
+                                    View
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`flex w-full items-center px-4 py-2 
+                                    ${theme === "dark" ? " hover:bg-gray-700  " : " hover:bg-gray-100  "}
+                                  `}
+                                  >
+                                    Edit
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -979,10 +1028,11 @@ export default function LeadsPage() {
                             onDragStart={() => handleDragStart(lead.id)}
                             onDragEnd={handleDragEnd}
                             onDragOver={handleDragOver}
+                            onClick={() => handleLeadClick(lead.id)}
                           >
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className={`text-md font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                                <p className={`text-md font-bold hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
                                   {lead.name}
                                 </p>
                                 <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{lead.id}</p>
