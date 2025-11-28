@@ -1,235 +1,45 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import useSWR, { mutate } from "swr";
 import { useTheme } from "../context/themeContext";
 import StatusDropdown from "../components/statusTooglebtn";
 import PriorityDropdown from "../components/priorityTooglebtn";
 import FilterBtn from "../components/filterbtn";
 
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
-
-
-const initialProspects = [
-    {
-        id: "PR-1001",
-        name: "John Doe",
-        phone: "+1 (555) 987-6543",
-        email: "john@example.com",
-        source: "Meta Ads",
-        status: "Qualified",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Call done · 2 days ago",
-        createdAt: "Nov 20, 2025",
-        priority: "Hot",
-        successRate: 78,
-    },
-    {
-        id: "PR-1002",
-        name: "Priya Sharma",
-        phone: "+1 (555) 987-1122",
-        email: "priya@example.com",
-        source: "Google Ads",
-        status: "Proposal",
-        assignedTo: "Jorge Patel",
-        lastActivity: "Proposal sent · 1 day ago",
-        createdAt: "Nov 18, 2025",
-        priority: "Warm",
-        successRate: 72,
-    },
-    {
-        id: "PR-1003",
-        name: "Michael Lee",
-        phone: "+1 (555) 998-8776",
-        email: "michael@example.com",
-        source: "Website Form",
-        status: "Qualified",
-        assignedTo: "Priya Nair",
-        lastActivity: "Meeting scheduled · Tomorrow",
-        createdAt: "Nov 15, 2025",
-        priority: "Cold",
-        successRate: 65,
-    },
-    {
-        id: "PR-1004",
-        name: "Emma Wilson",
-        phone: "+1 (555) 234-5678",
-        email: "emma@techcorp.io",
-        source: "Referral",
-        status: "Proposal",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Email sent · 3h ago",
-        createdAt: "Nov 12, 2025",
-        priority: "Hot",
-        successRate: 89,
-    },
-    {
-        id: "PR-1005",
-        name: "David Chen",
-        phone: "+1 (555) 345-6789",
-        email: "david@startup.co",
-        source: "LinkedIn",
-        status: "Qualified",
-        assignedTo: "Jorge Patel",
-        lastActivity: "Demo completed · Yesterday",
-        createdAt: "Nov 10, 2025",
-        priority: "Warm",
-        successRate: 74,
-    },
-
-    // ⭐ New Added Prospects ⭐
-
-    {
-        id: "PR-1006",
-        name: "Sophia Brown",
-        phone: "+1 (555) 223-8844",
-        email: "sophia.b@example.com",
-        source: "YouTube Ads",
-        status: "Proposal",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Follow-up scheduled · 4h ago",
-        createdAt: "Nov 09, 2025",
-        priority: "Hot",
-        successRate: 81,
-    },
-    {
-        id: "PR-1007",
-        name: "Carlos Martinez",
-        phone: "+1 (555) 998-1123",
-        email: "carlos@bizgroup.com",
-        source: "Google Ads",
-        status: "Qualified",
-        assignedTo: "Jorge Patel",
-        lastActivity: "Call missed · 6h ago",
-        createdAt: "Nov 07, 2025",
-        priority: "Warm",
-        successRate: 68,
-    },
-    {
-        id: "PR-1008",
-        name: "Ayesha Khan",
-        phone: "+1 (555) 667-4433",
-        email: "ayesha.k@example.com",
-        source: "Website Form",
-        status: "Proposal",
-        assignedTo: "Priya Nair",
-        lastActivity: "Docs requested · 3 days ago",
-        createdAt: "Nov 05, 2025",
-        priority: "Cold",
-        successRate: 70,
-    },
-    {
-        id: "PR-1009",
-        name: "Robert Young",
-        phone: "+1 (555) 556-7788",
-        email: "robert@cloudtech.ai",
-        source: "Referral",
-        status: "Qualified",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Intro call done · 5 days ago",
-        createdAt: "Nov 04, 2025",
-        priority: "Hot",
-        successRate: 92,
-    },
-    {
-        id: "PR-1010",
-        name: "Lily Anderson",
-        phone: "+1 (555) 452-8811",
-        email: "lily.a@example.com",
-        source: "LinkedIn",
-        status: "Proposal",
-        assignedTo: "Jorge Patel",
-        lastActivity: "Viewed proposal · 1h ago",
-        createdAt: "Nov 02, 2025",
-        priority: "Warm",
-        successRate: 88,
-    },
-    {
-        id: "PR-1011",
-        name: "Ryan Matthews",
-        phone: "+1 (555) 221-5522",
-        email: "ryan@innovix.co",
-        source: "Website Form",
-        status: "Qualified",
-        assignedTo: "Priya Nair",
-        lastActivity: "Awaiting callback · 1 day ago",
-        createdAt: "Nov 01, 2025",
-        priority: "Cold",
-        successRate: 67,
-    },
-    {
-        id: "PR-1012",
-        name: "Isabella Flores",
-        phone: "+1 (555) 878-3344",
-        email: "isabella.f@example.com",
-        source: "Google Ads",
-        status: "Proposal",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Pricing shared · 2h ago",
-        createdAt: "Oct 31, 2025",
-        priority: "Hot",
-        successRate: 95,
-    },
-    {
-        id: "PR-1013",
-        name: "Benjamin Carter",
-        phone: "+1 (555) 441-9911",
-        email: "ben.carter@example.com",
-        source: "YouTube Ads",
-        status: "Qualified",
-        assignedTo: "Jorge Patel",
-        lastActivity: "Lead warmed · 20m ago",
-        createdAt: "Oct 29, 2025",
-        priority: "Warm",
-        successRate: 72,
-    },
-    {
-        id: "PR-1014",
-        name: "Clara Lewis",
-        phone: "+1 (555) 781-4466",
-        email: "clara.l@example.com",
-        source: "Referral",
-        status: "Proposal",
-        assignedTo: "Priya Nair",
-        lastActivity: "Contract shared · Yesterday",
-        createdAt: "Oct 27, 2025",
-        priority: "Hot",
-        successRate: 86,
-    },
-    {
-        id: "PR-1015",
-        name: "Ethan Walker",
-        phone: "+1 (555) 318-7222",
-        email: "ethan.w@example.com",
-        source: "Meta Ads",
-        status: "Qualified",
-        assignedTo: "Sarah Lin",
-        lastActivity: "Discussed budget · Today",
-        createdAt: "Oct 25, 2025",
-        priority: "Warm",
-        successRate: 76,
-    },
-];
-
+const LoaderIcon = ({ className }) => (
+    <svg className={`animate-spin ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
 
 export default function ProspectsPage() {
-    const [prospectsData, setProspectsData] = useState(initialProspects);
     const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const { theme } = useTheme();
     const [filter, setFilter] = useState("all");
-const [openFilter, setOpenFilter] = useState(false);
-const [advancedFilters, setAdvancedFilters] = useState({
-    source: "",
-    status: "",
-    assignedTo: "",
-    priority: "",
-    type: "",
-});
-const handleApplyFilters = (filters) => {
-    setAdvancedFilters(filters);
-};
+    const [openFilter, setOpenFilter] = useState(false);
+    const [advancedFilters, setAdvancedFilters] = useState({
+        source: "",
+        status: "",
+        assignedTo: "",
+        priority: "",
+        type: "",
+    });
+
+    // Fetch prospects from API (leads with conversion_chance >= 60)
+    const { data: prospectsData, error: prospectsError, isLoading } = useSWR("/api/prospects", fetcher);
+
+    const handleApplyFilters = (filters) => {
+        setAdvancedFilters(filters);
+    };
 
     const filteredProspects = useMemo(() => {
+        if (!prospectsData || !Array.isArray(prospectsData)) return [];
+        
         let result = prospectsData;
 
         // Apply advanced filters
@@ -269,20 +79,40 @@ const handleApplyFilters = (filters) => {
         return result;
     }, [prospectsData, searchTerm, advancedFilters]);
 
-    const handleStatusUpdate = (prospectId, newStatus) => {
-        setProspectsData((prev) =>
-            prev.map((prospect) =>
-                prospect.id === prospectId ? { ...prospect, status: newStatus } : prospect
-            )
-        );
+    const handleStatusUpdate = async (prospectId, newStatus) => {
+        try {
+            const response = await fetch("/api/prospects", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: prospectId, status: newStatus }),
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to update status");
+            }
+            
+            mutate("/api/prospects");
+        } catch (error) {
+            console.error("Error updating status:", error);
+        }
     };
 
-    const handlePriorityUpdate = (prospectId, newPriority) => {
-        setProspectsData((prev) =>
-            prev.map((prospect) =>
-                prospect.id === prospectId ? { ...prospect, priority: newPriority } : prospect
-            )
-        );
+    const handlePriorityUpdate = async (prospectId, newPriority) => {
+        try {
+            const response = await fetch("/api/prospects", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: prospectId, priority: newPriority }),
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to update priority");
+            }
+            
+            mutate("/api/prospects");
+        } catch (error) {
+            console.error("Error updating priority:", error);
+        }
     };
 
     const handleToggleActions = (prospectId) => {
@@ -302,11 +132,33 @@ const handleApplyFilters = (filters) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [openActions]);
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <LoaderIcon className={`w-8 h-8 ${theme === "dark" ? "text-orange-400" : "text-orange-500"}`} />
+            </div>
+        );
+    }
+
+    if (prospectsError) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className={`text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    <p className="text-lg">Failed to load prospects</p>
+                    <p className="text-sm mt-2">Please try refreshing the page</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="pl-5 md:pl-0 2xl:pl-0 w-[98%]">
             <div className="mt-10 flex justify-between items-center">
                 <div>
                     <h1 className="text-4xl font-bold mb-1">Prospects</h1>
+                    <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        Leads with 60%+ conversion chance
+                    </p>
                 </div>
                 <div>
                     <button
@@ -350,10 +202,10 @@ const handleApplyFilters = (filters) => {
                         </svg>
                         <input
                             type="text"
-                            placeholder="Search leads,id's..."
+                            placeholder="Search prospects..."
                             value={searchTerm}
                             onChange={(event) => setSearchTerm(event.target.value)}
-                            className={`w-full pl-2 pr-4 text-sm focus:outline-none ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}
+                            className={`w-full pl-2 pr-4 text-sm focus:outline-none ${theme === "dark" ? "text-gray-300 bg-transparent" : "text-gray-900 bg-transparent"}`}
                         />
                     </div>
 
@@ -383,7 +235,7 @@ const handleApplyFilters = (filters) => {
                                     "Last Activity",
                                     "Created At",
                                     "Priority",
-                                    "Success Rate",
+                                    "Conversion Chance",
                                     "Actions",
 
                                 ].map((column) => (
@@ -409,7 +261,10 @@ const handleApplyFilters = (filters) => {
                                         colSpan={12}
                                         className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                                     >
-                                        No prospects match "{searchTerm.trim()}". Try a different search.
+                                        {searchTerm.trim() 
+                                            ? `No prospects match "${searchTerm.trim()}". Try a different search.`
+                                            : "No prospects found with 60%+ conversion chance."
+                                        }
                                     </td>
                                 </tr>
                             ) : (
@@ -437,7 +292,7 @@ const handleApplyFilters = (filters) => {
                                                 <div className="flex items-center gap-x-3">
                                                     <div className="flex flex-col">
                                                         <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                            {prospect.name}
+                                                            {prospect.name || "—"}
                                                         </span>
                                                         <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
                                                             {prospect.id}
@@ -449,10 +304,10 @@ const handleApplyFilters = (filters) => {
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <a
-                                                    href={`tel:${prospect.phone.replace(/[^0-9+]/g, "")}`}
+                                                    href={`tel:${prospect.phone?.replace(/[^0-9+]/g, "")}`}
                                                     className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
                                                 >
-                                                    {prospect.phone}
+                                                    {prospect.phone || "—"}
                                                 </a>
                                             </div>
                                         </td>
@@ -462,14 +317,14 @@ const handleApplyFilters = (filters) => {
                                                     href={`mailto:${prospect.email}`}
                                                     className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-blue-400" : "text-gray-900 hover:text-blue-600"}`}
                                                 >
-                                                    {prospect.email}
+                                                    {prospect.email || "—"}
                                                 </a>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.source}
+                                                    {prospect.source || "—"}
                                                 </span>
                                             </div>
                                         </td>
@@ -485,21 +340,21 @@ const handleApplyFilters = (filters) => {
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.assignedTo}
+                                                    {prospect.assignedTo || "—"}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.lastActivity}
+                                                    {prospect.lastActivity || "—"}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.createdAt}
+                                                    {prospect.createdAt || "—"}
                                                 </span>
                                             </div>
                                         </td>
@@ -512,24 +367,24 @@ const handleApplyFilters = (filters) => {
                                                 />
                                             </div>
                                         </td>
+                                        {/* Conversion Chance Progress Bar */}
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <div className="flex items-center gap-2 min-w-[120px]">
-                                                    <div className={`flex-1 h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"
-                                                        }`}>
+                                                    <div className={`flex-1 h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
                                                         <div
-                                                            className={`h-full rounded-full transition-all duration-300 ${prospect.successRate >= 80
+                                                            className={`h-full rounded-full transition-all duration-300 ${
+                                                                prospect.conversionChance >= 80
                                                                     ? "bg-emerald-500"
-                                                                    : prospect.successRate >= 60
+                                                                    : prospect.conversionChance >= 60
                                                                         ? "bg-orange-500"
                                                                         : "bg-red-500"
-                                                                }`}
-                                                            style={{ width: `${prospect.successRate}%` }}
+                                                            }`}
+                                                            style={{ width: `${prospect.conversionChance}%` }}
                                                         />
                                                     </div>
-                                                    <span className={`text-xs font-medium min-w-[36px] ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                                                        }`}>
-                                                        {prospect.successRate}%
+                                                    <span className={`text-xs font-medium min-w-[36px] ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                                                        {prospect.conversionChance}%
                                                     </span>
                                                 </div>
                                             </div>
@@ -610,7 +465,7 @@ const handleApplyFilters = (filters) => {
                 <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                     <div className="inline-flex items-center gap-x-2">
                         <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
-                            Showing: {filteredProspects.length} of {prospectsData.length}
+                            Showing: {filteredProspects.length} of {prospectsData?.length || 0}
                         </p>
                     </div>
 

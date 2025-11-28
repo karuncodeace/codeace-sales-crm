@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../../lib/supabase/serverClient";
+import { supabaseServer } from "../../../lib/supabase/serverClient";
 
 // Helper function to format timestamp to relative time
 function formatLastActivity(timestamp) {
@@ -23,22 +23,23 @@ function formatLastActivity(timestamp) {
   });
 }
 
-export async function GET(request, { params }) {
+export async function GET() {
   const supabase = await supabaseServer();
-  const { id } = await params;
-
-  const { data: lead, error } = await supabase
+  
+  // Fetch leads with conversion_chance >= 60 (prospects)
+  const { data, error } = await supabase
     .from("leads_table")
     .select("*")
-    .eq("id", id)
-    .single();
+    .gte("conversion_chance", 60)
+    .order("conversion_chance", { ascending: false });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 404 });
+    console.error("Prospects API Error:", error.message);
+    return Response.json([]);
   }
 
   // Map the data to the format expected by the frontend
-  const formattedLead = {
+  const prospects = (data || []).map((lead) => ({
     id: lead.id,
     name: lead.lead_name,
     phone: lead.phone || "",
@@ -48,10 +49,6 @@ export async function GET(request, { params }) {
     status: lead.status,
     priority: lead.priority,
     assignedTo: lead.assigned_to || "",
-    location: lead.location || "",
-    company: lead.company || lead.lead_name,
-    campaign: lead.campaign || "",
-    budget: lead.budget || "",
     createdAt: lead.created_at
       ? new Date(lead.created_at).toLocaleDateString("en-US", {
           month: "short",
@@ -60,17 +57,41 @@ export async function GET(request, { params }) {
         })
       : "",
     lastActivity: formatLastActivity(lead.last_activity),
-    lastActivityDate: lead.last_activity
-      ? new Date(lead.last_activity).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "",
-  };
+    conversionChance: lead.conversion_chance || 0,
+  }));
 
-  return Response.json(formattedLead);
+  return Response.json(prospects);
 }
 
+export async function PATCH(request) {
+  const supabase = await supabaseServer();
+  
+  const body = await request.json();
+  const { id, status, priority } = body;
 
+  if (!id) {
+    return Response.json({ error: "Lead ID is required" }, { status: 400 });
+  }
+
+  const updateData = {};
+  if (status !== undefined) updateData.status = status;
+  if (priority !== undefined) updateData.priority = priority;
+
+  if (Object.keys(updateData).length === 0) {
+    return Response.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from("leads_table")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  return Response.json({ success: true, data });
+}
 

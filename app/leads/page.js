@@ -89,6 +89,16 @@ export default function LeadsPage() {
     priority: "",
     type: "",
   });
+  
+  // Status change modal state
+  const [statusChangeModal, setStatusChangeModal] = useState({
+    isOpen: false,
+    leadId: null,
+    newStatus: null,
+    comment: "",
+    isSubmitting: false,
+  });
+
   const handleApplyFilters = (filters) => {
     setAdvancedFilters(filters);
   };
@@ -245,30 +255,87 @@ export default function LeadsPage() {
     setDragOverStatus((prev) => (prev === status ? null : prev));
   };
 
-  const handleStatusUpdate = async (leadId, newStatus) => {
-    // Optimistically update the UI
-    mutate(
-      leadData.map((lead) =>
-        lead.id === leadId ? { ...lead, status: newStatus } : lead
-      ),
-      false // Don't revalidate
-    );
+  // Open status change modal - requires comment
+  const handleStatusUpdate = (leadId, newStatus) => {
+    setStatusChangeModal({
+      isOpen: true,
+      leadId,
+      newStatus,
+      comment: "",
+      isSubmitting: false,
+    });
+  };
 
-    // Persist to backend
+  // Confirm status change with comment
+  const handleConfirmStatusChange = async () => {
+    const { leadId, newStatus, comment } = statusChangeModal;
+    
+    if (!comment.trim()) {
+      alert("Please add a comment before changing status");
+      return;
+    }
+
+    setStatusChangeModal((prev) => ({ ...prev, isSubmitting: true }));
+
     try {
+      // First, post the comment to task_activities
+      const activityRes = await fetch("/api/task-activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          comments: comment,
+          activity_type: `Status changed to ${newStatus}`,
+        }),
+      });
+
+      if (!activityRes.ok) {
+        throw new Error("Failed to save activity comment");
+      }
+
+      // Then update the lead status
       const res = await fetch("/api/leads", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: leadId, status: newStatus }),
       });
+
       if (!res.ok) {
         throw new Error("Failed to update status");
       }
+
+      // Optimistically update the UI
+      mutate(
+        leadData.map((lead) =>
+          lead.id === leadId ? { ...lead, status: newStatus } : lead
+        ),
+        false
+      );
+
+      // Close modal
+      setStatusChangeModal({
+        isOpen: false,
+        leadId: null,
+        newStatus: null,
+        comment: "",
+        isSubmitting: false,
+      });
     } catch (error) {
       console.error("Error updating status:", error);
-      // Revalidate to restore correct state on error
-      mutate();
+      alert(error.message);
+      setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
+  };
+
+  // Cancel status change
+  const handleCancelStatusChange = () => {
+    setStatusChangeModal({
+      isOpen: false,
+      leadId: null,
+      newStatus: null,
+      comment: "",
+      isSubmitting: false,
+    });
   };
 
   const handlePriorityUpdate = async (leadId, newPriority) => {
@@ -562,14 +629,20 @@ export default function LeadsPage() {
 
                 <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                   {filteredLeads.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={11}
-                        className="px-6 py-10 text-center text-sm text-gray-500"
-                      >
-                        No leads match “{searchTerm.trim()}”. Try a different search.
-                      </td>
-                    </tr>
+                   <tr>
+                   <td colSpan={11} className="px-6 py-10 text-center">
+                     <div className="flex items-center justify-center gap-2">
+                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce"></div>
+                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                     </div>
+                     <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">Loading leads…</p>
+                   </td>
+                 </tr>
+                 
+                  
+                  
+                  
                   ) : (
                     filteredLeads.map((lead) => (
                       <tr key={lead.id}>
@@ -966,6 +1039,136 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Status Change Comment Modal */}
+      {statusChangeModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+              theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
+            }`}
+          >
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-orange-500"
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Change Status</h2>
+                  <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Changing to: <span className="font-medium text-orange-500">{statusChangeModal.newStatus}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCancelStatusChange}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === "dark" ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5">
+              <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                Comment <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                placeholder="Add a comment explaining this status change..."
+                className={`w-full p-3 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none ${
+                  theme === "dark"
+                    ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                    : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"
+                }`}
+                rows={4}
+                value={statusChangeModal.comment}
+                onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, comment: e.target.value }))}
+                autoFocus
+              />
+              <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                This comment will be saved to the activity log.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <button
+                onClick={handleCancelStatusChange}
+                disabled={statusChangeModal.isSubmitting}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  theme === "dark"
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                } disabled:opacity-50`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmStatusChange}
+                disabled={statusChangeModal.isSubmitting || !statusChangeModal.comment.trim()}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {statusChangeModal.isSubmitting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Confirm Change
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

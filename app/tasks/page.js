@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import useSWR, { mutate } from "swr";
 import { useTheme } from "../context/themeContext";
 import PriorityDropdown from "../components/priorityTooglebtn";
 import RescheduleButton from "../components/RescheduleButton";
@@ -37,120 +38,14 @@ const CalendarIcon = ({ className }) => (
     </svg>
 );
 
-const initialTasks = [
-    {
-        id: "TK-1001",
-        title: "Call John Doe",
-        type: "Call",
-        lead: "John Doe",
-        phone: "+1 (555) 987-6543",
-        time: "10:00 AM",
-        due: "today",
-        priority: "Hot",
-        status: "pending",
-        assignedTo: "Sarah Lin",
-        createdAt: "Nov 25, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1002",
-        title: "Follow-up with Priya",
-        type: "Follow-Up",
-        lead: "Priya Sharma",
-        phone: "+1 (555) 988-7766",
-        time: "2:00 PM",
-        due: "today",
-        priority: "Warm",
-        status: "pending",
-        assignedTo: "Jorge Patel",
-        createdAt: "Nov 24, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1003",
-        title: "Send proposal to Arjun",
-        type: "Proposal",
-        lead: "Arjun Patel",
-        phone: "+1 (555) 912-3456",
-        time: "Feb 7",
-        due: "upcoming",
-        priority: "Cold",
-        status: "pending",
-        assignedTo: "Priya Nair",
-        createdAt: "Nov 23, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1004",
-        title: "Meeting with Rakesh",
-        type: "Meeting",
-        lead: "Rakesh Kumar",
-        phone: "+1 (555) 987-1122",
-        time: "Yesterday",
-        due: "overdue",
-        priority: "Hot",
-        status: "pending",
-        assignedTo: "Sarah Lin",
-        createdAt: "Nov 22, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1005",
-        title: "Demo call with TechCorp",
-        type: "Call",
-        lead: "Emma Wilson",
-        phone: "+1 (555) 234-5678",
-        time: "3:30 PM",
-        due: "today",
-        priority: "Warm",
-        status: "pending",
-        assignedTo: "Jorge Patel",
-        createdAt: "Nov 25, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1006",
-        title: "Send contract to David",
-        type: "Proposal",
-        lead: "David Chen",
-        phone: "+1 (555) 345-6789",
-        time: "Nov 28",
-        due: "upcoming",
-        priority: "Cold",
-        status: "pending",
-        assignedTo: "Priya Nair",
-        createdAt: "Nov 24, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1007",
-        title: "Follow-up with Sophia",
-        type: "Follow-Up",
-        lead: "Sophia Brown",
-        phone: "+1 (555) 223-8844",
-        time: "Nov 20",
-        due: "overdue",
-        priority: "Hot",
-        status: "pending",
-        assignedTo: "Sarah Lin",
-        createdAt: "Nov 18, 2025",
-        rescheduleComment: "",
-    },
-    {
-        id: "TK-1008",
-        title: "Schedule meeting with Carlos",
-        type: "Meeting",
-        lead: "Carlos Martinez",
-        phone: "+1 (555) 998-1123",
-        time: "Nov 30",
-        due: "upcoming",
-        priority: "Cold",
-        status: "completed",
-        assignedTo: "Jorge Patel",
-        createdAt: "Nov 20, 2025",
-        rescheduleComment: "",
-    },
-];
+const LoaderIcon = ({ className }) => (
+    <svg className={`animate-spin ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
 const dueStyles = {
     today: {
@@ -176,9 +71,17 @@ const dueStyles = {
 };
 
 const statusStyles = {
+    Pending: {
+        light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
+        dark: "text-amber-400 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
+    },
     pending: {
         light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
         dark: "text-amber-400 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
+    },
+    Completed: {
+        light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
+        dark: "text-emerald-400 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
     },
     completed: {
         light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
@@ -186,13 +89,43 @@ const statusStyles = {
     },
 };
 
+// Helper function to determine due status from due_datetime
+function getDueStatus(dueDatetime, status) {
+    if (status?.toLowerCase() === "completed") return "completed";
+    if (!dueDatetime) return "upcoming";
+    
+    const now = new Date();
+    const dueDate = new Date(dueDatetime);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    
+    if (dueDateOnly < today) return "overdue";
+    if (dueDateOnly.getTime() === today.getTime()) return "today";
+    return "upcoming";
+}
+
+// Helper function to format due datetime for display
+function formatDueDateTime(dueDatetime) {
+    if (!dueDatetime) return "—";
+    const date = new Date(dueDatetime);
+    return date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+    });
+}
+
 export default function TasksPage() {
-    const [tasksData, setTasksData] = useState(initialTasks);
     const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
     const [openAddTask, setOpenAddTask] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState({
         source: "",
         status: "",
@@ -202,23 +135,103 @@ export default function TasksPage() {
     });
     const { theme } = useTheme();
 
+    // Fetch tasks from API
+    const { data: tasksData, error: tasksError, isLoading: tasksLoading } = useSWR("/api/tasks", fetcher);
+    
+    // Fetch leads for dropdown
+    const { data: leadsData } = useSWR("/api/leads", fetcher);
+    
+    // Fetch sales persons for dropdown
+    const { data: salesPersonsData } = useSWR("/api/sales-persons", fetcher);
+
+
     const handleApplyFilters = (filters) => {
         setAdvancedFilters(filters);
     };
 
-    const handleAddTask = (newTask) => {
-        setTasksData((prev) => [newTask, ...prev]);
+    const handleAddTask = async (taskData) => {
+        setIsSubmitting(true);
+        try {
+            const response = await fetch("/api/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(taskData),
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.error || "Failed to add task");
+            }
+            
+            // Refresh tasks data
+            mutate("/api/tasks");
+            setOpenAddTask(false);
+        } catch (error) {
+            console.error("Error adding task:", error);
+            alert(error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
+    // Create lookup maps for lead and sales person names
+    const leadsMap = useMemo(() => {
+        if (!leadsData || !Array.isArray(leadsData)) return {};
+        return leadsData.reduce((acc, lead) => {
+            acc[lead.id] = lead;
+            return acc;
+        }, {});
+    }, [leadsData]);
+
+    const salesPersonsMap = useMemo(() => {
+        if (!salesPersonsData || !Array.isArray(salesPersonsData)) return {};
+        return salesPersonsData.reduce((acc, person) => {
+            acc[person.id] = person;
+            return acc;
+        }, {});
+    }, [salesPersonsData]);
+
+    // Transform API tasks to display format
+    const transformedTasks = useMemo(() => {
+        // Handle error responses or non-array data
+        if (!tasksData || !Array.isArray(tasksData) || tasksData.error) return [];
+        
+        return tasksData.map((task) => {
+            const lead = leadsMap[task.lead_id];
+            const salesPerson = salesPersonsMap[task.sales_person_id];
+            const dueStatus = getDueStatus(task.due_datetime, task.status);
+            
+            return {
+                id: task.id,
+                title: task.title || "—",
+                type: task.type || "Call",
+                lead_id: task.lead_id,
+                sales_person_id: task.sales_person_id,
+                leadName: lead?.name || task.lead_id || "—",
+                phone: lead?.phone || "—",
+                due_datetime: task.due_datetime,
+                dueDisplay: formatDueDateTime(task.due_datetime),
+                due: dueStatus,
+                priority: task.priority || "Warm",
+                status: task.status || "Pending",
+                assignedTo: salesPerson?.name || salesPerson?.sales_person_name || salesPerson?.full_name || task.sales_person_id || "—",
+                comments: task.comments || "",
+                recentLog: null, // Will be added later if task_activities is set up
+                recentLogDisplay: "",
+            };
+        });
+    }, [tasksData, leadsMap, salesPersonsMap]);
+
     const filteredTasks = useMemo(() => {
-        let result = tasksData;
+        let result = transformedTasks;
         
         // Apply due filter (tab filter)
         if (filter !== "all") {
             result = result.filter((task) => {
                 const filterLower = filter.toLowerCase();
                 if (filterLower === "completed") {
-                    return task.status === "completed";
+                    return task.status?.toLowerCase() === "completed";
                 }
                 if (filterLower === "rescheduled") {
                     return task.due === "rescheduled";
@@ -229,7 +242,7 @@ export default function TasksPage() {
 
         // Apply advanced filters
         if (advancedFilters.status) {
-            result = result.filter((task) => task.status === advancedFilters.status.toLowerCase());
+            result = result.filter((task) => task.status?.toLowerCase() === advancedFilters.status.toLowerCase());
         }
         if (advancedFilters.assignedTo) {
             result = result.filter((task) => task.assignedTo === advancedFilters.assignedTo);
@@ -247,10 +260,10 @@ export default function TasksPage() {
             result = result.filter((task) => {
                 const haystack = [
                     task.title,
-                    task.lead,
+                    task.type,
+                    task.leadName,
                     task.phone,
                     task.id,
-                    task.type,
                     task.assignedTo,
                 ]
                     .filter(Boolean)
@@ -261,42 +274,69 @@ export default function TasksPage() {
         }
         
         return result;
-    }, [tasksData, searchTerm, filter, advancedFilters]);
+    }, [transformedTasks, searchTerm, filter, advancedFilters]);
 
-    const handlePriorityUpdate = (taskId, newPriority) => {
-        setTasksData((prev) =>
-            prev.map((task) =>
-                task.id === taskId ? { ...task, priority: newPriority } : task
-            )
-        );
+    const handlePriorityUpdate = async (taskId, newPriority) => {
+        try {
+            const response = await fetch("/api/tasks", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: taskId, priority: newPriority }),
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to update priority");
+            }
+            
+            mutate("/api/tasks");
+        } catch (error) {
+            console.error("Error updating priority:", error);
+        }
     };
 
     const handleToggleActions = (taskId) => {
         setOpenActions((prev) => (prev === taskId ? null : taskId));
     };
 
-    const handleMarkComplete = (taskId) => {
-        setTasksData((prev) =>
-            prev.map((task) =>
-                task.id === taskId ? { ...task, status: task.status === "completed" ? "pending" : "completed" } : task
-            )
-        );
+    const handleMarkComplete = async (taskId, currentStatus) => {
+        const newStatus = currentStatus?.toLowerCase() === "completed" ? "Pending" : "Completed";
+        try {
+            const response = await fetch("/api/tasks", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: taskId, status: newStatus }),
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to update status");
+            }
+            
+            mutate("/api/tasks");
+        } catch (error) {
+            console.error("Error updating status:", error);
+        }
         setOpenActions(null);
     };
 
-    const handleReschedule = (taskId, rescheduleData) => {
-        setTasksData((prev) =>
-            prev.map((task) =>
-                task.id === taskId
-                    ? {
-                        ...task,
-                        time: rescheduleData.time,
-                        due: "rescheduled",
-                        rescheduleComment: rescheduleData.comment,
-                    }
-                    : task
-            )
-        );
+    const handleReschedule = async (taskId, rescheduleData) => {
+        try {
+            const response = await fetch("/api/tasks", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    id: taskId, 
+                    due_datetime: new Date(rescheduleData.time).toISOString() 
+                }),
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to reschedule");
+            }
+            
+            mutate("/api/tasks");
+        } catch (error) {
+            console.error("Error rescheduling:", error);
+        }
     };
 
     useEffect(() => {
@@ -326,6 +366,25 @@ export default function TasksPage() {
         }
     };
 
+    if (tasksLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <LoaderIcon className={`w-8 h-8 ${theme === "dark" ? "text-orange-400" : "text-orange-500"}`} />
+            </div>
+        );
+    }
+
+    if (tasksError) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className={`text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    <p className="text-lg">Failed to load tasks</p>
+                    <p className="text-sm mt-2">Please try refreshing the page</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="pl-5 md:pl-0 2xl:pl-0 w-[98%]">
             <div className="mt-10 flex justify-between items-center">
@@ -333,7 +392,14 @@ export default function TasksPage() {
                     <h1 className="text-4xl font-bold mb-1">Tasks</h1>
                 </div>
                 <div className="flex items-center gap-3 ">
-                    <AddTaskModal open={openAddTask} onClose={() => setOpenAddTask(false)} onAdd={handleAddTask} />
+                    <AddTaskModal 
+                        open={openAddTask} 
+                        onClose={() => setOpenAddTask(false)} 
+                        onAdd={handleAddTask}
+                        leads={Array.isArray(leadsData) ? leadsData : []}
+                        salesPersons={Array.isArray(salesPersonsData) ? salesPersonsData : []}
+                        isSubmitting={isSubmitting}
+                    />
                     <button 
                         onClick={() => setOpenAddTask(true)}
                         className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-orange-500 text-white hover:bg-orange-600 focus:outline-hidden focus:bg-orange-600 disabled:opacity-50 disabled:pointer-events-none">
@@ -449,7 +515,7 @@ export default function TasksPage() {
                                     "Status",
                                     "Assigned To",
                                     "Priority",
-                                    "Created At",
+                                    
                                     "Actions",
                                     "Comments",
                                 ].map((column) => (
@@ -472,7 +538,7 @@ export default function TasksPage() {
                             {filteredTasks.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan={11}
+                                        colSpan={12}
                                         className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                                     >
                                         No tasks found. Try a different search or filter.
@@ -480,7 +546,7 @@ export default function TasksPage() {
                                 </tr>
                             ) : (
                                 filteredTasks.map((task) => (
-                                    <tr key={task.id} className={task.status === "completed" ? "opacity-60" : ""}>
+                                    <tr key={task.id} className={task.status?.toLowerCase() === "completed" ? "opacity-60" : ""}>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="ps-6 py-2">
                                                 <label
@@ -491,11 +557,11 @@ export default function TasksPage() {
                                                         type="checkbox"
                                                         className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                                                         id={`task-${task.id}`}
-                                                        checked={task.status === "completed"}
-                                                        onChange={() => handleMarkComplete(task.id)}
+                                                        checked={task.status?.toLowerCase() === "completed"}
+                                                        onChange={() => handleMarkComplete(task.id, task.status)}
                                                     />
                                                     <span className="sr-only">
-                                                        Select {task.title}
+                                                        Select {task.id}
                                                     </span>
                                                 </label>
                                             </div>
@@ -503,7 +569,7 @@ export default function TasksPage() {
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <div className="flex flex-col">
-                                                    <span className={`text-sm font-medium ${task.status === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                                    <span className={`text-sm font-medium ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                                                         {task.title}
                                                     </span>
                                                     <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
@@ -525,14 +591,14 @@ export default function TasksPage() {
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                    {task.lead}
+                                                    {task.lead_id}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <a
-                                                    href={`tel:${task.phone.replace(/[^0-9+]/g, "")}`}
+                                                    href={`tel:${task.phone?.replace(/[^0-9+]/g, "")}`}
                                                     className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
                                                 >
                                                     {task.phone}
@@ -541,26 +607,29 @@ export default function TasksPage() {
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
-                                                <RescheduleButton
-                                                    task={task}
-                                                    theme={theme}
-                                                    onReschedule={handleReschedule}
-                                                />
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium w-fit`}>
+                                                       
+                                                    </span>
+                                                    <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                        {task.dueDisplay}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                                    statusStyles[task.status]?.[theme === "dark" ? "dark" : "light"] || statusStyles.pending.light
+                                                    statusStyles[task.status]?.[theme === "dark" ? "dark" : "light"] || statusStyles.Pending.light
                                                 }`}>
-                                                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                    {task.status}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {task.assignedTo}
+                                                    {task.sales_person_id}
                                                 </span>
                                             </div>
                                         </td>
@@ -573,13 +642,7 @@ export default function TasksPage() {
                                                 />
                                             </div>
                                         </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {task.createdAt}
-                                                </span>
-                                            </div>
-                                        </td>
+                                        
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <div
@@ -631,10 +694,10 @@ export default function TasksPage() {
                                                         }`}>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleMarkComplete(task.id)}
+                                                                onClick={() => handleMarkComplete(task.id, task.status)}
                                                                 className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                                             >
-                                                                {task.status === "completed" ? "Mark Pending" : "Mark Complete"}
+                                                                {task.status?.toLowerCase() === "completed" ? "Mark Pending" : "Mark Complete"}
                                                             </button>
                                                             {["View", "Edit"].map((action) => (
                                                                 <button
@@ -652,7 +715,7 @@ export default function TasksPage() {
                                         </td>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2 max-w-[200px]">
-                                                {task.rescheduleComment ? (
+                                                {task.comments ? (
                                                     <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                                                         <div className="flex items-start gap-1.5">
                                                             <svg 
@@ -663,13 +726,13 @@ export default function TasksPage() {
                                                             >
                                                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
                                                             </svg>
-                                                            <span className="line-clamp-2 break-words" title={task.rescheduleComment}>
-                                                                {task.rescheduleComment}
+                                                            <span className="line-clamp-2 break-words" title={task.comments}>
+                                                                {task.comments}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span className={`text-xs italic ${theme === "dark" ? "text-gray-300" : "text-gray-400"}`}>
+                                                    <span className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
                                                         No comments
                                                     </span>
                                                 )}
@@ -687,7 +750,7 @@ export default function TasksPage() {
                 <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                     <div className="inline-flex items-center gap-x-2">
                         <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
-                            Showing: {filteredTasks.length} of {tasksData.length}
+                            Showing: {filteredTasks.length} of {transformedTasks.length}
                         </p>
                     </div>
 

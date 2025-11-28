@@ -3,28 +3,19 @@
 import { useTheme } from "../context/themeContext";
 import { useState } from "react";
 
-export default function AddTaskModal({ open, onClose, onAdd }) {
+export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPersons = [], isSubmitting = false }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-
-  // Get current date formatted
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
 
   const [formData, setFormData] = useState({
     title: "",
     type: "Call",
-    lead: "",
-    phone: "",
-    due: "today",
+    lead_id: "",
+    sales_person_id: "",
+    due_datetime: "",
     priority: "Warm",
-    status: "pending",
-    assignedTo: "",
+    status: "Pending",
+    comments: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -39,60 +30,56 @@ export default function AddTaskModal({ open, onClose, onAdd }) {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.title.trim()) newErrors.title = "Task title is required";
-    if (!formData.lead.trim()) newErrors.lead = "Lead name is required";
-    if (!formData.phone.trim()) newErrors.phone = "Phone is required";
-    if (!formData.assignedTo) newErrors.assignedTo = "Assigned to is required";
+    if (!formData.lead_id) newErrors.lead_id = "Lead is required";
+    if (!formData.sales_person_id) newErrors.sales_person_id = "Sales person is required";
+    if (!formData.due_datetime) newErrors.due_datetime = "Due date and time is required";
+    if (!formData.priority) newErrors.priority = "Priority is required";
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const newId = `TK-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const today = new Date();
-    const formattedDate = today.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    const newTask = {
-      id: newId,
+    // Call the onAdd function with the form data
+    await onAdd({
       title: formData.title,
       type: formData.type,
-      lead: formData.lead,
-      phone: formData.phone,
-      time: formattedDate,
-      due: formData.due,
+      lead_id: formData.lead_id,
+      sales_person_id: formData.sales_person_id,
+      due_datetime: new Date(formData.due_datetime).toISOString(),
       priority: formData.priority,
       status: formData.status,
-      assignedTo: formData.assignedTo,
-      createdAt: formattedDate,
-      rescheduleComment: "",
-    };
-
-    onAdd(newTask);
+      comments: formData.comments || null,
+    });
     
     // Reset form
     setFormData({
       title: "",
       type: "Call",
-      lead: "",
-      phone: "",
-      due: "today",
+      lead_id: "",
+      sales_person_id: "",
+      due_datetime: "",
       priority: "Warm",
-      status: "pending",
-      assignedTo: "",
+      status: "Pending",
+      comments: "",
     });
     setErrors({});
-    onClose();
   };
 
   const handleClose = () => {
     setErrors({});
+    setFormData({
+      title: "",
+      type: "Call",
+      lead_id: "",
+      sales_person_id: "",
+      due_datetime: "",
+      priority: "Warm",
+      status: "Pending",
+      comments: "",
+    });
     onClose();
   };
 
@@ -197,105 +184,83 @@ export default function AddTaskModal({ open, onClose, onAdd }) {
                 value={formData.type}
                 onChange={(e) => updateField("type", e.target.value)}
               >
-                <option value="Call"> Call</option>
-                <option value="Meeting"> Meeting</option>
-                <option value="Follow-Up"> Follow-Up</option>
-                <option value="Proposal"> Proposal</option>
-                <option value="Email"> Email</option>
+                <option value="Call">Call</option>
+                <option value="Meeting">Meeting</option>
+                <option value="Follow-Up">Follow-Up</option>
+                <option value="Proposal">Proposal</option>
+                <option value="Email">Email</option>
               </select>
             </div>
 
-            {/* Lead Name */}
+            {/* Lead Selection */}
             <div>
               <label className={labelClass}>
-                Lead Name <span className="text-red-500">*</span>
+                Lead <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                placeholder="e.g. John Doe"
-                className={inputClass("lead")}
-                value={formData.lead}
-                onChange={(e) => updateField("lead", e.target.value)}
-              />
-              {errors.lead && <p className="mt-1 text-xs text-red-500">{errors.lead}</p>}
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className={labelClass}>
-                Phone <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                placeholder="e.g. +1 (555) 123-4567"
-                className={inputClass("phone")}
-                value={formData.phone}
-                onChange={(e) => updateField("phone", e.target.value)}
-              />
-              {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
-            </div>
-
-            {/* Created At - Auto-generated with current date */}
-            <div>
-              <label className={labelClass}>Created At</label>
-              <input
-                type="text"
-                readOnly
-                className={`mt-1 w-full p-2.5 rounded-lg border text-sm cursor-not-allowed ${
-                  isDark
-                    ? "bg-[#262626]/50 border-gray-700 text-gray-300"
-                    : "bg-gray-50 border-gray-300 text-gray-700"
-                }`}
-                value={getCurrentDate()}
-              />
-            </div>
-
-            {/* Due */}
-            <div>
-              <label className={labelClass}>Due</label>
               <select
-                className={selectClass("due")}
-                value={formData.due}
-                onChange={(e) => updateField("due", e.target.value)}
+                className={selectClass("lead_id")}
+                value={formData.lead_id}
+                onChange={(e) => updateField("lead_id", e.target.value)}
               >
-                <option value="today">Today</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="overdue">Overdue</option>
+                <option value="">Select a lead</option>
+                {leads.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.name} ({lead.id})
+                  </option>
+                ))}
               </select>
+              {errors.lead_id && <p className="mt-1 text-xs text-red-500">{errors.lead_id}</p>}
             </div>
 
-            {/* Priority */}
-            <div>
-              <label className={labelClass}>Priority</label>
-              <select
-                className={selectClass("priority")}
-                value={formData.priority}
-                onChange={(e) => updateField("priority", e.target.value)}
-              >
-                <option value="Hot"> Hot</option>
-                <option value="Warm"> Warm</option>
-                <option value="Cold"> Cold</option>
-              </select>
-            </div>
-
-            {/* Assigned To */}
+            {/* Sales Person */}
             <div>
               <label className={labelClass}>
                 Assigned To <span className="text-red-500">*</span>
               </label>
               <select
-                className={selectClass("assignedTo")}
-                value={formData.assignedTo}
-                onChange={(e) => updateField("assignedTo", e.target.value)}
+                className={selectClass("sales_person_id")}
+                value={formData.sales_person_id}
+                onChange={(e) => updateField("sales_person_id", e.target.value)}
               >
-                <option value="">Select team member</option>
-                <option value="Sarah Lin">Sarah Lin</option>
-                <option value="Jorge Patel">Jorge Patel</option>
-                <option value="Priya Nair">Priya Nair</option>
-                <option value="Rachel Kim">Rachel Kim</option>
-                <option value="David Chen">David Chen</option>
+                <option value="">Select sales person</option>
+                {salesPersons.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name || person.sales_person_name || person.full_name || person.id}
+                  </option>
+                ))}
               </select>
-              {errors.assignedTo && <p className="mt-1 text-xs text-red-500">{errors.assignedTo}</p>}
+              {errors.sales_person_id && <p className="mt-1 text-xs text-red-500">{errors.sales_person_id}</p>}
+            </div>
+
+            {/* Due Date & Time */}
+            <div>
+              <label className={labelClass}>
+                Due Date & Time <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                className={inputClass("due_datetime")}
+                value={formData.due_datetime}
+                onChange={(e) => updateField("due_datetime", e.target.value)}
+              />
+              {errors.due_datetime && <p className="mt-1 text-xs text-red-500">{errors.due_datetime}</p>}
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className={labelClass}>
+                Priority <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={selectClass("priority")}
+                value={formData.priority}
+                onChange={(e) => updateField("priority", e.target.value)}
+              >
+                <option value="Hot">Hot</option>
+                <option value="Warm">Warm</option>
+                <option value="Cold">Cold</option>
+              </select>
+              {errors.priority && <p className="mt-1 text-xs text-red-500">{errors.priority}</p>}
             </div>
 
             {/* Status */}
@@ -306,10 +271,21 @@ export default function AddTaskModal({ open, onClose, onAdd }) {
                 value={formData.status}
                 onChange={(e) => updateField("status", e.target.value)}
               >
-                <option value="pending">Pending</option>
-                <option value="completed">Completed</option>
-                <option value="rescheduled">Rescheduled</option>
+                <option value="Pending">Pending</option>
+                <option value="Completed">Completed</option>
               </select>
+            </div>
+
+            {/* Comments */}
+            <div className="md:col-span-2">
+              <label className={labelClass}>Comments</label>
+              <textarea
+                placeholder="Add any notes or comments..."
+                className={`${inputClass("comments")} resize-none`}
+                rows={3}
+                value={formData.comments}
+                onChange={(e) => updateField("comments", e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -318,33 +294,47 @@ export default function AddTaskModal({ open, onClose, onAdd }) {
         <div className={`flex justify-end gap-3 px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <button
             onClick={handleClose}
+            disabled={isSubmitting}
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isDark
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+            } disabled:opacity-50`}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2"
+            disabled={isSubmitting}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
-            Add Task
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Adding...
+              </>
+            ) : (
+              <>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                Add Task
+              </>
+            )}
           </button>
         </div>
       </div>
