@@ -132,13 +132,7 @@ export default function ProspectsPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [openActions]);
 
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <LoaderIcon className={`w-8 h-8 ${theme === "dark" ? "text-orange-400" : "text-orange-500"}`} />
-            </div>
-        );
-    }
+   
 
     if (prospectsError) {
         return (

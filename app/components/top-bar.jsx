@@ -3,11 +3,26 @@ import Image from "next/image";
 import Tooglebtn from "./tooglebtn";
 import { useState, useEffect } from "react";
 import {useTheme} from "../context/themeContext"
+import { supabaseBrowser } from "../../lib/supabase/browserClient";
+
 
 export default function Header() {
     const {theme} = useTheme()
     const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+      const getUser = async () => {
+        const {
+          data: { user },
+        } = await supabaseBrowser.auth.getUser();
     
+        setUser(user);
+      };
+    
+      getUser();
+    }, []);
+
     const TooltipIcon = ({ label, className = "", children }) => (
         <div
           className={`relative group ${className}`}
@@ -188,12 +203,12 @@ export default function Header() {
               <span className={`font-medium text-sm
                 ${theme === "dark" ? "text-white" : "text-gray-800"}
               `}>
-                John Doe
+                {user?.user_metadata?.full_name}
               </span>
               <span className={`text-xs hidden lg:block
                 ${theme === "dark" ? "text-gray-300" : "text-gray-400"}
               `}>
-                john.doe@example.com
+                {user?.email}
               </span>
             </div>
             <button className={`hidden sm:block transition-colors

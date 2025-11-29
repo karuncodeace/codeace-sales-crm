@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "../context/themeContext"
+import { useTheme } from "../context/themeContext";
 
-const TooltipIcon = ({ label, className = "", children }) => (
-
+const TooltipIcon = ({ label, className = "", children, onClick }) => (
   <div
     className={`relative group ${className}`}
     aria-label={label}
     data-tooltip={label}
+    onClick={onClick}
   >
     {children}
     <span className="pointer-events-none absolute left-full top-1/2 ml-3 min-w-[4rem] -translate-y-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100">
@@ -25,6 +25,10 @@ export default function Sidebar() {
     router.push(page);
   }
   const { theme } = useTheme();
+
+  const handleLogout = () => {
+    window.location.href = "/logout";
+  };
   return (
     <div className="flex flex-col   items-center pt-10   space-y-10 px-7 md:px-4 lg:px-5 xl:px-6 ">
       <div className={`flex flex-col items-center space-y-10  p-3 py-4 rounded-full
@@ -285,9 +289,13 @@ export default function Sidebar() {
             />
           </svg>
         </TooltipIcon>
-        <TooltipIcon label="Log Out" className={`flex items-center justify-center
+        <TooltipIcon 
+          label="Log Out" 
+          className={`flex items-center justify-center cursor-pointer hover:text-red-500 transition-colors
           ${theme === "dark" ? "text-gray-400" : "text-black"}
-          `}>
+          `}
+          onClick={handleLogout}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"

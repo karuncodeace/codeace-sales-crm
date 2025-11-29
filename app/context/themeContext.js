@@ -6,12 +6,17 @@ const ThemeContext = createContext();
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState("light");
 
-  // Load saved theme on mount
+  // Load saved theme on mount, default to light
   useEffect(() => {
     const saved = localStorage.getItem("theme");
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.classList.toggle("dark", saved === "dark");
+    if (saved && saved === "dark") {
+      setTheme("dark");
+      document.documentElement.classList.add("dark");
+    } else {
+      // Ensure light theme is set as default
+      setTheme("light");
+      localStorage.setItem("theme", "light");
+      document.documentElement.classList.remove("dark");
     }
   }, []);
 
