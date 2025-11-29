@@ -143,6 +143,9 @@ export default function TasksPage() {
     
     // Fetch sales persons for dropdown
     const { data: salesPersonsData } = useSWR("/api/sales-persons", fetcher);
+    
+    // Fetch task activities for due dates
+    const { data: activitiesData } = useSWR("/api/task-activities", fetcher);
 
 
     const handleApplyFilters = (filters) => {
@@ -192,15 +195,68 @@ export default function TasksPage() {
         }, {});
     }, [salesPersonsData]);
 
+    // Create lookup map for latest due_date from task_activities by lead_id
+    const activitiesDueDateMap = useMemo(() => {
+        if (!activitiesData || !Array.isArray(activitiesData)) return {};
+        // Group by lead_id and get the most recent due_date
+        return activitiesData.reduce((acc, activity) => {
+            if (activity.due_date && activity.lead_id) {
+                // Only update if we don't have a date yet or this one is more recent
+                if (!acc[activity.lead_id] || new Date(activity.created_at) > new Date(acc[activity.lead_id].created_at)) {
+                    acc[activity.lead_id] = {
+                        due_date: activity.due_date,
+                        created_at: activity.created_at
+                    };
+                }
+            }
+            return acc;
+        }, {});
+    }, [activitiesData]);
+
     // Transform API tasks to display format
     const transformedTasks = useMemo(() => {
         // Handle error responses or non-array data
         if (!tasksData || !Array.isArray(tasksData) || tasksData.error) return [];
         
+        // Helper to get due date - from activities or default to 2 days from task creation
+        const getTaskDueDate = (task) => {
+            const activityDue = activitiesDueDateMap[task.lead_id];
+            if (activityDue?.due_date) {
+                return new Date(activityDue.due_date);
+            }
+            // Default: 2 days from task creation or now
+            const baseDate = task.created_at ? new Date(task.created_at) : new Date();
+            const defaultDue = new Date(baseDate);
+            defaultDue.setDate(defaultDue.getDate() + 2);
+            return defaultDue;
+        };
+
+        // Format due date for display
+        const formatDue = (date) => {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            
+            if (dateOnly.getTime() === today.getTime()) return "Today";
+            if (dateOnly.getTime() === tomorrow.getTime()) return "Tomorrow";
+            
+            const diffDays = Math.ceil((dateOnly - today) / (1000 * 60 * 60 * 24));
+            if (diffDays > 0 && diffDays <= 7) return `In ${diffDays} days`;
+            if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
+            
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        };
+        
         return tasksData.map((task) => {
             const lead = leadsMap[task.lead_id];
             const salesPerson = salesPersonsMap[task.sales_person_id];
-            const dueStatus = getDueStatus(task.due_datetime, task.status);
+            
+            // Get due date from activities or default to 2 days
+            const calculatedDueDate = getTaskDueDate(task);
+            const hasActivityDueDate = !!activitiesDueDateMap[task.lead_id]?.due_date;
+            const dueStatus = getDueStatus(calculatedDueDate.toISOString(), task.status);
             
             return {
                 id: task.id,
@@ -210,18 +266,20 @@ export default function TasksPage() {
                 sales_person_id: task.sales_person_id,
                 leadName: lead?.name || task.lead_id || "—",
                 phone: lead?.phone || "—",
-                due_datetime: task.due_datetime,
-                dueDisplay: formatDueDateTime(task.due_datetime),
+                due_datetime: calculatedDueDate.toISOString(),
+                dueDisplay: formatDue(calculatedDueDate),
+                dueFullDate: calculatedDueDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
                 due: dueStatus,
+                hasUpdatedDue: hasActivityDueDate,
                 priority: task.priority || "Warm",
                 status: task.status || "Pending",
                 assignedTo: salesPerson?.name || salesPerson?.sales_person_name || salesPerson?.full_name || task.sales_person_id || "—",
                 comments: task.comments || "",
-                recentLog: null, // Will be added later if task_activities is set up
+                recentLog: null,
                 recentLogDisplay: "",
             };
         });
-    }, [tasksData, leadsMap, salesPersonsMap]);
+    }, [tasksData, leadsMap, salesPersonsMap, activitiesDueDateMap]);
 
     const filteredTasks = useMemo(() => {
         let result = transformedTasks;
@@ -608,12 +666,18 @@ export default function TasksPage() {
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <div className="flex flex-col gap-1">
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium w-fit`}>
-                                                       
-                                                    </span>
-                                                    <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold w-fit ${
+                                                        dueStyles[task.due]?.[theme === "dark" ? "dark" : "light"] || dueStyles.upcoming.light
+                                                    }`}>
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
                                                         {task.dueDisplay}
+                                                        {task.hasUpdatedDue && (
+                                                            <span className="ml-1 w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                                                        )}
                                                     </span>
+                                                    
                                                 </div>
                                             </div>
                                         </td>

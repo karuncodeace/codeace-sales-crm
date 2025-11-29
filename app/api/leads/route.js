@@ -133,13 +133,18 @@ export async function PATCH(request) {
     .from("leads_table")
     .update(updateData)
     .eq("id", id)
-    .select()
-    .single();
+    .select();
 
   if (error) {
+    console.error("Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.json({ success: true, data });
+  if (!data || data.length === 0) {
+    console.error("Leads PATCH Error: No lead found with ID:", id);
+    return Response.json({ error: "Lead not found" }, { status: 404 });
+  }
+
+  return Response.json({ success: true, data: data[0] });
 }
 

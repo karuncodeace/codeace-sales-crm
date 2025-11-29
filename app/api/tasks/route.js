@@ -15,8 +15,8 @@ export async function GET(request) {
     query = query.eq("lead_id", leadId);
   }
 
-  // Order by due_datetime
-  const { data, error } = await query.order("due_datetime", { ascending: true });
+  // Order by created_at (newest first)
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     console.error("Tasks API Error:", error.message);
@@ -31,22 +31,24 @@ export async function POST(request) {
   const supabase = await supabaseServer();
   const body = await request.json();
 
-  const { lead_id, sales_person_id, due_datetime, priority, comments, type } = body;
+  const { lead_id, sales_person_id, priority, comments, type, title } = body;
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
-  if (!sales_person_id) return Response.json({ error: "sales_person_id is required" }, { status: 400 });
-  if (!due_datetime) return Response.json({ error: "due_datetime is required" }, { status: 400 });
+
+  const insertData = {
+    lead_id,
+    type: type || "Call",
+    priority: priority || "Medium",
+    comments: comments || null,
+  };
+
+  // Add optional fields
+  if (sales_person_id) insertData.sales_person_id = sales_person_id;
+  if (title) insertData.title = title;
 
   const { data, error } = await supabase
     .from("tasks_table")
-    .insert({
-      lead_id,
-      sales_person_id,
-      type: type || null,      // Trigger will generate title
-      priority: priority || "Medium",
-      comments: comments || null,
-      due_datetime
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -60,28 +62,33 @@ export async function PATCH(request) {
   const supabase = await supabaseServer();
   const body = await request.json();
 
-  const { id, type, status, priority, due_datetime, comments } = body;
+  const { id, lead_id, title, type, status, priority, comments } = body;
 
-  if (!id) return Response.json({ error: "Task ID is required" }, { status: 400 });
+  // Either id or lead_id must be provided
+  if (!id && !lead_id) return Response.json({ error: "Task ID or Lead ID is required" }, { status: 400 });
 
   const updateData = {};
 
+  if (title !== undefined) updateData.title = title;
   if (type !== undefined) updateData.type = type;
   if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
-  if (due_datetime !== undefined) updateData.due_datetime = due_datetime;
   if (comments !== undefined) updateData.comments = comments;
 
-  const { data, error } = await supabase
-    .from("tasks_table")
-    .update(updateData)
-    .eq("id", id)
-    .select()
-    .single();
+  let query = supabase.from("tasks_table").update(updateData);
+  
+  // Update by task id or by lead_id
+  if (id) {
+    query = query.eq("id", id);
+  } else {
+    query = query.eq("lead_id", lead_id);
+  }
+
+  const { data, error } = await query.select();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  return Response.json({ success: true, task: data });
+  return Response.json({ success: true, task: data?.[0] || data });
 }
 
 /* ---------------- DELETE ---------------- */
