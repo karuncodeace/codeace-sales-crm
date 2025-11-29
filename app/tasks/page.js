@@ -249,7 +249,7 @@ export default function TasksPage() {
             return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         };
         
-        return tasksData.map((task) => {
+        const mappedTasks = tasksData.map((task) => {
             const lead = leadsMap[task.lead_id];
             const salesPerson = salesPersonsMap[task.sales_person_id];
             
@@ -278,6 +278,15 @@ export default function TasksPage() {
                 recentLog: null,
                 recentLogDisplay: "",
             };
+        });
+
+        // Sort by due date (earliest first), with overdue tasks at top
+        return mappedTasks.sort((a, b) => {
+            // Completed tasks go to bottom
+            if (a.status?.toLowerCase() === "completed" && b.status?.toLowerCase() !== "completed") return 1;
+            if (b.status?.toLowerCase() === "completed" && a.status?.toLowerCase() !== "completed") return -1;
+            // Sort by due date (ascending - earliest first)
+            return new Date(a.due_datetime) - new Date(b.due_datetime);
         });
     }, [tasksData, leadsMap, salesPersonsMap, activitiesDueDateMap]);
 

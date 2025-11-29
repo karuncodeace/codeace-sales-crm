@@ -3,7 +3,11 @@ import { supabaseServer } from "../../../lib/supabase/serverClient";
 export async function GET() {
   const supabase = await supabaseServer();
   
-  const { data, error } = await supabase.from("leads_table").select("*");
+  // Order by id (descending to show newest leads first)
+  const { data, error } = await supabase
+    .from("leads_table")
+    .select("*")
+    .order("id", { ascending: true });
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });

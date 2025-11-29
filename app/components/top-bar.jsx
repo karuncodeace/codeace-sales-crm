@@ -203,7 +203,9 @@ export default function Header() {
               <span className={`font-medium text-sm
                 ${theme === "dark" ? "text-white" : "text-gray-800"}
               `}>
-                {user?.user_metadata?.full_name}
+                {user?.user_metadata?.full_name || 
+                  (user?.email?.split('@')[0]?.charAt(0).toUpperCase() + user?.email?.split('@')[0]?.slice(1)) || 
+                  "User"}
               </span>
               <span className={`text-xs hidden lg:block
                 ${theme === "dark" ? "text-gray-300" : "text-gray-400"}
