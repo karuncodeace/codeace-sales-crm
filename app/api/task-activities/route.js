@@ -16,6 +16,7 @@ export async function POST(request) {
     type: type || "note",
     comments: comments || "",
     source: "user",
+    created_at: new Date().toISOString(),
   };
 
   // Add optional fields if provided

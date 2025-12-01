@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Test - CRM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .result.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        .info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #004085;
+        }
+        .info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Email Test</h1>
+        <p class="subtitle">Test your SMTP configuration</p>
+        
+        <div class="info">
+            <strong>ℹ️ Instructions:</strong>
+            Fill in the form below and click "Send Test Email" to test your SMTP configuration.
+            Make sure your server is running on <code>http://localhost:3000</code>
+        </div>
+
+        <form id="emailForm">
+            <div class="form-group">
+                <label for="to">To Email *</label>
+                <input 
+                    type="email" 
+                    id="to" 
+                    name="to" 
+                    placeholder="recipient@example.com" 
+                    required
+                    value=""
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="subject">Subject *</label>
+                <input 
+                    type="text" 
+                    id="subject" 
+                    name="subject" 
+                    placeholder="Test Email" 
+                    required
+                    value="Test Email from CRM"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Message *</label>
+                <textarea 
+                    id="message" 
+                    name="message" 
+                    placeholder="Enter your message here..." 
+                    required
+                >This is a test email from the CRM system. If you received this, your SMTP configuration is working correctly! ✅</textarea>
+            </div>
+            
+            <button type="submit" id="submitBtn">Send Test Email</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('emailForm');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                to: document.getElementById('to').value,
+                subject: document.getElementById('subject').value,
+                message: document.getElementById('message').value
+            };
+
+            // Show loading state
+            result.className = 'result loading';
+            result.textContent = 'Sending email...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:3000/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        to: formData.to,
+                        subject: formData.subject,
+                        message: `<p>${formData.message.replace(/\n/g, '</p><p>')}</p>`
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    result.className = 'result success';
+                    result.textContent = `✅ Email sent successfully! Message ID: ${data.messageId || 'N/A'}`;
+                } else {
+                    result.className = 'result error';
+                    result.textContent = `❌ Error: ${data.error || 'Failed to send email'}`;
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `❌ Network Error: ${error.message}. Make sure your server is running on http://localhost:3000`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+

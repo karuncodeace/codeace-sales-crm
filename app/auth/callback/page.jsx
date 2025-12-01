@@ -41,6 +41,9 @@ export default function AuthCallback() {
             setStatus("success");
             setMessage("Welcome back! Preparing your dashboard...");
             
+            // Save login timestamp for auto-logout
+            localStorage.setItem("login_time", Date.now().toString());
+            
             // Small delay to show success state
             await new Promise(resolve => setTimeout(resolve, 800));
             
@@ -58,6 +61,10 @@ export default function AuthCallback() {
           if (session) {
             setStatus("success");
             setMessage("Session found! Redirecting...");
+            
+            // Save login timestamp for auto-logout
+            localStorage.setItem("login_time", Date.now().toString());
+            
             await new Promise(resolve => setTimeout(resolve, 500));
             window.location.href = "/dashboard";
           } else {

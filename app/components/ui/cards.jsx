@@ -1,6 +1,6 @@
 "use client"
 import {useEffect,useState} from "react"
-import {useTheme} from "../context/themeContext"
+import { useTheme } from "../../context/themeContext";
 export default function Cards(){
 const { theme } = useTheme();
  const [mounted, setMounted] = useState(false);

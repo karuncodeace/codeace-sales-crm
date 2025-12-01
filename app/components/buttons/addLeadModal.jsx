@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "../context/themeContext";
+import { useTheme } from "../../context/themeContext";
 import { useState } from "react";
 
 export default function AddLeadModal({ open, onClose, onAdd }) {

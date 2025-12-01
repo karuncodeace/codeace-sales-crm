@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useTheme } from "../context/themeContext";
+import { useTheme } from "../../context/themeContext";
 
 const PriorityDropdown = ({ value = "Hot", onChange = () => {}, theme: themeProp }) => {
   const { theme: ctxTheme } = useTheme();

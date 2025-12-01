@@ -1,9 +1,9 @@
 "use client";
 import Image from "next/image";
-import Tooglebtn from "./tooglebtn";
+import Tooglebtn from "../buttons/tooglebtn";
 import { useState, useEffect } from "react";
-import {useTheme} from "../context/themeContext"
-import { supabaseBrowser } from "../../lib/supabase/browserClient";
+import { useTheme } from "../../context/themeContext";
+import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 
 
 export default function Header() {

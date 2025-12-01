@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabaseBrowser } from "../../lib/supabase/browserClient";
+import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 
 export default function Header() {
     const [displayName, setDisplayName] = useState("");

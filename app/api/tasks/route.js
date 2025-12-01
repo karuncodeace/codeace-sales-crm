@@ -31,7 +31,7 @@ export async function POST(request) {
   const supabase = await supabaseServer();
   const body = await request.json();
 
-  const { lead_id, sales_person_id, priority, comments, type, title } = body;
+  const { lead_id, sales_person_id, priority, comments, type, title, due_date } = body;
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
 
@@ -45,6 +45,7 @@ export async function POST(request) {
   // Add optional fields
   if (sales_person_id) insertData.sales_person_id = sales_person_id;
   if (title) insertData.title = title;
+  if (due_date) insertData.due_date = due_date;
 
   const { data, error } = await supabase
     .from("tasks_table")
@@ -62,7 +63,7 @@ export async function PATCH(request) {
   const supabase = await supabaseServer();
   const body = await request.json();
 
-  const { id, lead_id, title, type, status, priority, comments } = body;
+  const { id, lead_id, title, type, status, priority, comments, due_date } = body;
 
   // Either id or lead_id must be provided
   if (!id && !lead_id) return Response.json({ error: "Task ID or Lead ID is required" }, { status: 400 });
@@ -74,6 +75,7 @@ export async function PATCH(request) {
   if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
   if (comments !== undefined) updateData.comments = comments;
+  if (due_date !== undefined) updateData.due_date = due_date;
 
   let query = supabase.from("tasks_table").update(updateData);
   

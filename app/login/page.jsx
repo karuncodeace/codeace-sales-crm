@@ -75,6 +75,9 @@ function LoginContent() {
         return;
       }
       
+      // Save login timestamp for auto-logout
+      localStorage.setItem("login_time", Date.now().toString());
+      
       // Success - redirect to dashboard
       window.location.href = "/dashboard";
     } catch (err) {

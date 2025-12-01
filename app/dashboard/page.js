@@ -1,12 +1,12 @@
 import WeeklyLineChart from "../components/charts/weeklylinecharts";
 import RevenueLineChart from "../components/charts/revenuelinechart";
-import Cards from "../components/cards"
+import Cards from "../components/ui/cards"
 
 import DonutChart from "../components/charts/donutchart";
 import BarChart from "../components/charts/kpi-barcharts";
 import SalesPersonComparisonChart from "../components/charts/salesperson-barchart";
 import RevenueAreaChart from "../components/charts/areachart";
-import Header from "../components/header";
+import Header from "../components/ui/header";
 export default function DashboardPage() {
   return (
     <>

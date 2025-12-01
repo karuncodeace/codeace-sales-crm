@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "../context/themeContext"
+import { useTheme } from "../../context/themeContext"
 
 export default function ToggleBtn() {
   const { theme, toggleTheme } = useTheme();
