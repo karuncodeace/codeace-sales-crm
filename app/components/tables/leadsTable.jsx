@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
+import { useNotification } from "../../context/notificationContext";
 import { Copy, Check, Mail } from "lucide-react";
 
 import StatusDropdown from "../buttons/statusTooglebtn";
@@ -68,6 +69,7 @@ const priorityStyles = {
 
 export default function LeadsTable() {
   const router = useRouter();
+  const { showNotification } = useNotification();
   
   // SWR for cached data fetching - data persists across navigations
   const { data: leadData = [], mutate } = useSWR("leads", fetchLeads, {
@@ -352,6 +354,19 @@ export default function LeadsTable() {
         });
       }
 
+      // Get lead name for notification
+      const lead = leadData.find((l) => l.id === leadId);
+      const companyName = lead?.name || "the company";
+
+      // Show notification if status is "Approved" or similar
+      if (newStatus.toLowerCase().includes("approved") || newStatus.toLowerCase() === "approved") {
+        showNotification(
+          `Request for "${companyName}" has been approved`,
+          "success",
+          6000
+        );
+      }
+
       // Optimistically update the UI
       mutate(
         leadData.map((lead) =>
@@ -359,6 +374,9 @@ export default function LeadsTable() {
         ),
         false
       );
+
+      // Revalidate to ensure data is fresh (but don't navigate)
+      mutate("leads", undefined, { revalidate: true });
 
       // Close modal
       setStatusChangeModal({
@@ -373,7 +391,7 @@ export default function LeadsTable() {
       });
     } catch (error) {
       console.error("Error updating status:", error);
-      alert(error.message);
+      showNotification(error.message || "Failed to update status", "error");
       setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -446,7 +464,7 @@ export default function LeadsTable() {
     <div className="">
       
 
-      <div className={`h-[calc(100vh-120px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
+      <div className={`h-[calc(100vh-180px)] mt-5 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
         {/* Header */}
         <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
           {/* LEFT SIDE — Title + Search */}

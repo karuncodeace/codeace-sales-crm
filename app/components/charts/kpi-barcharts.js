@@ -2,13 +2,36 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { useTheme } from "../../context/themeContext"; // update path if needed
+import useSWR from "swr";
+import { useTheme } from "../../context/themeContext";
+import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function KPICallBarChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  // Fallback data for immediate display
+  const fallbackData = {
+    calls: [420, 380, 450, 400],
+    meetings: [95, 85, 110, 100],
+    conversions: [58, 52, 68, 60],
+    categories: ["Q1", "Q2", "Q3", "Q4"]
+  };
+
+  // Fetch data using SWR with fallback for instant display
+  const { data = fallbackData, error, isValidating } = useSWR(
+    "/api/dashboard/kpi-breakdown",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      fallbackData: fallbackData, // Show this immediately while fetching
+    }
+  );
 
   const baseOptions = useMemo(
     () => ({
@@ -124,9 +147,9 @@ export default function KPICallBarChart() {
         type: "bar",
         height: 400,
         series: [
-          { name: "Calls", data: [420, 380, 450, 400] },
-          { name: "Meetings", data: [95, 85, 110, 100] },
-          { name: "Conversions", data: [58, 52, 68, 60] },
+          { name: "Calls", data: data.calls || [] },
+          { name: "Meetings", data: data.meetings || [] },
+          { name: "Conversions", data: data.conversions || [] },
         ],
         options: {
           ...baseOptions,
@@ -138,7 +161,7 @@ export default function KPICallBarChart() {
 
           xaxis: {
             ...baseOptions.xaxis,
-            categories: ["Q1", "Q2", "Q3", "Q4"],
+            categories: data.categories || ["Q1", "Q2", "Q3", "Q4"],
           },
 
           tooltip: {
@@ -152,8 +175,26 @@ export default function KPICallBarChart() {
         },
       },
     ],
-    [baseOptions, isDark]
+    [baseOptions, isDark, data]
   );
+
+  if (error) {
+    return (
+      <div className={`rounded-2xl p-5 border ${
+        isDark
+          ? "bg-[#262626] border-gray-700 text-gray-300"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="text-center py-8">
+          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
+            Failed to load chart data
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No loading state needed - fallbackData ensures we always have data
 
   return (
     <div

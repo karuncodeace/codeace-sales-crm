@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState, useEffect } from "react";
+import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
+import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -14,12 +16,30 @@ export default function RevenueAreaChart() {
   useEffect(() => setMounted(true), []);
   if (!mounted) return null; // prevent hydration mismatch
 
-  const revenueData = [
-    115000, 128000, 150000, 142000, 168000, 195000,
-    185000, 210000, 198000, 225000, 238000, 260000,
-  ];
+  // Fallback data for immediate display
+  const fallbackData = {
+    revenue: [
+      115000, 128000, 150000, 142000, 168000, 195000,
+      185000, 210000, 198000, 225000, 238000, 260000,
+    ],
+    months: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  };
 
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // Fetch data using SWR with fallback for instant display
+  const { data = fallbackData, error, isValidating } = useSWR(
+    "/api/dashboard/revenue-area",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      fallbackData: fallbackData, // Show this immediately while fetching
+    }
+  );
+
+  const revenueData = data.revenue || fallbackData.revenue;
+  const months = data.months || fallbackData.months;
 
   const calculateGrowth = (data) =>
     data.map((v, i) => (i === 0 ? null : ((v - data[i - 1]) / data[i - 1]) * 100));
@@ -145,6 +165,24 @@ export default function RevenueAreaChart() {
   const totalGrowth = ((revenueData.at(-1) - revenueData[0]) / revenueData[0]) * 100;
   const spikeCount = anomalies.filter((a) => a.type === "spike").length;
   const dipCount = anomalies.filter((a) => a.type === "dip").length;
+
+  if (error) {
+    return (
+      <div className={`rounded-2xl p-5 border ${
+        isDark
+          ? "bg-[#262626] border-gray-700 text-gray-300"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="text-center py-8">
+          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
+            Failed to load chart data
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No loading state needed - fallbackData ensures we always have data
 
   return (
     <div

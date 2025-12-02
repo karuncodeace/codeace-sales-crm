@@ -2,10 +2,33 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import TopHeader from "./components/ui/top-bar";
-import Sidebar from "./components/ui/sidebar";
+import TopBar2 from "./components/ui/top-bar-2";
+import Sidebar2 from "./components/ui/sidebar-2";
+import SearchBtn from "./components/buttons/searchBtn";
+
 import { ThemeProvider, useTheme } from "./context/themeContext";
+import { SidebarProvider, useSidebar } from "./context/sidebarContext";
+import { NotificationProvider } from "./context/notificationContext";
+import NotificationContainer from "./components/ui/notification";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
+
+function MainContent({ children }) {
+  const { isCollapsed } = useSidebar();
+  
+  return (
+    <main
+      className="flex-1 overflow-y-auto transition-all duration-300 p-6 pt-2 pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      style={{
+        marginLeft: isCollapsed ? "80px" : "224px", // w-20 = 80px, w-64 = 256px
+        marginTop: "64px", // Top bar height (h-16 = 64px)
+        scrollbarWidth: "none", // Firefox
+        msOverflowStyle: "none", // IE and Edge
+      }}
+    >
+      {children}
+    </main>
+  );
+}
 
 function LayoutStructure({ children, fonts }) {
   const { theme } = useTheme();
@@ -37,13 +60,13 @@ function LayoutStructure({ children, fonts }) {
         {isLoginPage ? (
           children
         ) : (
-          <div className="flex flex-col h-screen ">
-            <TopHeader />
-            <div className="flex flex-1 overflow-hidden ">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto">{children}</main>
+          <SidebarProvider>
+            <div className="flex flex-col h-screen">
+              <Sidebar2 />
+              <TopBar2 />
+              <MainContent>{children}</MainContent>
             </div>
-          </div>
+          </SidebarProvider>
         )}
       </body>
     </html>
@@ -53,7 +76,10 @@ function LayoutStructure({ children, fonts }) {
 export default function LayoutClient({ children, fonts }) {
   return (
     <ThemeProvider>
-      <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+      <NotificationProvider>
+        <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+        <NotificationContainer />
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

@@ -2,13 +2,36 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { useTheme } from "../../context/themeContext"; // update path if needed
+import useSWR from "swr";
+import { useTheme } from "../../context/themeContext";
+import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function SalesPersonComparisonChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  // Fallback data for immediate display
+  const fallbackData = {
+    calls: [145, 132, 168],
+    meetings: [32, 28, 45],
+    conversions: [18, 15, 24],
+    salesPersons: ["Sarah", "John", "Emily"]
+  };
+
+  // Fetch data using SWR with fallback for instant display
+  const { data = fallbackData, error, isValidating } = useSWR(
+    "/api/dashboard/salesperson-performance",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      fallbackData: fallbackData, // Show this immediately while fetching
+    }
+  );
 
   const baseOptions = useMemo(
     () => ({
@@ -117,9 +140,9 @@ export default function SalesPersonComparisonChart() {
         height: 400,
 
         series: [
-          { name: "Calls", data: [145, 132, 168] },
-          { name: "Meetings", data: [32, 28, 45] },
-          { name: "Conversions", data: [18, 15, 24] },
+          { name: "Calls", data: data.calls || [] },
+          { name: "Meetings", data: data.meetings || [] },
+          { name: "Conversions", data: data.conversions || [] },
         ],
 
         options: {
@@ -132,7 +155,7 @@ export default function SalesPersonComparisonChart() {
 
           xaxis: {
             ...baseOptions.xaxis,
-            categories: ["Sarah", "John", "Emily"],
+            categories: data.salesPersons || ["Sarah", "John", "Emily"],
           },
 
           tooltip: {
@@ -146,8 +169,26 @@ export default function SalesPersonComparisonChart() {
         },
       },
     ],
-    [baseOptions, isDark]
+    [baseOptions, isDark, data]
   );
+
+  if (error) {
+    return (
+      <div className={`rounded-2xl p-5 border ${
+        isDark
+          ? "bg-[#262626] border-gray-700 text-gray-300"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="text-center py-8">
+          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
+            Failed to load chart data
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No loading state needed - fallbackData ensures we always have data
 
   return (
     <div

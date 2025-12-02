@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { useTheme } from "../../context/themeContext"; // update path if needed
+import useSWR from "swr";
+import { useTheme } from "../../context/themeContext";
+import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -10,13 +12,38 @@ export default function DonutChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
+  // Fallback data for immediate display
+  const fallbackData = {
+    series: [48, 26, 16, 10],
+    labels: [
+      "Inbound Marketing",
+      "Outbound Prospects",
+      "Partner Referrals",
+      "Field Events",
+    ],
+    total: 2480
+  };
+
+  // Fetch data using SWR with fallback for instant display
+  const { data = fallbackData, error, isValidating } = useSWR(
+    "/api/dashboard/lead-sources",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      fallbackData: fallbackData, // Show this immediately while fetching
+    }
+  );
+
   const { options, series } = useMemo(
     () => ({
       id: "lead-source-breakdown",
       title: "Lead Source Breakdown",
       subtitle: "Share of total Leads by acquisition channel",
       height: 320,
-      series: [48, 26, 16, 10],
+      series: data.series || [48, 26, 16, 10],
       options: {
         chart: {
           type: "donut",
@@ -24,7 +51,7 @@ export default function DonutChart() {
           background: "transparent",
         },
 
-        labels: [
+        labels: data.labels || [
           "Inbound Marketing",
           "Outbound Prospects",
           "Partner Referrals",
@@ -74,7 +101,7 @@ export default function DonutChart() {
                   label: "Total Leads",
                   color: isDark ? "#E2E8F0" : "#0f172a",
                   formatter() {
-                    return "2,480";
+                    return data.total?.toLocaleString() || "2,480";
                   },
                 },
                 value: {
@@ -105,8 +132,26 @@ export default function DonutChart() {
         ],
       },
     }),
-    [isDark]
+    [isDark, data]
   );
+
+  if (error) {
+    return (
+      <div className={`rounded-2xl p-5 border ${
+        isDark
+          ? "bg-[#262626] border-gray-700 text-gray-300"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="text-center py-8">
+          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
+            Failed to load chart data
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No loading state needed - fallbackData ensures we always have data
 
   return (
     <div

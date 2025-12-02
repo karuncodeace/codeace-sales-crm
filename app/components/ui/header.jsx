@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
-
+import { useTheme } from "../../context/themeContext";
 export default function Header() {
     const [displayName, setDisplayName] = useState("");
-
+    const { theme } = useTheme();
     useEffect(() => {
         const getUser = async () => {
             const { data: { user } } = await supabaseBrowser.auth.getUser();
@@ -24,7 +24,7 @@ export default function Header() {
     return (
         <div className="mt-10 pt-0 w-[98%]">
             <div>
-                <h1 className="text-4xl font-bold mb-1">
+                <h1 className={`text-3xl font-bold font-dyna-puff ${theme === "dark" ? "text-white" : "text-black"}`}>
                     Hello {displayName || "..."} !!!
                 </h1>
             </div>

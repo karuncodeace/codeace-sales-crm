@@ -2,13 +2,35 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
+import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function weeklyLineChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  // Fallback data for immediate display
+  const fallbackData = {
+    closedWon: [32, 45, 38, 60, 72, 81, 95],
+    newPipeline: [58, 62, 70, 78, 84, 90, 102],
+    categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  };
+
+  // Fetch data using SWR with fallback for instant display
+  const { data = fallbackData, error, isValidating } = useSWR(
+    "/api/dashboard/weekly-sales",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      fallbackData: fallbackData, // Show this immediately while fetching
+    }
+  );
 
   // base chart options with theme support
   const baseOptions = useMemo(
@@ -60,14 +82,14 @@ export default function weeklyLineChart() {
         type: "line",
         height: 400,
         series: [
-          { name: "Closed Won", data: [32, 45, 38, 60, 72, 81, 95] },
-          { name: "New Pipeline", data: [58, 62, 70, 78, 84, 90, 102] },
+          { name: "Closed Won", data: data.closedWon || [] },
+          { name: "New Pipeline", data: data.newPipeline || [] },
         ],
         options: {
           ...baseOptions,
           colors: isDark ? ["#4ade80", "#fb923c"] : ["#22c55e", "#f97316"],
           xaxis: {
-            categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            categories: data.categories || ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
             axisBorder: { show: false },
             axisTicks: { show: false },
             labels: {
@@ -104,8 +126,26 @@ export default function weeklyLineChart() {
         },
       },
     ],
-    [baseOptions, isDark]
+    [baseOptions, isDark, data]
   );
+
+  if (error) {
+    return (
+      <div className={`rounded-2xl p-5 border ${
+        isDark
+          ? "bg-[#262626] border-gray-700 text-gray-300"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="text-center py-8">
+          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
+            Failed to load chart data
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No loading state needed - fallbackData ensures we always have data
 
   return (
     <div className="grid gap-6 grid-cols-1 sm:grid-cols-1 xl:grid-cols-1">

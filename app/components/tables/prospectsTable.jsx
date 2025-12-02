@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
+import { useRouter } from "next/navigation";
 import { useTheme } from "../../context/themeContext";
+import { useNotification } from "../../context/notificationContext";
 import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
@@ -20,6 +22,8 @@ export default function ProspectsTable() {
     const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const { theme } = useTheme();
+    const router = useRouter();
+    const { showNotification } = useNotification();
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState({
@@ -81,6 +85,10 @@ export default function ProspectsTable() {
 
     const handleStatusUpdate = async (prospectId, newStatus) => {
         try {
+            // Get the prospect name before updating
+            const prospect = prospectsData?.find((p) => p.id === prospectId);
+            const companyName = prospect?.name || "the company";
+
             const response = await fetch("/api/prospects", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -91,9 +99,20 @@ export default function ProspectsTable() {
                 throw new Error("Failed to update status");
             }
             
-            mutate("/api/prospects");
+            // Show notification if status is "Approved" or similar
+            if (newStatus.toLowerCase().includes("approved") || newStatus.toLowerCase() === "approved") {
+                showNotification(
+                    `Request for "${companyName}" has been approved`,
+                    "success",
+                    6000
+                );
+            }
+            
+            // Refresh data without navigation to prevent 404
+            await mutate("/api/prospects", undefined, { revalidate: true });
         } catch (error) {
             console.error("Error updating status:", error);
+            showNotification("Failed to update status", "error");
         }
     };
 
