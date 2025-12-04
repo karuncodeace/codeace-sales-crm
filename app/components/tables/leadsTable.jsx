@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
-import { useNotification } from "../../context/notificationContext";
 import { Copy, Check, Mail } from "lucide-react";
 
 import StatusDropdown from "../buttons/statusTooglebtn";
@@ -69,7 +68,6 @@ const priorityStyles = {
 
 export default function LeadsTable() {
   const router = useRouter();
-  const { showNotification } = useNotification();
   
   // SWR for cached data fetching - data persists across navigations
   const { data: leadData = [], mutate } = useSWR("leads", fetchLeads, {
@@ -354,19 +352,6 @@ export default function LeadsTable() {
         });
       }
 
-      // Get lead name for notification
-      const lead = leadData.find((l) => l.id === leadId);
-      const companyName = lead?.name || "the company";
-
-      // Show notification if status is "Approved" or similar
-      if (newStatus.toLowerCase().includes("approved") || newStatus.toLowerCase() === "approved") {
-        showNotification(
-          `Request for "${companyName}" has been approved`,
-          "success",
-          6000
-        );
-      }
-
       // Optimistically update the UI
       mutate(
         leadData.map((lead) =>
@@ -374,9 +359,6 @@ export default function LeadsTable() {
         ),
         false
       );
-
-      // Revalidate to ensure data is fresh (but don't navigate)
-      mutate("leads", undefined, { revalidate: true });
 
       // Close modal
       setStatusChangeModal({
@@ -391,7 +373,7 @@ export default function LeadsTable() {
       });
     } catch (error) {
       console.error("Error updating status:", error);
-      showNotification(error.message || "Failed to update status", "error");
+      alert(error.message);
       setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
