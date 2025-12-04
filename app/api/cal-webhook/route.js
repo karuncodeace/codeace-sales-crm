@@ -5,6 +5,10 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // MUST use service role for webhooks
 );
+export function GET() {
+    return new Response("Cal.com Webhook OK", { status: 200 });
+  }
+  
 
 export async function POST(req) {
   try {
