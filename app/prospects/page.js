@@ -36,7 +36,7 @@ export default function ProspectsPage() {
         <div className="pl-5 md:pl-0 2xl:pl-0 w-full">
             <div className="mt-10 flex justify-between items-center">
                 <div>
-                    <h1 className="text-4xl font-bold mb-1">Prospects</h1>
+                    <h1 className="text-3xl font-bold mb-1">Prospects</h1>
                     <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                         Leads with 60%+ conversion chance
                     </p>

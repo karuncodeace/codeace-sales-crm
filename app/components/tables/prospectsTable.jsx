@@ -149,7 +149,7 @@ export default function ProspectsTable() {
         <div className="">
            
 
-            <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
+            <div className={`h-[calc(100vh-180px)] mt-4 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
                 <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                     {/* Search Bar */}
                     <div className={`relative w-full md:w-80 p-2  flex items-center rounded-[10px] pl-4 px-4 py-2 ${theme === "dark" ? " border border-gray-700 bg-gray-800/50" : " border border-gray-200"}`}>

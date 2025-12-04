@@ -628,14 +628,13 @@ export default function LeadsTable() {
                     </th>
 
                     {[
-                      "Lead Name",
-                      "Phone",
-                      "Email",
                       "Contact Name",
+                      "Lead Name"
+,                     "Phone",
+                      "Email",
                       "Lead Source",
                       "Status",
                       "Assigned To",
-                      "Last Activity",
                       "Created At",
                       "Priority",
                       "Actions",
@@ -689,6 +688,13 @@ export default function LeadsTable() {
                                 Select {lead.name}
                               </span>
                             </label>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                              {lead.contactName || "—"}
+                            </span>
                           </div>
                         </td>
                         <td className="size-px whitespace-nowrap">
@@ -759,13 +765,7 @@ export default function LeadsTable() {
                             )}
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                              {lead.contactName || "—"}
-                            </span>
-                          </div>
-                        </td>
+                       {/*
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
@@ -773,6 +773,7 @@ export default function LeadsTable() {
                             </span>
                           </div>
                         </td>
+*/}
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <StatusDropdown
@@ -789,13 +790,7 @@ export default function LeadsTable() {
                             </span>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {lead.lastActivity}
-                            </span>
-                          </div>
-                        </td>
+                        
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>

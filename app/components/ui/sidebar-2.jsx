@@ -249,8 +249,8 @@ export default function Sidebar2() {
 
             {/* Logo Section */}
             <div
-                className={`flex items-center border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"
-                    } p-3 relative overflow-hidden`}
+                className={`flex items-center border-b p-10 ${theme === "dark" ? "border-gray-800" : "border-gray-200"
+                    } h-18 relative overflow-hidden`}
             >
                 {/* Full Logo (shown when expanded) */}
                 <Image
@@ -285,8 +285,8 @@ export default function Sidebar2() {
 
 
             {/* Menu Items */}
-            <nav className="flex-1  py-4 pt-5 px-3 flex flex-col">
-                <div className="space-y-5 flex-1">
+            <nav className="flex-1  py-4 pt-8 md:pt-4 2xl:pt-8 px-3 flex flex-col">
+                <div className="space-y-5 md:space-y-3 2xl:space-y-5 flex-1">
                     {menuItems.map((item) => {
                         const active = isActive(item.path);
                         return (

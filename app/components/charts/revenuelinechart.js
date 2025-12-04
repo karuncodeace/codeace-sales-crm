@@ -119,6 +119,31 @@ export default function weeklyLineChart() {
             colors: isDark ? "#ef4444" : "#22c55e",
           },
         },
+        responsive: [
+          {
+            breakpoint: 1024, // tablets & small laptops
+            options: {
+              legend: {
+                horizontalAlign: "center",
+                fontSize: "13px",
+                markers: { radius: 10 },
+              },
+            },
+          },
+          {
+            breakpoint: 640, // mobile screens
+            options: {
+              legend: {
+                horizontalAlign: "center",
+                fontSize: "12px",
+                markers: { radius: 10 },
+              },
+              chart: {
+                height: 260,
+              },
+            },
+          },
+        ],
       },
     ],
     [baseOptions, isDark, data]
@@ -155,14 +180,14 @@ export default function weeklyLineChart() {
         >
           <div className="mb-4">
             <h3
-              className={`text-lg font-semibold ${
+              className={`text-lg md:text-base 2xl:text-lg font-semibold ${
                 isDark ? "text-gray-200" : "text-gray-900"
               }`}
             >
               {card.title}
             </h3>
             <p
-              className={`text-sm ${
+              className={`text-sm md:text-xs 2xl:text-sm ${
                 isDark ? "text-gray-400" : "text-gray-500/50"
               }`}
             >
@@ -171,13 +196,15 @@ export default function weeklyLineChart() {
           </div>
 
           {/* 🔄 forces rerender when theme changes */}
-          <ApexChart
+            <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
+            <ApexChart
             key={theme}
             options={card.options}
             series={card.series}
             type={card.type}
-            height={card.height}
+            height="100%"
           />
+            </div>
         </div>
       ))}
     </div>

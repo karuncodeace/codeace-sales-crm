@@ -42,7 +42,7 @@ export default function DonutChart() {
       id: "lead-source-breakdown",
       title: "Lead Source Breakdown",
       subtitle: "Share of total Leads by acquisition channel",
-      height: 320,
+      height: 350,
       series: data.series || [48, 26, 16, 10],
       options: {
         chart: {
@@ -60,8 +60,22 @@ export default function DonutChart() {
 
         // 🎨 Colors mode-wise (vibrant in light, deeper tone in dark)
         colors: isDark
-          ? ["#f87171", "#fb923c", "#facc15", "#4ade80", "#2dd4bf"] // dark mode shades
-          : ["#FF7A7A", "#FFB061", "#FFE066", "#7DDFA3", "#48DCC9"], // original light mode
+          ? ["#4C6EF5", // Soft Indigo (Primary)
+            "#74C0FC", // Sky Blue
+            "#4DABF7", // Bright Blue
+            "#FCC419", // Warm Gold
+            "#FF922B", // Soft Orange
+            "#FF6B6B",] // dark mode shades
+          : [
+            "#4C6EF5", // Soft Indigo (Primary)
+            "#74C0FC", // Sky Blue
+            "#4DABF7", // Bright Blue
+            "#FCC419", // Warm Gold
+            "#FF922B", // Soft Orange
+            "#FF6B6B", // Coral Red
+          ]
+          
+          , // original light mode
 
         states: {
           hover: {
@@ -162,16 +176,20 @@ export default function DonutChart() {
       }`}
     >
       <div className="mb-4">
-        <h3 className={`text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+        <h3 className={`text-lg md:text-base 2xl:text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
           Lead Source Breakdown
         </h3>
-        <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
+        <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
           Share of total Leads by acquisition channel
         </p>
       </div>
 
       {/* 🔄 Re-render when theme changes */}
-      <ApexChart key={theme} options={options} series={series} type="donut" height={400} />
+      <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
+      <ApexChart key={theme} options={options} series={series} type="donut" height="100%" 
+      
+      />
+      </div>
     </div>
   );
 }

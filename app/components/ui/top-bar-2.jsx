@@ -26,10 +26,11 @@ const TooltipIcon = ({ label, className = "", children, onClick }) => (
 export default function TopBar2() {
     const { theme } = useTheme();
     const { isCollapsed } = useSidebar();
-    const [searchQuery, setSearchQuery] = useState("");
+    const router = useRouter();
+
     const [user, setUser] = useState(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const router = useRouter();
+
 
     useEffect(() => {
         const getUser = async () => {
@@ -52,7 +53,7 @@ export default function TopBar2() {
 
     return (
         <div
-            className={`fixed top-0 h-21.5 flex transition-all duration-300 ${theme === "dark" ? "bg-[#1a1a1a]" : "bg-white"
+            className={`fixed top-0 h-18 flex transition-all duration-300 p-10 ${theme === "dark" ? "bg-[#1a1a1a]" : "bg-white"
                 } border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"
                 } flex items-center justify-between px-4 z-30 `}
             style={{
@@ -66,7 +67,7 @@ export default function TopBar2() {
             </div>
 
             {/* Right Side Controls */}
-            <div className="flex items-center gap-8 ml-4">
+            <div className="flex items-center gap-4 ml-4">
                 {/* Dark Mode Toggle */}
                 <div className="hidden sm:block">
                     <Tooglebtn />
@@ -140,7 +141,7 @@ export default function TopBar2() {
                             <button
                                 onClick={() => {
                                     setShowProfileMenu(false);
-                                    // Add profile navigation logic here if needed
+                                    router.push("/profile");
                                 }}
                                 className={`w-full px-4 py-2 text-left text-sm transition-colors ${theme === "dark"
                                     ? "text-gray-300 hover:bg-gray-800"

@@ -37,16 +37,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium 
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>Leads Generated</h3>
-              <p className="text-2xl font-semibold text-green-600 mt-1">
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
+                Leads Generated
+              </h3>
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : data?.leadsGenerated ?? 25}
               </p>
             </div>
             <div
-              className="p-2 sm:p-3 bg-green-100 text-green-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-2 sm:p-3 bg-green-100 text-green-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M8 17L8 14" />
@@ -61,16 +60,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium 
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>First Call Done</h3>
-              <p className="text-2xl font-semibold text-yellow-600 mt-1">
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
+                First Call Done
+              </h3>
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : data?.firstCallDone ?? 12}
               </p>
             </div>
             <div
-              className="p-3 bg-yellow-100 text-yellow-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-yellow-100 text-yellow-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M13 7.5L15.5 10L21 4" />
@@ -82,18 +80,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium 
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
                 Qualified Leads
               </h3>
-              <p className="text-2xl font-semibold text-green-600 mt-1">
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : data?.qualifiedLeads ?? 32}
               </p>
             </div>
             <div
-              className="p-3 bg-green-100 text-green-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-green-100 text-green-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -122,16 +117,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium 
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>Meeting Scheduled</h3>
-              <p className="text-2xl font-semibold text-orange-600 mt-1">
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
+                Meeting Scheduled
+              </h3>
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : data?.meetingScheduled ?? 12}
               </p>
             </div>
             <div
-              className="p-3 bg-orange-100 text-orange-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-orange-100 text-orange-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M16 2V6M8 2V6" />
@@ -145,9 +139,7 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
                 Meeting Conducted
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
@@ -170,18 +162,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
                 Follow Up Calls
               </h3>
-              <p className="text-2xl font-semibold text-cyan-600 mt-1">
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : data?.followUpCalls ?? 45}
               </p>
             </div>
             <div
-              className="p-3 bg-cyan-100 text-cyan-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-cyan-100 text-cyan-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4.91186 10.5413L7.55229 7.90088C8.09091 7.36227 8.27728 6.56642 8.05944 5.83652C7.8891 5.26577 7.69718 4.57964 7.56961 3.99292C7.45162 3.45027 6.97545 3 6.42012 3H4.91186C3.8012 3 2.88911 3.90384 3.01094 5.0078C3.93709 13.3996 10.6004 20.0629 18.9922 20.9891C20.0962 21.1109 21 20.1988 21 19.0881V17.5799C21 17.0246 20.5479 16.569 20.0015 16.4696C19.3988 16.36 18.7611 16.1804 18.2276 16.0103C17.4611 15.7659 16.6091 15.9377 16.0403 16.5065L13.4587 19.0881" />
@@ -193,9 +182,7 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
                 Proposals Sent
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
@@ -203,8 +190,7 @@ export default function Cards() {
               </p>
             </div>
             <div
-              className="p-3 bg-blue-100 text-blue-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-blue-100 text-blue-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.9805 7.01556C14.9805 7.01556 15.4805 7.51556 15.9805 8.51556C15.9805 8.51556 17.5687 6.01556 18.9805 5.51556" />
@@ -219,18 +205,15 @@ export default function Cards() {
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-sm font-medium
-                ${theme === "dark" ? "text-gray-300" : "text-gray-500"}
-                `}>
+              <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
                 Conversion Rate
               </h3>
-              <p className="text-2xl font-semibold text-purple-600 mt-1">
+              <p className="text-2xl font-semibold text-blue-600 mt-1">
                 {error ? "N/A" : `${data?.conversionRate ?? 24.5}%`}
               </p>
             </div>
             <div
-              className="p-3 bg-purple-100 text-purple-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-purple-100 text-purple-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 21H10C6.70017 21 5.05025 21 4.02513 19.9749C3 18.9497 3 17.2998 3 14V3" />

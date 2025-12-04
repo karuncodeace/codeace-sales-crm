@@ -159,22 +159,24 @@ export default function weeklyLineChart() {
           }`}
         >
           <div className="mb-4">
-            <h3 className={`text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+            <h3 className={`text-lg md:text-base 2xl:text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
               {card.title}
             </h3>
-            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
+            <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
               {card.subtitle}
             </p>
           </div>
 
           {/* Key forces re-render when theme changes */}
-          <ApexChart
+          <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
+            <ApexChart
             key={theme}
             options={card.options}
             series={card.series}
             type={card.type}
-            height={card.height}
+            height="100%"
           />
+            </div>
         </div>
       ))}
     </div>
