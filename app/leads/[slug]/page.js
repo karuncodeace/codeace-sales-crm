@@ -8,7 +8,7 @@ import { useTheme } from "../../context/themeContext";
 import EmailModal from "../../components/ui/email-modal";
 import OverveiwTab from "./components/overveiwTab";
 import ActivityTab from "./components/activityTab";
-
+import BookMeetingButton from "../../components/buttons/bookMeetingbtn";
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 // Notes Tab Component
@@ -235,6 +235,7 @@ function NotesTab({ theme, leadId, leadName }) {
                         {notes.length} {notes.length === 1 ? 'note' : 'notes'} for {leadName}
                     </p>
                 </div>
+               
                 <button 
                     onClick={() => setShowAddNote(!showAddNote)}
                     className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-medium text-sm"
@@ -758,6 +759,7 @@ export default function LeadDetailPage() {
                         </span>
                     </div>
                 </div>
+                
 
                 {/* Action Menu Button */}
                 <div className="relative">
@@ -813,6 +815,7 @@ export default function LeadDetailPage() {
                         </>
                     )}
                 </div>
+                <BookMeetingButton lead={lead} />
             </div>
 
             {/* tabs */}

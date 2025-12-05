@@ -36,7 +36,7 @@ export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/auth/callback", "/logout"];
+  const publicRoutes = ["/login", "/auth/callback", "/logout", "/api/cal-webhook"];
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route)
   );

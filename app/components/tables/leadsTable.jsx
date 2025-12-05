@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { Copy, Check, Mail } from "lucide-react";
+import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 
 import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
@@ -109,6 +110,7 @@ export default function LeadsTable() {
     isSubmitting: false,
     showCalendar: false,
   });
+  
 
   const handleApplyFilters = (filters) => {
     setAdvancedFilters(filters);
@@ -613,7 +615,7 @@ export default function LeadsTable() {
         {viewMode === "table" ? (
           <>
             {/* Table */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto">
+            <div className="flex-1 overflow-y-auto overflow-x-auto h-[calc(100vh-200px)]">
               <table className={`min-w-full divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                 <thead className={`  ${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
                   <tr>
@@ -632,7 +634,7 @@ export default function LeadsTable() {
                       "Lead Name"
 ,                     "Phone",
                       "Email",
-                      "Lead Source",
+                      
                       "Status",
                       "Assigned To",
                       "Created At",
@@ -980,7 +982,7 @@ export default function LeadsTable() {
             {/* End Footer */}
           </>
         ) : (
-          <div className={`px-6 py-6 overflow-x-auto divide-y-3 
+          <div className={`px-6 py-6 overflow-x-auto divide-y-3 h-[calc(100vh-190px)] 
           ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}
           `}>
             <div className="flex items-start gap-4 ">
@@ -1429,6 +1431,7 @@ export default function LeadsTable() {
         recipientEmail={emailModal.recipientEmail}
         recipientName={emailModal.recipientName}
       />
+
     </div>
   );
 }
