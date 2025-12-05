@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase client with error handling
+let supabase;
+try {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("❌ Missing Supabase environment variables");
+    console.error("  - NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
+    console.error("  - SUPABASE_SERVICE_ROLE_KEY:", supabaseKey ? "✅ Set" : "❌ Missing");
+  }
+  
+  supabase = createClient(supabaseUrl, supabaseKey);
+} catch (err) {
+  console.error("❌ Failed to initialize Supabase client:", err);
+}
 
 // GET → required for Cal.com Ping Test
 export function GET() {
@@ -85,9 +97,9 @@ export async function POST(req) {
                     null;
 
     const status = payload.status || "ACCEPTED";
-    const calEventId = payload.id || 
-                      payload.uid ||
+    const calEventId = payload.uid ||
                       payload.bookingId ||
+                      payload.id ||
                       `cal-${Date.now()}`;
 
     console.log("📋 Extracted Fields:");
@@ -104,19 +116,19 @@ export async function POST(req) {
     // ----------------------------------------------------------
     // 4️⃣ Fetch Lead Name and Resolve Salesperson ID (if exists)
     // ----------------------------------------------------------
-    let lead_name = null;
+    let lead_name = responses.lead_name?.value || responses.name?.value || attendeeName || null;
     let resolvedSalespersonId = salesperson_id;
 
     if (lead_id) {
       try {
         const { data: lead, error: leadError } = await supabase
           .from("leads")
-          .select("lead_name, name")
+          .select("lead_name, name, full_name")
           .eq("id", lead_id)
           .single();
 
         if (!leadError && lead) {
-          lead_name = lead.lead_name || lead.name || null;
+          lead_name = lead.lead_name || lead.full_name || lead.name || lead_name || null;
           console.log("  - lead_name (from DB):", lead_name);
         } else {
           console.log("  - lead_name: Not found in database");
@@ -204,7 +216,7 @@ export async function POST(req) {
       // Prepare appointment data
       const appointmentData = {
         cal_event_id: calEventId,
-        title: "15min Meeting",
+        title: payload.title || payload.eventTitle || payload.type || "Meeting",
         start_time: startTime,
         end_time: endTime,
         status: appointmentStatus,
@@ -253,23 +265,93 @@ export async function POST(req) {
         console.log("   Updated data:", JSON.stringify(updatedData, null, 2));
       } else {
         console.log("📝 Creating new appointment");
+        console.log("   Appointment data:", JSON.stringify(appointmentData, null, 2));
         
-        const { data: insertedData, error: insertError } = await supabase
-          .from("appointments")
-          .insert(appointmentData)
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("❌ Insert Error:", insertError);
+        // Validate required fields before insert
+        if (!appointmentData.lead_id) {
+          console.error("❌ Missing required field: lead_id");
           return NextResponse.json(
-            { error: `Failed to insert appointment: ${insertError.message}` },
-            { status: 500 }
+            { error: "Missing required field: lead_id" },
+            { status: 400 }
           );
         }
 
-        console.log("✅ Successfully created new appointment:", insertedData?.id);
-        console.log("   Inserted data:", JSON.stringify(insertedData, null, 2));
+        if (!appointmentData.start_time) {
+          console.error("❌ Missing required field: start_time");
+          return NextResponse.json(
+            { error: "Missing required field: start_time" },
+            { status: 400 }
+          );
+        }
+
+        // Check if Supabase client is initialized
+        if (!supabase) {
+          console.error("❌ Supabase client not initialized");
+          return NextResponse.json(
+            { error: "Database connection not available. Check environment variables." },
+            { status: 500 }
+          );
+        }
+        
+        // Log what we're about to insert
+        console.log("📤 Attempting Supabase insert...");
+        console.log("   - Table: appointments");
+        console.log("   - Data keys:", Object.keys(appointmentData));
+        
+        try {
+          const { data: insertedData, error: insertError } = await supabase
+            .from("appointments")
+            .insert(appointmentData)
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("❌ Insert Error Details:");
+            console.error("   - Code:", insertError.code);
+            console.error("   - Message:", insertError.message);
+            console.error("   - Details:", insertError.details);
+            console.error("   - Hint:", insertError.hint);
+            console.error("   - Full Error Object:", JSON.stringify(insertError, null, 2));
+            
+            // Check if error message contains HTML (Cloudflare/proxy error)
+            const errorMessage = insertError.message || String(insertError) || "Unknown error";
+            if (errorMessage.includes('<html>') || errorMessage.includes('cloudflare') || errorMessage.includes('500 Internal Server Error')) {
+              console.error("⚠️ Detected HTML/Cloudflare error - this suggests a connection or configuration issue");
+              return NextResponse.json(
+                { 
+                  error: "Database connection error. The error response contains HTML, suggesting a Supabase URL or network configuration issue.",
+                  suggestion: "Please check: 1) NEXT_PUBLIC_SUPABASE_URL is correct, 2) SUPABASE_SERVICE_ROLE_KEY is valid, 3) Network connectivity to Supabase"
+                },
+                { status: 500 }
+              );
+            }
+            
+            return NextResponse.json(
+              { 
+                error: `Failed to insert appointment: ${errorMessage}`,
+                code: insertError.code,
+                details: insertError.details,
+                hint: insertError.hint
+              },
+              { status: 500 }
+            );
+          }
+
+          console.log("✅ Successfully created new appointment:", insertedData?.id);
+          console.log("   Inserted data:", JSON.stringify(insertedData, null, 2));
+        } catch (insertException) {
+          console.error("❌ Exception during Supabase insert:");
+          console.error("   - Type:", insertException.constructor.name);
+          console.error("   - Message:", insertException.message);
+          console.error("   - Stack:", insertException.stack);
+          return NextResponse.json(
+            { 
+              error: `Exception during database insert: ${insertException.message}`,
+              type: insertException.constructor.name
+            },
+            { status: 500 }
+          );
+        }
       }
 
       // Update lead last activity (if lead_id exists)
