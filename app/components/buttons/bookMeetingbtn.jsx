@@ -1,10 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
+import { generateCalUrl } from "../../../utils/generateCalUrl";
 
 export default function BookMeetingButton({ lead }) {
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     supabaseBrowser.auth.getUser().then(({ data }) => {
@@ -15,29 +18,21 @@ export default function BookMeetingButton({ lead }) {
   const handleBook = async () => {
     setIsLoading(true);
 
-    const salespersonId = lead.assigned_to || currentUser?.id;
+    const salespersonId = lead.assigned_to || currentUser?.id || "";
 
-    const meetingUrl =
-    `https://cal.com/karun-karthikeyan-8wsv1t/15min?lead_id=${lead.id}&salesperson_id=${salespersonId}`;
-  
-    try {
-      // Save pending appointment
-      await fetch("/api/appointments/pending", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_id: lead.id,
-          salesperson_id: salespersonId
-        }),
-      });
+    // Build Cal.com URL with encoded params
+    const meetingUrl = generateCalUrl(
+      {
+        id: lead.id,
+        name: lead.name || lead.lead_name || "",
+        email: lead.email || lead.lead_email || "",
+      },
+      { id: salespersonId }
+    );
 
-      window.open(meetingUrl, "_blank");
-    } catch (e) {
-      console.error("Pending appointment save error:", e);
-      window.open(meetingUrl, "_blank");
-    } finally {
-      setIsLoading(false);
-    }
+    // Redirect the salesperson to Cal.com (App Router friendly)
+    router.push(meetingUrl);
+    setIsLoading(false);
   };
 
   return (
