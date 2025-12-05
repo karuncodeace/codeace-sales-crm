@@ -67,13 +67,85 @@ export async function GET(request, { params }) {
           year: "numeric",
         })
       : "",
+    // Include score fields
+    lead_score: lead.lead_score || 0,
+    responsiveness_score: lead.responsiveness_score || 0,
+    conversion_probability_score: lead.conversion_probability_score || 0,
+    total_score: lead.total_score || 0,
   };
 
   return Response.json(formattedLead);
 }
 
+export async function PATCH(request, { params }) {
+  try {
+    const supabase = await supabaseServer();
+    const { id } = await params;
+    const body = await request.json();
 
+    // Extract score fields
+    const updateData = {};
+    if (body.lead_score !== undefined) {
+      updateData.lead_score = body.lead_score;
+    }
+    if (body.responsiveness_score !== undefined) {
+      updateData.responsiveness_score = body.responsiveness_score;
+    }
+    if (body.conversion_probability_score !== undefined) {
+      updateData.conversion_probability_score = body.conversion_probability_score;
+    }
 
+    // Calculate total_score if any score is being updated
+    if (Object.keys(updateData).length > 0) {
+      // Get current values from database if not all scores are provided
+      let lead_score = body.lead_score;
+      let responsiveness_score = body.responsiveness_score;
+      let conversion_probability_score = body.conversion_probability_score;
 
+      // If any score is missing, fetch current values from database
+      if (lead_score === undefined || responsiveness_score === undefined || conversion_probability_score === undefined) {
+        const { data: currentLead } = await supabase
+          .from("leads_table")
+          .select("lead_score, responsiveness_score, conversion_probability_score")
+          .eq("id", id)
+          .single();
+
+        if (currentLead) {
+          lead_score = lead_score !== undefined ? lead_score : (currentLead.lead_score || 0);
+          responsiveness_score = responsiveness_score !== undefined ? responsiveness_score : (currentLead.responsiveness_score || 0);
+          conversion_probability_score = conversion_probability_score !== undefined ? conversion_probability_score : (currentLead.conversion_probability_score || 0);
+        } else {
+          lead_score = lead_score || 0;
+          responsiveness_score = responsiveness_score || 0;
+          conversion_probability_score = conversion_probability_score || 0;
+        }
+      }
+
+      // Calculate total_score
+      updateData.total_score = (lead_score || 0) + (responsiveness_score || 0) + (conversion_probability_score || 0);
+    }
+
+    // Update the lead
+    const { data, error } = await supabase
+      .from("leads_table")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating lead scores:", error);
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+
+    return Response.json({ success: true, data });
+  } catch (error) {
+    console.error("PATCH error:", error);
+    return Response.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
 
