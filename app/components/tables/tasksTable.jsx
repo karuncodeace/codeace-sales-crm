@@ -365,19 +365,40 @@ export default function TasksPage() {
         setOpenActions((prev) => (prev === taskId ? null : taskId));
     };
 
-    const handleMarkComplete = async (taskId, currentStatus) => {
+    const handleMarkComplete = async (task) => {
+        const currentStatus = task.status;
         const newStatus = currentStatus?.toLowerCase() === "completed" ? "Pending" : "Completed";
         try {
             const response = await fetch("/api/tasks", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: taskId, status: newStatus }),
+                body: JSON.stringify({ id: task.id, status: newStatus }),
             });
             
             if (!response.ok) {
                 throw new Error("Failed to update status");
             }
-            
+
+            // If we just marked a task completed, auto-create the next follow-up task for the same lead
+            if (newStatus === "Completed" && task.lead_id) {
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 1); // default follow-up due tomorrow
+                const title = task.title ? `Follow up: ${task.title}` : "Follow up";
+
+                await fetch("/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: task.lead_id,
+                        sales_person_id: task.sales_person_id || null,
+                        priority: task.priority || "Medium",
+                        type: "Follow-Up",
+                        title,
+                        due_date: dueDate.toISOString(),
+                    }),
+                });
+            }
+
             mutate("/api/tasks");
         } catch (error) {
             console.error("Error updating status:", error);
@@ -606,7 +627,7 @@ export default function TasksPage() {
                                                         className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                                                         id={`task-${task.id}`}
                                                         checked={task.status?.toLowerCase() === "completed"}
-                                                        onChange={() => handleMarkComplete(task.id, task.status)}
+                                                        onChange={() => handleMarkComplete(task)}
                                                     />
                                                     <span className="sr-only">
                                                         Select {task.id}
@@ -748,7 +769,7 @@ export default function TasksPage() {
                                                         }`}>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleMarkComplete(task.id, task.status)}
+                                                                onClick={() => handleMarkComplete(task)}
                                                                 className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                                             >
                                                                 {task.status?.toLowerCase() === "completed" ? "Mark Pending" : "Mark Complete"}

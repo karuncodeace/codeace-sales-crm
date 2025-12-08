@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { useTheme } from "../context/themeContext";
 import BookingWidget from "./BookingWidget";
 
-export default function BookingModal({ isOpen, onClose, leadId, leadName, leadEmail, salespersonId, onBookingComplete, onError }) {
+export default function BookingModal({ isOpen, onClose, leadId, leadName, leadEmail, salespersonId, callType, onBookingComplete, onError }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -37,19 +37,19 @@ export default function BookingModal({ isOpen, onClose, leadId, leadName, leadEm
 
       {/* Modal Content */}
       <div
-        className={`relative w-full max-w-4xl h-[90vh] max-h-[800px] rounded-2xl shadow-2xl transform transition-all duration-300 animate-in zoom-in-95 slide-in-from-bottom-4 ${
+        className={`relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl transform transition-all duration-300 animate-in zoom-in-95 slide-in-from-bottom-4 ${
           isDark ? "bg-[#1a1a1a] border border-gray-700" : "bg-white border border-gray-200"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <div>
             <h2 className={`text-xl font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
               Book a Meeting
             </h2>
             <p className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              {leadName ? `Scheduling with ${leadName}` : "Select a time slot"}
+              {leadName ? `Scheduling ${callType?.duration || ""} meeting with ${leadName}` : "Select a time slot"}
             </p>
           </div>
           <button
@@ -66,12 +66,13 @@ export default function BookingModal({ isOpen, onClose, leadId, leadName, leadEm
         </div>
 
         {/* Booking Widget Container */}
-        <div className="h-[calc(90vh-80px)] overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           <BookingWidget
             leadId={leadId}
             leadName={leadName}
             leadEmail={leadEmail}
             salespersonId={salespersonId}
+            callType={callType}
             onBookingComplete={onBookingComplete}
             onError={onError}
           />

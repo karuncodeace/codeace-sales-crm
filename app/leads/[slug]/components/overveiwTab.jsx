@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import useSWR from "swr";
-import { Phone, Mail, MapPin, User, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Copy, Check, Target, MessageSquare, Zap, Edit2, Save, X } from "lucide-react";
+import { Phone, Mail, MapPin, User, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Copy, Check, Target, MessageSquare, Zap, Edit2 } from "lucide-react";
 import { useTheme } from "../../../context/themeContext";
 import EmailModal from "../../../components/ui/email-modal";
 
+
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-export default function OverveiwTab({ lead, leadId, setTab }) {
+export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
     const { theme } = useTheme();
     const [emailModal, setEmailModal] = useState({
         isOpen: false,
@@ -16,80 +17,6 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
         recipientName: "",
     });
     const [copiedEmail, setCopiedEmail] = useState(false);
-    
-    // Scoring state
-    const [isEditingScores, setIsEditingScores] = useState(false);
-    const [scores, setScores] = useState({
-        lead_score: Number(lead?.lead_score) || 0,
-        responsiveness_score: Number(lead?.responsiveness_score) || 0,
-        conversion_probability_score: Number(lead?.conversion_probability_score) || 0,
-    });
-    const [isSavingScores, setIsSavingScores] = useState(false);
-
-    // Update scores when lead changes
-    useEffect(() => {
-        if (lead) {
-            setScores({
-                lead_score: Number(lead.lead_score) || 0,
-                responsiveness_score: Number(lead.responsiveness_score) || 0,
-                conversion_probability_score: Number(lead.conversion_probability_score) || 0,
-            });
-        }
-    }, [lead]);
-
-    // Save scores function
-    const handleSaveScores = async () => {
-        if (!leadId) return;
-        
-        setIsSavingScores(true);
-        try {
-            const response = await fetch(`/api/leads/${leadId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    lead_score: scores.lead_score,
-                    responsiveness_score: scores.responsiveness_score,
-                    conversion_probability_score: scores.conversion_probability_score,
-                }),
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || "Failed to save scores");
-            }
-
-            // Update local lead data
-            if (lead) {
-                lead.lead_score = scores.lead_score;
-                lead.responsiveness_score = scores.responsiveness_score;
-                lead.conversion_probability_score = scores.conversion_probability_score;
-            }
-
-            setIsEditingScores(false);
-            alert("Scores saved successfully!");
-        } catch (error) {
-            console.error("Error saving scores:", error);
-            alert(error.message || "Failed to save scores. Please try again.");
-        } finally {
-            setIsSavingScores(false);
-        }
-    };
-
-    // Handle score change
-    const handleScoreChange = (field, value) => {
-        const numValue = parseInt(value) || 0;
-        let maxValue = 5;
-        if (field === "responsiveness_score" || field === "conversion_probability_score") {
-            maxValue = 10;
-        }
-        
-        setScores((prev) => ({
-            ...prev,
-            [field]: Math.max(0, Math.min(maxValue, numValue)),
-        }));
-    };
 
     // Fetch tasks for this lead
     const { data: tasksData } = useSWR(
@@ -328,6 +255,27 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                 Contact Information
                             </h3>
                             <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                        <User className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
+                                    </div>
+                                    <div>
+                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Contact Name</p>
+                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.contactName || "—"}</p>
+                                    </div>
+                                </div>
+                                
+                                {lead.company && (
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                            <Building2 className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
+                                        </div>
+                                        <div>
+                                            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Company</p>
+                                            <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.company}</p>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                                         <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
@@ -374,37 +322,7 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                        <User className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                    </div>
-                                    <div>
-                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Contact Name</p>
-                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.contactName || "—"}</p>
-                                    </div>
-                                </div>
-                                {lead.location && (
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                            <MapPin className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                        </div>
-                                        <div>
-                                            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Location</p>
-                                            <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.location}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {lead.company && (
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                            <Building2 className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                        </div>
-                                        <div>
-                                            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Company</p>
-                                            <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.company}</p>
-                                        </div>
-                                    </div>
-                                )}
+                                
                             </div>
 
                             {/* Lead Information */}
@@ -421,18 +339,8 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                         <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead Source</span>
                                         <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.source || "—"}</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Status</span>
-                                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${theme === "dark" ? statusStyle.dark : statusStyle.light}`}>
-                                            {lead.status}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Priority</span>
-                                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${theme === "dark" ? priorityStyle.dark : priorityStyle.light}`}>
-                                            {lead.priority}
-                                        </span>
-                                    </div>
+                                    
+                                   
                                     {lead.assignedTo && (
                                         <div className="flex items-center justify-between">
                                             <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Assigned To</span>
@@ -475,44 +383,15 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                     <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
                                         Lead Scoring
                                     </h3>
-                                    <div className="flex items-center gap-2">
-                                        {!isEditingScores ? (
-                                            <button
-                                                onClick={() => setIsEditingScores(true)}
-                                                className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
-                                                title="Edit Scores"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={handleSaveScores}
-                                                    disabled={isSavingScores}
-                                                    className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"} disabled:opacity-50`}
-                                                    title="Save Scores"
-                                                >
-                                                    <Save className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsEditingScores(false);
-                                                        // Reset to original values
-                                                        setScores({
-                                                            lead_score: Number(lead?.lead_score) || 0,
-                                                            responsiveness_score: Number(lead?.responsiveness_score) || 0,
-                                                            conversion_probability_score: Number(lead?.conversion_probability_score) || 0,
-                                                        });
-                                                    }}
-                                                    disabled={isSavingScores}
-                                                    className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-red-400" : "hover:bg-gray-100 text-gray-600 hover:text-red-600"} disabled:opacity-50`}
-                                                    title="Cancel"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {onEditScores && (
+                                        <button
+                                            onClick={onEditScores}
+                                            className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
+                                            title="Edit Scores"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -524,30 +403,14 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                                 Lead Score
                                             </span>
                                         </div>
-                                        {isEditingScores ? (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="5"
-                                                    value={scores.lead_score}
-                                                    onChange={(e) => handleScoreChange("lead_score", e.target.value)}
-                                                    className={`w-20 px-2 py-1 rounded text-2xl font-bold text-center ${theme === "dark" ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                                                />
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 5
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-baseline gap-2">
-                                                <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                    {scores.lead_score}
-                                                </span>
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 5
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-baseline gap-2">
+                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                                {Number(lead?.lead_score) || 0}
+                                            </span>
+                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                                / 5
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Responsiveness Score */}
@@ -558,30 +421,14 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                                 Responsiveness
                                             </span>
                                         </div>
-                                        {isEditingScores ? (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="10"
-                                                    value={scores.responsiveness_score}
-                                                    onChange={(e) => handleScoreChange("responsiveness_score", e.target.value)}
-                                                    className={`w-20 px-2 py-1 rounded text-2xl font-bold text-center ${theme === "dark" ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} border focus:outline-none focus:ring-2 focus:ring-green-500`}
-                                                />
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 10
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-baseline gap-2">
-                                                <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                    {scores.responsiveness_score}
-                                                </span>
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 10
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-baseline gap-2">
+                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                                {Number(lead?.responsiveness_score) || 0}
+                                            </span>
+                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                                / 10
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Conversion Probability Score */}
@@ -592,30 +439,14 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                                 Conversion Probability
                                             </span>
                                         </div>
-                                        {isEditingScores ? (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="10"
-                                                    value={scores.conversion_probability_score}
-                                                    onChange={(e) => handleScoreChange("conversion_probability_score", e.target.value)}
-                                                    className={`w-20 px-2 py-1 rounded text-2xl font-bold text-center ${theme === "dark" ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} border focus:outline-none focus:ring-2 focus:ring-yellow-500`}
-                                                />
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 10
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-baseline gap-2">
-                                                <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                    {scores.conversion_probability_score}
-                                                </span>
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                    / 10
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-baseline gap-2">
+                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                                {Number(lead?.conversion_probability_score) || 0}
+                                            </span>
+                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                                / 10
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Total Score */}
@@ -628,7 +459,7 @@ export default function OverveiwTab({ lead, leadId, setTab }) {
                                         </div>
                                         <div className="flex items-baseline gap-2">
                                             <span className={`text-2xl font-bold ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>
-                                                {Number(scores.lead_score || 0) + Number(scores.responsiveness_score || 0) + Number(scores.conversion_probability_score || 0)}
+                                                {Number(lead?.lead_score || 0) + Number(lead?.responsiveness_score || 0) + Number(lead?.conversion_probability_score || 0)}
                                             </span>
                                             <span className={`text-xs ${theme === "dark" ? "text-orange-400/70" : "text-orange-600/70"}`}>
                                                 / 25

@@ -6,7 +6,7 @@ import { useTheme } from "../context/themeContext";
 import { Loader2 } from "lucide-react";
 import Script from "next/script";
 
-export default function BookingWidget({ leadId, leadName, leadEmail, salespersonId, onBookingComplete, onError }) {
+export default function BookingWidget({ leadId, leadName, leadEmail, salespersonId, callType, onBookingComplete, onError }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [isLoading, setIsLoading] = useState(true);
@@ -32,9 +32,11 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
         if (calRef.current) {
           // Clear any existing embed first
           try {
+            const calLink = callType?.calLink || "karun-karthikeyan-8wsv1t/15min";
+            
             cal("inline", {
               elementOrSelector: calRef.current,
-              calLink: "karun-karthikeyan-8wsv1t/15min",
+              calLink: calLink,
               layout: "month_view",
               config: {
                 name: leadName || "",
@@ -150,7 +152,7 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
       clearTimeout(fallbackTimer);
       isProcessingRef.current = false;
     };
-  }, [leadId, leadName, leadEmail, salespersonId, onBookingComplete, onError, isLoading]);
+  }, [leadId, leadName, leadEmail, salespersonId, callType, onBookingComplete, onError, isLoading]);
 
   return (
     <>
@@ -163,7 +165,7 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
       />
       <div className={`w-full h-full flex flex-col ${isDark ? "bg-[#1a1a1a]" : "bg-white"}`}>
         {isLoading && (
-          <div className="flex items-center justify-center h-full min-h-[400px]">
+          <div className="flex items-center justify-center flex-1 min-h-[500px]">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
               <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
@@ -174,24 +176,26 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
         )}
         
         {error && (
-          <div className="flex items-center justify-center h-full min-h-[400px]">
+          <div className="flex items-center justify-center flex-1 min-h-[500px]">
             <div className={`text-center p-6 rounded-lg ${isDark ? "bg-red-900/20 text-red-400" : "bg-red-50 text-red-600"}`}>
               <p className="text-sm font-medium">{error}</p>
             </div>
           </div>
         )}
 
-        <div className={`flex-1 ${isLoading ? "hidden" : ""}`}>
-          <div
-            ref={calRef}
-            className="w-full h-full min-h-[600px]"
-            style={{
-              width: "100%",
-              height: "100%",
-              overflow: "auto",
-            }}
-          />
-        </div>
+        {!isLoading && !error && (
+          <div className="flex-1 w-full h-full overflow-hidden">
+            <div
+              ref={calRef}
+              className="w-full h-full"
+              style={{
+                width: "100%",
+                height: "100%",
+                minHeight: "600px",
+              }}
+            />
+          </div>
+        )}
       </div>
     </>
   );

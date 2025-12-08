@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
-import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarX, CalendarClock } from "lucide-react";
+import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarX, CalendarClock, MoreVertical } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -16,6 +16,24 @@ export default function AppointmentsPage() {
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [openActionsMenu, setOpenActionsMenu] = useState(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('[data-actions-menu="true"]')) {
+        setOpenActionsMenu(null);
+      }
+    };
+
+    if (openActionsMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openActionsMenu]);
 
   // Fetch all appointments (no status filter on server)
   const { data: appointments, error, isLoading, mutate } = useSWR(
@@ -174,7 +192,7 @@ export default function AppointmentsPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
-      <div className="p-6">
+      <div className="pl-5 md:pl-0 2xl:pl-0 w-full mt-10">
         {/* Header */}
         <div className="mb-6">
           <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
@@ -251,7 +269,7 @@ export default function AppointmentsPage() {
 
         {/* Appointments List */}
         {!isLoading && !error && (
-          <div className="space-y-4">
+          <div>
             {filteredAppointments.length === 0 ? (
               <div className={`text-center py-12 rounded-lg ${isDark ? "bg-[#262626]" : "bg-white"}`}>
                 <Calendar className={`w-12 h-12 mx-auto mb-4 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
@@ -263,19 +281,20 @@ export default function AppointmentsPage() {
                 </p>
               </div>
             ) : (
-              filteredAppointments.map((appointment) => {
-                const startTime = formatDateTime(appointment.start_time);
-                const endTime = formatDateTime(appointment.end_time);
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredAppointments.map((appointment) => {
+                  const startTime = formatDateTime(appointment.start_time);
+                  const endTime = formatDateTime(appointment.end_time);
 
-                return (
-                  <div
-                    key={appointment.id}
-                    className={`p-6 rounded-lg border transition-all hover:shadow-lg ${
-                      isDark
-                        ? "bg-[#262626] border-gray-700 hover:border-gray-600"
-                        : "bg-white border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
+                  return (
+                    <div
+                      key={appointment.id}
+                      className={`p-6 rounded-lg border transition-all hover:shadow-lg ${
+                        isDark
+                          ? "bg-[#262626] border-gray-700 hover:border-gray-600"
+                          : "bg-white border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
                     <div className="flex items-start justify-between">
                       {/* Left Section - Main Info */}
                       <div className="flex-1">
@@ -287,17 +306,12 @@ export default function AppointmentsPage() {
                             <h3 className={`text-lg font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
                               {appointment.title || "Meeting"}
                             </h3>
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(appointment.status)}
-                              <span className={getStatusBadge(appointment.status)}>
-                                {appointment.status || "unknown"}
-                              </span>
-                            </div>
+                            
                           </div>
                         </div>
 
                         {/* Details Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                           {/* Date & Time */}
                           <div className="flex items-start gap-3">
                             <Clock className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
@@ -336,45 +350,9 @@ export default function AppointmentsPage() {
                             </div>
                           )}
 
-                          {/* Attendee Information */}
-                          {appointment.attendee_name && (
-                            <div className="flex items-start gap-3">
-                              <User className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
-                                <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                  Attendee
-                                </p>
-                                <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                                  {appointment.attendee_name}
-                                </p>
-                                {appointment.attendee_email && (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <Mail className={`w-3 h-3 ${isDark ? "text-gray-500" : "text-gray-500"}`} />
-                                    <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                                      {appointment.attendee_email}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                        
 
-                          {/* Location */}
-                          {appointment.location && (
-                            <div className="flex items-start gap-3">
-                              <MapPin className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
-                                <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                  Meeting Mode
-                                </p>
-                                <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                                  {appointment.location === "integrations:google:meet"
-                                    ? "Google Meet"
-                                    : appointment.location}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                        
 
                           {/* Join URL */}
                           {appointment.join_url && (
@@ -401,79 +379,104 @@ export default function AppointmentsPage() {
                         </div>
                       </div>
 
-                       {/* Right Section - Actions */}
-                       <div className="ml-4 flex flex-col gap-2">
-                         {appointment.join_url && (
-                           <a
-                             href={appointment.join_url}
-                             target="_blank"
-                             rel="noopener noreferrer"
-                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                               isDark
-                                 ? "bg-orange-600 hover:bg-orange-700 text-white"
-                                 : "bg-orange-500 hover:bg-orange-600 text-white"
-                             }`}
-                           >
-                             <Video className="w-4 h-4" />
-                             Join
-                           </a>
-                         )}
-                         {appointment.status === "booked" && (
-                           <>
-                             <button
-                               onClick={() => setRescheduleModal({ isOpen: true, appointment })}
-                               disabled={isProcessing}
-                               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                 isDark
-                                   ? "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                                   : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
-                               }`}
-                             >
-                               <CalendarClock className="w-4 h-4" />
-                               Reschedule
-                             </button>
-                             <button
-                               onClick={() => handleCancel(appointment)}
-                               disabled={isProcessing}
-                               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                 isDark
-                                   ? "bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                                   : "bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
-                               }`}
-                             >
-                               <CalendarX className="w-4 h-4" />
-                               Cancel
-                             </button>
-                           </>
-                         )}
-                       </div>
-                    </div>
+                      {/* Right Section - Actions */}
+                      <div className="ml-4 relative">
+                        {appointment.status === "booked" && (
+                          <div className="relative" data-actions-menu="true">
+                            <button
+                              type="button"
+                              aria-label="Open actions menu"
+                              onClick={() => setOpenActionsMenu(openActionsMenu === appointment.id ? null : appointment.id)}
+                              className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-none transition-colors ${
+                                isDark
+                                  ? "border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600"
+                                  : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
+                              }`}
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
 
-                    {/* Footer - Metadata */}
-                    <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-4">
-                          {appointment.cal_event_id && (
-                            <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                              Event ID: {appointment.cal_event_id}
-                            </span>
-                          )}
-                          {appointment.created_at && (
-                            <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                              Created: {formatDateTime(appointment.created_at).date}
-                            </span>
-                          )}
-                        </div>
-                        {appointment.updated_at && appointment.updated_at !== appointment.created_at && (
-                          <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                            Updated: {formatDateTime(appointment.updated_at).date}
-                          </span>
+                            {openActionsMenu === appointment.id && (
+                              <div
+                                className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl ${
+                                  isDark
+                                    ? "bg-gray-800 text-gray-200 border-gray-700"
+                                    : "bg-white text-gray-700 border-gray-200"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRescheduleModal({ isOpen: true, appointment });
+                                    setOpenActionsMenu(null);
+                                  }}
+                                  disabled={isProcessing}
+                                  className={`flex w-full items-center gap-2 px-4 py-2 transition-colors ${
+                                    isProcessing
+                                      ? isDark
+                                        ? "text-gray-600 cursor-not-allowed opacity-50"
+                                        : "text-gray-400 cursor-not-allowed opacity-50"
+                                      : isDark
+                                      ? "hover:bg-gray-700"
+                                      : "hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <CalendarClock className="w-4 h-4" />
+                                  Reschedule
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCancel(appointment);
+                                    setOpenActionsMenu(null);
+                                  }}
+                                  disabled={isProcessing}
+                                  className={`flex w-full items-center gap-2 px-4 py-2 transition-colors ${
+                                    isProcessing
+                                      ? isDark
+                                        ? "text-gray-600 cursor-not-allowed opacity-50"
+                                        : "text-gray-400 cursor-not-allowed opacity-50"
+                                      : isDark
+                                      ? "hover:bg-gray-700 text-red-400"
+                                      : "hover:bg-gray-100 text-red-600"
+                                  }`}
+                                >
+                                  <CalendarX className="w-4 h-4" />
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+
+                      {/* Footer - Metadata */}
+                      <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-4">
+                            {appointment.cal_event_id && (
+                              <span className={isDark ? "text-gray-500" : "text-gray-500"}>
+                                Event ID: {appointment.cal_event_id}
+                              </span>
+                            )}
+                            {appointment.created_at && (
+                              <span className={isDark ? "text-gray-500" : "text-gray-500"}>
+                                Created: {formatDateTime(appointment.created_at).date}
+                              </span>
+                            )}
+                          </div>
+                          {appointment.updated_at && appointment.updated_at !== appointment.created_at && (
+                            <span className={isDark ? "text-gray-500" : "text-gray-500"}>
+                              Updated: {formatDateTime(appointment.updated_at).date}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

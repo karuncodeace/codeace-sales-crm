@@ -674,7 +674,7 @@ export default function LeadsTable() {
                   
                   ) : (
                     filteredLeads.map((lead) => (
-                      <tr key={lead.id}>
+                      <tr key={lead.id}  className="hover:bg-gray-100 dark:hover:bg-gray-100/40">
                         <td className="size-px whitespace-nowrap">
                           <div className="ps-6 py-2">
                             <label
@@ -692,20 +692,20 @@ export default function LeadsTable() {
                             </label>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
+                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(lead.id)}>
                           <div className="px-6 py-2">
                             <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                               {lead.contactName || "—"}
                             </span>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
+                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(lead.id)}>
                           <div className="px-6 py-2">
                             <div className="flex items-center gap-x-3">
 
                               <div 
                                 className="flex flex-col cursor-pointer"
-                                onClick={() => handleLeadClick(lead.id)}
+                                
                               >
                                 <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                                   {lead.name}

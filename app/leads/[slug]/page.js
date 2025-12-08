@@ -9,6 +9,9 @@ import EmailModal from "../../components/ui/email-modal";
 import OverveiwTab from "./components/overveiwTab";
 import ActivityTab from "./components/activityTab";
 import BookMeetingButton from "../../components/buttons/bookMeetingbtn";
+import EditLeadScoreModal from "../../components/buttons/editLeadScorebtn";
+import PriorityDropdown from "../../components/buttons/priorityTooglebtn";
+import StatusDropdown from "../../components/buttons/statusTooglebtn";
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 // Notes Tab Component
@@ -459,7 +462,7 @@ export default function LeadDetailPage() {
     const params = useParams();
     const leadId = params.slug;
     
-    const { data: lead, error, isLoading } = useSWR(
+    const { data: lead, error, isLoading, mutate } = useSWR(
         leadId ? `/api/leads/${leadId}` : null,
         fetcher
     );
@@ -485,6 +488,7 @@ export default function LeadDetailPage() {
     });
     const [copiedEmail, setCopiedEmail] = useState(false);
     const [showActionsMenu, setShowActionsMenu] = useState(false);
+    const [isEditScoreModalOpen, setIsEditScoreModalOpen] = useState(false);
 
     const tabs = [
         { id: "overview", label: "Overview" },
@@ -561,6 +565,42 @@ export default function LeadDetailPage() {
 
     const priorityStyle = priorityStyles[lead.priority] || priorityStyles.Warm;
     const statusStyle = statusStyles[lead.status] || statusStyles.New;
+
+    const handlePriorityUpdate = async (newPriority) => {
+        if (!leadId) return;
+        const optimistic = { ...lead, priority: newPriority };
+        mutate(optimistic, false);
+        try {
+            const res = await fetch("/api/leads", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: leadId, priority: newPriority }),
+            });
+            if (!res.ok) throw new Error("Failed to update priority");
+            await mutate();
+        } catch (err) {
+            console.error("Error updating priority:", err);
+            await mutate(); // revert to server state
+        }
+    };
+
+    const handleStatusUpdate = async (newStatus) => {
+        if (!leadId) return;
+        const optimistic = { ...lead, status: newStatus };
+        mutate(optimistic, false);
+        try {
+            const res = await fetch("/api/leads", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: leadId, status: newStatus }),
+            });
+            if (!res.ok) throw new Error("Failed to update status");
+            await mutate();
+        } catch (err) {
+            console.error("Error updating status:", err);
+            await mutate(); // revert to server state
+        }
+    };
 
     // Helper functions for formatting dates in Asia/Calcutta timezone
     const formatToCalcuttaTime = (dateString) => {
@@ -748,74 +788,27 @@ export default function LeadDetailPage() {
                    <h1 className={`text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
                     {lead.name}  
                     </h1>
-                    <span className={`text-3xl font-bold ml-3 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{lead.id}</span>
                    </div>
-                    <div className={`flex items-center gap-3 mt-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${theme === "dark" ? priorityStyle.dark : priorityStyle.light}`}>
-                            {lead.priority}
-                        </span>
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${theme === "dark" ? statusStyle.dark : statusStyle.light}`}>
-                            {lead.status}
-                        </span>
+                    <div className="flex items-center gap-3 mt-4">
+                        <PriorityDropdown
+                            value={lead.priority}
+                            theme={theme}
+                            onChange={handlePriorityUpdate}
+                        />
+                        <StatusDropdown
+                            value={lead.status}
+                            theme={theme}
+                            onChange={handleStatusUpdate}
+                        />
                     </div>
                 </div>
                 
 
                 {/* Action Menu Button */}
-                <div className="relative">
-                    <button
-                        onClick={() => setShowActionsMenu(!showActionsMenu)}
-                        className={`p-2 rounded-lg transition-colors ${
-                            theme === "dark" 
-                                ? "hover:bg-gray-700 text-gray-400" 
-                                : "hover:bg-gray-100 text-gray-500"
-                        }`}
-                    >
-                        <MoreHorizontal className="w-5 h-5" />
-                    </button>
-
-                    {/* Action Menu Dropdown */}
-                    {showActionsMenu && (
-                        <>
-                            {/* Backdrop */}
-                            <div 
-                                className="fixed inset-0 z-10" 
-                                onClick={() => setShowActionsMenu(false)}
-                            />
-                            {/* Menu */}
-                            <div className={`absolute right-0 mt-2 w-48 rounded-lg border shadow-xl z-20 ${
-                                theme === "dark" 
-                                    ? "bg-gray-800 border-gray-700" 
-                                    : "bg-white border-gray-200"
-                            }`}>
-                                <button
-                                    onClick={() => {
-                                        setEmailModal({
-                                            isOpen: true,
-                                            recipientEmail: lead.email,
-                                            recipientName: lead.name,
-                                        });
-                                        setShowActionsMenu(false);
-                                    }}
-                                    disabled={!lead.email}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${
-                                        lead.email
-                                            ? theme === "dark"
-                                                ? "hover:bg-gray-700 text-gray-200"
-                                                : "hover:bg-gray-100 text-gray-700"
-                                            : theme === "dark"
-                                                ? "text-gray-600 cursor-not-allowed"
-                                                : "text-gray-400 cursor-not-allowed"
-                                    }`}
-                                >
-                                    <Mail className="w-4 h-4" />
-                                    Send Email
-                                </button>
-                            </div>
-                        </>
-                    )}
+                <div className="relative flex items-center gap-3">
+                    
+                    <BookMeetingButton lead={lead} />
                 </div>
-                <BookMeetingButton lead={lead} />
             </div>
 
             {/* tabs */}
@@ -842,7 +835,12 @@ export default function LeadDetailPage() {
                 ))}
             </div>
             {tab === "overview" && (
-                <OverveiwTab lead={lead} leadId={leadId} setTab={setTab} />
+                <OverveiwTab 
+                    lead={lead} 
+                    leadId={leadId} 
+                    setTab={setTab} 
+                    onEditScores={() => setIsEditScoreModalOpen(true)} 
+                />
             )}
       
             {/* ACTIVITY TAB */}
@@ -864,6 +862,17 @@ export default function LeadDetailPage() {
                 recipientEmail={emailModal.recipientEmail}
                 recipientName={emailModal.recipientName}
                 leadId={leadId}
+            />
+
+            {/* Edit Lead Score Modal */}
+            <EditLeadScoreModal
+                isOpen={isEditScoreModalOpen}
+                onClose={() => setIsEditScoreModalOpen(false)}
+                lead={lead}
+                leadId={leadId}
+                onSave={() => {
+                    mutate(); // Refresh lead data
+                }}
             />
         </div>
     );
