@@ -40,6 +40,7 @@ export async function POST(request) {
     type: type || "Call",
     priority: priority || "Medium",
     comments: comments || null,
+    status: "Pending",
   };
 
   // Add optional fields
@@ -72,21 +73,41 @@ export async function PATCH(request) {
 
   if (title !== undefined) updateData.title = title;
   if (type !== undefined) updateData.type = type;
-  if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
   if (comments !== undefined) updateData.comments = comments;
   if (due_date !== undefined) updateData.due_date = due_date;
 
-  let query = supabase.from("tasks_table").update(updateData);
-  
-  // Update by task id or by lead_id
+  let targetTask;
   if (id) {
-    query = query.eq("id", id);
-  } else {
-    query = query.eq("lead_id", lead_id);
+    const { data: t } = await supabase.from("tasks_table").select("*").eq("id", id).single();
+    targetTask = t;
+  } else if (lead_id) {
+    const { data: t } = await supabase.from("tasks_table").select("*").eq("lead_id", lead_id).order("created_at", { ascending: false }).limit(1).single();
+    targetTask = t;
   }
 
-  const { data, error } = await query.select();
+  if (!targetTask) {
+    return Response.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  const isCompleted = String(targetTask.status || "").toLowerCase() === "completed";
+  if (isCompleted) {
+    return Response.json({ error: "Completed tasks are immutable" }, { status: 409 });
+  }
+
+  if (status !== undefined && String(status).toLowerCase() === "completed") {
+    updateData.status = "Completed";
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  let { data, error } = await supabase.from("tasks_table").update(updateData).eq("id", targetTask.id).select();
+  if (error && updateData.completed_at) {
+    const fallbackData = { ...updateData };
+    delete fallbackData.completed_at;
+    const result = await supabase.from("tasks_table").update(fallbackData).eq("id", targetTask.id).select();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 

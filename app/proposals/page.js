@@ -11,6 +11,9 @@ export default function ProposalPage() {
 
   const [formData, setFormData] = useState({
     companyName: "",
+    companyWebsite: "",
+    companyEmail: "",
+    companyPhone: "",
     clientName: "",
     clientEmail: "",
     clientPhone: "",
@@ -23,6 +26,7 @@ export default function ProposalPage() {
     items: [
       { description: "", quantity: 1, unitPrice: 0, total: 0 },
     ],
+    milestones: [],
   });
 
   const handleInputChange = (e) => {
@@ -67,200 +71,206 @@ export default function ProposalPage() {
   };
 
   const generatePDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
-    let yPosition = margin;
+    const accent = { r: 249, g: 115, b: 22 };
+    const lightGrey = { r: 240, g: 240, b: 240 };
 
-    // Helper function to add text with word wrap
-    const addText = (text, x, y, maxWidth, fontSize = 10, fontStyle = "normal") => {
+    const addWrappedText = (text, x, y, maxWidth, fontSize = 10, fontStyle = "normal", color = { r: 0, g: 0, b: 0 }) => {
+      doc.setTextColor(color.r, color.g, color.b);
       doc.setFontSize(fontSize);
       doc.setFont("helvetica", fontStyle);
       const lines = doc.splitTextToSize(text || "", maxWidth);
       doc.text(lines, x, y);
-      return lines.length * (fontSize * 0.4);
+      return lines.length * (fontSize * 0.45);
     };
 
-    // Header
-    doc.setFillColor(255, 140, 0); // Orange color
-    doc.rect(0, 0, pageWidth, 50, "F");
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text("PROPOSAL", margin, 25);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Date: ${formData.proposalDate || "N/A"}`, pageWidth - margin - 40, 20);
-    if (formData.proposalNumber) {
-      doc.text(`Proposal #: ${formData.proposalNumber}`, pageWidth - margin - 40, 28);
-    }
+    const addFooter = () => {
+      const count = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= count; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        const a = formData.companyName || "Company";
+        const w = formData.companyWebsite || "";
+        const e = formData.companyEmail || "";
+        const p = formData.companyPhone || "";
+        const footerLeft = [a, w, e, p].filter(Boolean).join(" | ");
+        doc.text(footerLeft, margin, pageHeight - 10);
+        doc.text(`Page ${i} of ${count}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+      }
+    };
 
-    yPosition = 60;
-
-    // Client Information
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Client Information", margin, yPosition);
-    yPosition += 10;
-
+    doc.setFontSize(28);
+    doc.text("PROPOSAL", margin, 40);
+    doc.setFontSize(16);
+    addWrappedText(formData.proposalTitle || "", margin, 60, pageWidth - 2 * margin, 16, "bold", accent);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    if (formData.companyName) {
-      yPosition += addText(`Company: ${formData.companyName}`, margin, yPosition, pageWidth - 2 * margin);
-    }
-    if (formData.clientName) {
-      yPosition += addText(`Name: ${formData.clientName}`, margin, yPosition, pageWidth - 2 * margin);
-    }
-    if (formData.clientEmail) {
-      yPosition += addText(`Email: ${formData.clientEmail}`, margin, yPosition, pageWidth - 2 * margin);
-    }
-    if (formData.clientPhone) {
-      yPosition += addText(`Phone: ${formData.clientPhone}`, margin, yPosition, pageWidth - 2 * margin);
-    }
+    doc.text(`Prepared for: ${formData.clientName || ""}`, margin, 80);
+    doc.text(`Prepared by: ${formData.companyName || ""}`, margin, 88);
+    doc.text(`Date: ${formData.proposalDate || ""}`, margin, 96);
 
-    yPosition += 10;
+    doc.addPage();
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Client Details", margin, 30);
+    doc.text("Company Details", pageWidth / 2 + 10, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    let y = 40;
+    y += addWrappedText(`Name: ${formData.clientName || ""}`, margin, y, pageWidth / 2 - margin);
+    y += addWrappedText(`Email: ${formData.clientEmail || ""}`, margin, y, pageWidth / 2 - margin);
+    y += addWrappedText(`Phone: ${formData.clientPhone || ""}`, margin, y, pageWidth / 2 - margin);
+    let y2 = 40;
+    y2 += addWrappedText(`Company: ${formData.companyName || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
+    y2 += addWrappedText(`Website: ${formData.companyWebsite || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
+    y2 += addWrappedText(`Email: ${formData.companyEmail || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
+    y2 += addWrappedText(`Phone: ${formData.companyPhone || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
+    const introTop = Math.max(y, y2) + 15;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Introduction", margin, introTop);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    addWrappedText(`Dear Sir,\n\n${formData.overview || ""}`, margin, introTop + 8, pageWidth - 2 * margin);
 
-    // Proposal Title
-    if (formData.proposalTitle) {
-      doc.setFontSize(16);
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Scope of Work", margin, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const sections = (formData.overview || "").split(/\n\n+/).filter(Boolean);
+    let sy = 40;
+    sections.forEach((s, idx) => {
+      const title = `Section ${idx + 1}`;
       doc.setFont("helvetica", "bold");
-      yPosition += addText(formData.proposalTitle, margin, yPosition, pageWidth - 2 * margin, 16, "bold");
-      yPosition += 5;
-    }
-
-    // Overview
-    if (formData.overview) {
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      yPosition += addText("Overview", margin, yPosition, pageWidth - 2 * margin, 12, "bold");
-      yPosition += 5;
-
-      doc.setFontSize(10);
+      doc.setFontSize(11);
+      sy += addWrappedText(title, margin, sy, pageWidth - 2 * margin, 11, "bold");
       doc.setFont("helvetica", "normal");
-      yPosition += addText(formData.overview, margin, yPosition, pageWidth - 2 * margin);
-      yPosition += 10;
-    }
-
-    // Items/Services Table
-    const hasItems = formData.items.some(item => item.description);
-    if (hasItems) {
-      // Check if we need a new page
-      if (yPosition > 200) {
+      sy += addWrappedText(s, margin, sy, pageWidth - 2 * margin);
+      sy += 6;
+      if (sy > pageHeight - 30) {
         doc.addPage();
-        yPosition = margin;
+        sy = 30;
       }
+    });
 
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Pricing & Payment Terms", margin, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setFillColor(lightGrey.r, lightGrey.g, lightGrey.b);
+    doc.rect(margin, 40, pageWidth - 2 * margin, 8, "F");
+    doc.setFont("helvetica", "bold");
+    doc.text("Description", margin + 2, 46);
+    doc.text("Qty", pageWidth - 120, 46);
+    doc.text("Unit Price", pageWidth - 90, 46);
+    doc.text("Total", pageWidth - 50, 46);
+    let ty = 56;
+    doc.setFont("helvetica", "normal");
+    formData.items.forEach((item) => {
+      if (item.description) {
+        const descLines = doc.splitTextToSize(item.description, pageWidth - 150);
+        doc.text(descLines, margin + 2, ty);
+        doc.text(String(item.quantity || 0), pageWidth - 120, ty);
+        doc.text(`$${Number(item.unitPrice || 0).toFixed(2)}`, pageWidth - 90, ty, { align: "left" });
+        doc.text(`$${Number(item.total || 0).toFixed(2)}`, pageWidth - 50, ty, { align: "left" });
+        ty += Math.max(descLines.length * 5, 8) + 2;
+      }
+    });
+    const subtotal = calculateSubtotal();
+    if (subtotal > 0) {
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
+      doc.setDrawColor(accent.r, accent.g, accent.b);
+      doc.rect(pageWidth - margin - 70, ty + 6, 70, 12);
+      doc.text("Estimated Project Cost", pageWidth - margin - 68, ty + 12);
+      doc.text(`$${subtotal.toFixed(2)}`, pageWidth - margin - 68, ty + 18);
+    }
+    let my = ty + 30;
+    if (formData.milestones && formData.milestones.length) {
       doc.setFont("helvetica", "bold");
-      yPosition += addText("Services / Items", margin, yPosition, pageWidth - 2 * margin, 12, "bold");
-      yPosition += 8;
-
-      // Table header
-      doc.setFillColor(240, 240, 240);
-      doc.rect(margin, yPosition - 5, pageWidth - 2 * margin, 8, "F");
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("Description", margin + 2, yPosition);
-      doc.text("Qty", pageWidth - 120, yPosition);
-      doc.text("Unit Price", pageWidth - 90, yPosition);
-      doc.text("Total", pageWidth - 50, yPosition);
-      yPosition += 10;
-
-      // Table rows
-      doc.setFont("helvetica", "normal");
-      formData.items.forEach((item) => {
-        if (item.description) {
-          // Check if we need a new page
-          if (yPosition > 250) {
-            doc.addPage();
-            yPosition = margin;
-          }
-
-          const descLines = doc.splitTextToSize(item.description, pageWidth - 150);
-          const itemHeight = Math.max(descLines.length * 5, 8);
-          
-          doc.setFontSize(9);
-          doc.text(descLines, margin + 2, yPosition);
-          doc.text(item.quantity.toString(), pageWidth - 120, yPosition);
-          doc.text(`$${item.unitPrice.toFixed(2)}`, pageWidth - 90, yPosition);
-          doc.text(`$${item.total.toFixed(2)}`, pageWidth - 50, yPosition);
-          
-          yPosition += itemHeight + 2;
-        }
+      doc.setFontSize(12);
+      doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text("Payment Milestones", margin, my);
+      doc.setTextColor(0, 0, 0);
+      my += 8;
+      formData.milestones.forEach((m) => {
+        doc.rect(margin, my, pageWidth - 2 * margin, 10);
+        doc.text(`${m.label || "Milestone"} - ${m.amount || ""}`, margin + 2, my + 6);
+        my += 14;
       });
-
-      yPosition += 5;
-
-      // Subtotal
-      const subtotal = calculateSubtotal();
-      if (subtotal > 0) {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = margin;
-        }
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.text("Subtotal:", pageWidth - 90, yPosition);
-        doc.text(`$${subtotal.toFixed(2)}`, pageWidth - 50, yPosition);
-        yPosition += 10;
-      }
     }
 
-    // Terms and Conditions
-    if (formData.terms) {
-      if (yPosition > 200) {
-        doc.addPage();
-        yPosition = margin;
-      }
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Terms, SRS & Notes", margin, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    let py = 40;
+    doc.setFont("helvetica", "bold");
+    doc.text("Project Objective", margin, py);
+    doc.setFont("helvetica", "normal");
+    py += addWrappedText(formData.overview || "", margin, py + 4, pageWidth - 2 * margin);
+    py += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Scope", margin, py);
+    doc.setFont("helvetica", "normal");
+    py += addWrappedText((formData.overview || "").split(/\n\n+/).join("\n• "), margin, py + 4, pageWidth - 2 * margin);
+    py += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Deliverables", margin, py);
+    doc.setFont("helvetica", "normal");
+    py += addWrappedText("As per scope sections.", margin, py + 4, pageWidth - 2 * margin);
+    py += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms", margin, py);
+    doc.setFont("helvetica", "normal");
+    py += addWrappedText(formData.terms || "", margin, py + 4, pageWidth - 2 * margin);
+    py += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Notes", margin, py);
+    doc.setFont("helvetica", "normal");
+    addWrappedText(formData.notes || "", margin, py + 4, pageWidth - 2 * margin);
 
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      yPosition += addText("Terms and Conditions", margin, yPosition, pageWidth - 2 * margin, 12, "bold");
-      yPosition += 5;
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text("Acceptance & Signature", margin, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    addWrappedText("We hereby accept the terms and conditions outlined in this proposal.", margin, 42, pageWidth - 2 * margin);
+    doc.setDrawColor(180, 180, 180);
+    doc.line(margin, 70, pageWidth / 2, 70);
+    doc.text("Signature", margin, 75);
+    doc.line(pageWidth / 2 + 10, 70, pageWidth - margin, 70);
+    doc.text("Date", pageWidth / 2 + 10, 75);
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPosition += addText(formData.terms, margin, yPosition, pageWidth - 2 * margin);
-      yPosition += 10;
-    }
+    addFooter();
 
-    // Notes
-    if (formData.notes) {
-      if (yPosition > 200) {
-        doc.addPage();
-        yPosition = margin;
-      }
-
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      yPosition += addText("Notes", margin, yPosition, pageWidth - 2 * margin, 12, "bold");
-      yPosition += 5;
-
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPosition += addText(formData.notes, margin, yPosition, pageWidth - 2 * margin);
-    }
-
-    // Footer
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(128, 128, 128);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: "center" }
-      );
-    }
-
-    // Download PDF
     const fileName = formData.proposalTitle
       ? `${formData.proposalTitle.replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate}.pdf`
       : `Proposal_${formData.proposalDate}.pdf`;
@@ -403,6 +413,57 @@ export default function ProposalPage() {
                 </div>
 
                 {/* Proposal Number */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    Company Website
+                  </label>
+                  <input
+                    type="text"
+                    name="companyWebsite"
+                    value={formData.companyWebsite}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2 rounded-lg border ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                    placeholder="https://www.example.com"
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    Company Email
+                  </label>
+                  <input
+                    type="email"
+                    name="companyEmail"
+                    value={formData.companyEmail}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2 rounded-lg border ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                    placeholder="sales@example.com"
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    Company Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="companyPhone"
+                    value={formData.companyPhone}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2 rounded-lg border ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                    placeholder="+91 0000000000"
+                  />
+                </div>
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                     Proposal Number

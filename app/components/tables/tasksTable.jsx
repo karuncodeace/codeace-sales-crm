@@ -93,14 +93,14 @@ const statusStyles = {
 function getDueStatus(dueDatetime, status) {
     if (status?.toLowerCase() === "completed") return "completed";
     if (!dueDatetime) return "upcoming";
-    
+
     const now = new Date();
     const dueDate = new Date(dueDatetime);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-    
+
     if (dueDateOnly < today) return "overdue";
     if (dueDateOnly.getTime() === today.getTime()) return "today";
     return "upcoming";
@@ -137,13 +137,13 @@ export default function TasksPage() {
 
     // Fetch tasks from API
     const { data: tasksData, error: tasksError, isLoading: tasksLoading } = useSWR("/api/tasks", fetcher);
-    
+
     // Fetch leads for dropdown
     const { data: leadsData } = useSWR("/api/leads", fetcher);
-    
+
     // Fetch sales persons for dropdown
     const { data: salesPersonsData } = useSWR("/api/sales-persons", fetcher);
-    
+
     // Fetch task activities for due dates
     const { data: activitiesData } = useSWR("/api/task-activities", fetcher);
 
@@ -160,13 +160,13 @@ export default function TasksPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(taskData),
             });
-            
+
             const result = await response.json();
-            
+
             if (!response.ok) {
                 throw new Error(result.error || "Failed to add task");
             }
-            
+
             // Refresh tasks data
             mutate("/api/tasks");
             setOpenAddTask(false);
@@ -217,7 +217,7 @@ export default function TasksPage() {
     const transformedTasks = useMemo(() => {
         // Handle error responses or non-array data
         if (!tasksData || !Array.isArray(tasksData) || tasksData.error) return [];
-        
+
         // Helper to get due date - from activities or default to 1 day from task creation
         const getTaskDueDate = (task) => {
             const activityDue = activitiesDueDateMap[task.lead_id];
@@ -238,26 +238,26 @@ export default function TasksPage() {
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
             const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-            
+
             if (dateOnly.getTime() === today.getTime()) return "Today";
             if (dateOnly.getTime() === tomorrow.getTime()) return "Tomorrow";
-            
+
             const diffDays = Math.ceil((dateOnly - today) / (1000 * 60 * 60 * 24));
             if (diffDays > 0 && diffDays <= 7) return `In ${diffDays} days`;
             if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
-            
+
             return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         };
-        
+
         const mappedTasks = tasksData.map((task) => {
             const lead = leadsMap[task.lead_id];
             const salesPerson = salesPersonsMap[task.sales_person_id];
-            
+
             // Get due date from activities or default to 1 day
             const calculatedDueDate = getTaskDueDate(task);
             const hasActivityDueDate = !!activitiesDueDateMap[task.lead_id]?.due_date;
             const dueStatus = getDueStatus(calculatedDueDate.toISOString(), task.status);
-            
+
             return {
                 id: task.id,
                 title: task.title || "—",
@@ -292,9 +292,10 @@ export default function TasksPage() {
 
     const filteredTasks = useMemo(() => {
         let result = transformedTasks;
-        
-        // Apply due filter (tab filter)
-        if (filter !== "all") {
+
+        if (filter === "all") {
+            result = result.filter((task) => task.status?.toLowerCase() !== "completed");
+        } else {
             result = result.filter((task) => {
                 const filterLower = filter.toLowerCase();
                 if (filterLower === "completed") {
@@ -307,7 +308,6 @@ export default function TasksPage() {
             });
         }
 
-        // Apply advanced filters
         if (advancedFilters.status) {
             result = result.filter((task) => task.status?.toLowerCase() === advancedFilters.status.toLowerCase());
         }
@@ -320,8 +320,7 @@ export default function TasksPage() {
         if (advancedFilters.type) {
             result = result.filter((task) => task.type === advancedFilters.type);
         }
-        
-        // Apply search
+
         if (searchTerm.trim()) {
             const query = searchTerm.trim().toLowerCase();
             result = result.filter((task) => {
@@ -339,7 +338,7 @@ export default function TasksPage() {
                 return haystack.includes(query);
             });
         }
-        
+
         return result;
     }, [transformedTasks, searchTerm, filter, advancedFilters]);
 
@@ -350,11 +349,11 @@ export default function TasksPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: taskId, priority: newPriority }),
             });
-            
+
             if (!response.ok) {
                 throw new Error("Failed to update priority");
             }
-            
+
             mutate("/api/tasks");
         } catch (error) {
             console.error("Error updating priority:", error);
@@ -366,42 +365,34 @@ export default function TasksPage() {
     };
 
     const handleMarkComplete = async (task) => {
-        const currentStatus = task.status;
-        const newStatus = currentStatus?.toLowerCase() === "completed" ? "Pending" : "Completed";
+        if (task.status?.toLowerCase() === "completed") return;
+
+        mutate(
+            "/api/tasks",
+            (currentTasks) => {
+                if (!currentTasks || !Array.isArray(currentTasks)) return currentTasks;
+                return currentTasks.map((t) =>
+                    t.id === task.id ? { ...t, status: "Completed" } : t
+                );
+            },
+            false
+        );
+
         try {
             const response = await fetch("/api/tasks", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: task.id, status: newStatus }),
+                body: JSON.stringify({ id: task.id, status: "Completed" }),
             });
-            
+
             if (!response.ok) {
                 throw new Error("Failed to update status");
-            }
-
-            // If we just marked a task completed, auto-create the next follow-up task for the same lead
-            if (newStatus === "Completed" && task.lead_id) {
-                const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + 1); // default follow-up due tomorrow
-                const title = task.title ? `Follow up: ${task.title}` : "Follow up";
-
-                await fetch("/api/tasks", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        lead_id: task.lead_id,
-                        sales_person_id: task.sales_person_id || null,
-                        priority: task.priority || "Medium",
-                        type: "Follow-Up",
-                        title,
-                        due_date: dueDate.toISOString(),
-                    }),
-                });
             }
 
             mutate("/api/tasks");
         } catch (error) {
             console.error("Error updating status:", error);
+            mutate("/api/tasks");
         }
         setOpenActions(null);
     };
@@ -411,16 +402,16 @@ export default function TasksPage() {
             const response = await fetch("/api/tasks", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    id: taskId, 
-                    due_datetime: new Date(rescheduleData.time).toISOString() 
+                body: JSON.stringify({
+                    id: taskId,
+                    due_datetime: new Date(rescheduleData.time).toISOString()
                 }),
             });
-            
+
             if (!response.ok) {
                 throw new Error("Failed to reschedule");
             }
-            
+
             mutate("/api/tasks");
         } catch (error) {
             console.error("Error rescheduling:", error);
@@ -474,49 +465,47 @@ export default function TasksPage() {
     }
 
     return (
-     
 
 
-            <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
-                {/* Header */}
-                <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                    {/* LEFT SIDE — Search + Filters */}
-                    <div className="flex gap-2 w-full md:w-auto">
-                        {/* Search Bar */}
-                        <div className={`relative w-full md:w-80 flex items-center rounded-[10px] px-4 py-2 ${
-                            theme === "dark" 
-                                ? "border border-gray-700 bg-gray-800/50" 
-                                : "border border-gray-200 bg-white"
+
+        <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
+            {/* Header */}
+            <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                {/* LEFT SIDE — Search + Filters */}
+                <div className="flex gap-2 w-full md:w-auto">
+                    {/* Search Bar */}
+                    <div className={`relative w-full md:w-80 flex items-center rounded-[10px] px-4 py-2 ${theme === "dark"
+                            ? "border border-gray-700 bg-gray-800/50"
+                            : "border border-gray-200 bg-white"
                         }`}>
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                                stroke="currentColor"
-                                className={`w-5 h-5 shrink-0 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.5 5.5a7.5 7.5 0 0011.15 11.15z"
-                                />
-                            </svg>
-                            <input
-                                type="text"
-                                placeholder="Search tasks, leads..."
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
-                                className={`w-full pl-2 pr-4 text-sm bg-transparent focus:outline-none ${
-                                    theme === "dark" 
-                                        ? "text-gray-200 placeholder:text-gray-500" 
-                                        : "text-gray-900 placeholder:text-gray-400"
-                                }`}
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className={`w-5 h-5 shrink-0 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.5 5.5a7.5 7.5 0 0011.15 11.15z"
                             />
-                        </div>
-                        {/* Filter Button */}
-                       <div>
-                         <button 
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search tasks, leads..."
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            className={`w-full pl-2 pr-4 text-sm bg-transparent focus:outline-none ${theme === "dark"
+                                    ? "text-gray-200 placeholder:text-gray-500"
+                                    : "text-gray-900 placeholder:text-gray-400"
+                                }`}
+                        />
+                    </div>
+                    {/* Filter Button */}
+                    <div>
+                        <button
                             onClick={() => setOpenFilter(true)}
                             className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg transition
                             ${theme === "dark" ? " bg-orange-500 hover:bg-orange-600 text-gray-300" : "border border-gray-200 text-gray-700 bg-white hover:bg-gray-100"}
@@ -534,355 +523,353 @@ export default function TasksPage() {
                             Filter
                         </button>
                         <FilterBtn open={openFilter} onClose={() => setOpenFilter(false)} onApply={handleApplyFilters} />
-                       </div>
-                    </div>
-
-                    {/* RIGHT SIDE — Tab Filters */}
-                    <div className="grid grid-cols-4 items-center overflow-x-auto  ">
-                            {["all","overdue", "rescheduled", "completed"].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-3 py-1.5 text-sm font-medium transition 
-                                        ${filter === f
-                                            ? theme === "dark"
-                                                ? "text-white border-b border-orange-500"
-                                                : "text-black border-b border-orange-500"
-                                            : theme === "dark"
-                                                ? "text-gray-300"
-                                                : "text-gray-700"
-                                        }`}
-                                    
-                                >
-                                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                                </button>
-                        ))}
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="flex-1 overflow-y-auto overflow-x-auto">
-                    <table className={`min-w-full divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
-                        <thead className={`${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
-                            <tr>
-                                <th scope="col" className="ps-6 py-3 text-start">
-                                    <label htmlFor="task-select-all" className="flex">
-                                        <input
-                                            type="checkbox"
-                                            className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-                                            id="task-select-all"
-                                        />
-                                    </label>
-                                </th>
+                {/* RIGHT SIDE — Tab Filters */}
+                <div className="grid grid-cols-4 items-center overflow-x-auto  ">
+                    {["all", "overdue", "rescheduled", "completed"].map((f) => (
+                        <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={`px-3 py-1.5 text-sm font-medium transition 
+                                        ${filter === f
+                                    ? theme === "dark"
+                                        ? "text-white border-b border-orange-500"
+                                        : "text-black border-b border-orange-500"
+                                    : theme === "dark"
+                                        ? "text-gray-300"
+                                        : "text-gray-700"
+                                }`}
 
-                                {[
-                                    "Task",
-                                    "Type",
-                                    "Lead",
-                                    "Phone",
-                                    "Due",
-                                    "Status",
-                                    "Assigned To",
-                                    "Priority",
-                                    
-                                    "Actions",
-                                    "Comments",
-                                ].map((column) => (
-                                    <th
-                                        key={column}
-                                        scope="col"
-                                        className="px-6 py-3 text-start"
-                                    >
-                                        <div className="flex items-center gap-x-2">
-                                            <span className="text-xs font-semibold uppercase">
-                                                {column}
+                        >
+                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto">
+                <table className={`min-w-full divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+                    <thead className={`${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
+                        <tr>
+                            <th scope="col" className="ps-6 py-3 text-start">
+                                <label htmlFor="task-select-all" className="flex">
+                                    <input
+                                        type="checkbox"
+                                        className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                                        id="task-select-all"
+                                    />
+                                </label>
+                            </th>
+
+                            {[
+                                "Task",
+                                "Type",
+                                "Lead",
+                                "Phone",
+                                "Due",
+                                "Status",
+                                "Assigned To",
+                                "Priority",
+
+                                "Actions",
+                                "Comments",
+                            ].map((column) => (
+                                <th
+                                    key={column}
+                                    scope="col"
+                                    className="px-6 py-3 text-start"
+                                >
+                                    <div className="flex items-center gap-x-2">
+                                        <span className="text-xs font-semibold uppercase">
+                                            {column}
+                                        </span>
+                                    </div>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+
+                    <tbody className={`divide-y overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+                        {filteredTasks.length === 0 ? (
+                            <tr>
+                                <td
+                                    colSpan={12}
+                                    className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                                >
+                                    No tasks found. Try a different search or filter.
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredTasks.map((task) => (
+                                <tr key={task.id} className={task.status?.toLowerCase() === "completed" ? "opacity-60" : ""}>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="ps-6 py-2">
+                                            <label
+                                                htmlFor={`task-${task.id}`}
+                                                className="flex"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                                                    id={`task-${task.id}`}
+                                                    checked={task.status?.toLowerCase() === "completed"}
+                                                    onChange={() => handleMarkComplete(task)}
+                                                />
+                                                <span className="sr-only">
+                                                    Select {task.id}
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <div className="flex flex-col">
+                                                <span className={`text-sm font-medium ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                                    {task.title}
+                                                </span>
+                                                <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                                    {task.id}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <div className="flex items-center gap-2">
+                                                {getTypeIcon(task.type)}
+                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                                    {task.type}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                                {task.lead_id}
                                             </span>
                                         </div>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-
-                        <tbody className={`divide-y overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
-                            {filteredTasks.length === 0 ? (
-                                <tr>
-                                    <td
-                                        colSpan={12}
-                                        className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                                    >
-                                        No tasks found. Try a different search or filter.
                                     </td>
-                                </tr>
-                            ) : (
-                                filteredTasks.map((task) => (
-                                    <tr key={task.id} className={task.status?.toLowerCase() === "completed" ? "opacity-60" : ""}>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="ps-6 py-2">
-                                                <label
-                                                    htmlFor={`task-${task.id}`}
-                                                    className="flex"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-                                                        id={`task-${task.id}`}
-                                                        checked={task.status?.toLowerCase() === "completed"}
-                                                        onChange={() => handleMarkComplete(task)}
-                                                    />
-                                                    <span className="sr-only">
-                                                        Select {task.id}
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <div className="flex flex-col">
-                                                    <span className={`text-sm font-medium ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                        {task.title}
-                                                    </span>
-                                                    <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                                        {task.id}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <div className="flex items-center gap-2">
-                                                    {getTypeIcon(task.type)}
-                                                    <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                        {task.type}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                    {task.lead_id}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <a
-                                                    href={`tel:${task.phone?.replace(/[^0-9+]/g, "")}`}
-                                                    className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
-                                                >
-                                                    {task.phone}
-                                                </a>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <div className="flex flex-col gap-1">
-                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold w-fit ${
-                                                        dueStyles[task.due]?.[theme === "dark" ? "dark" : "light"] || dueStyles.upcoming.light
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <a
+                                                href={`tel:${task.phone?.replace(/[^0-9+]/g, "")}`}
+                                                className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
+                                            >
+                                                {task.phone}
+                                            </a>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold w-fit ${dueStyles[task.due]?.[theme === "dark" ? "dark" : "light"] || dueStyles.upcoming.light
                                                     }`}>
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                        </svg>
-                                                        {task.dueDisplay}
-                                                        {task.hasUpdatedDue && (
-                                                            <span className="ml-1 w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
-                                                        )}
-                                                    </span>
-                                                    
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                                    statusStyles[task.status]?.[theme === "dark" ? "dark" : "light"] || statusStyles.Pending.light
-                                                }`}>
-                                                    {task.status}
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    {task.dueDisplay}
+                                                    {task.hasUpdatedDue && (
+                                                        <span className="ml-1 w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                                                    )}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {task.sales_person_id}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <PriorityDropdown
-                                                    value={task.priority}
-                                                    theme={theme}
-                                                    onChange={(newPriority) => handlePriorityUpdate(task.id, newPriority)}
-                                                />
-                                            </div>
-                                        </td>
-                                        
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <div
-                                                    className="relative"
-                                                    data-actions-menu="true"
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        aria-label="Open actions menu"
-                                                        onClick={() => handleToggleActions(task.id)}
-                                                        className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-hidden ${theme === "dark"
-                                                            ? "border-gray-700 text-gray-400 hover:text-gray-200"
-                                                            : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
-                                                        }`}
-                                                    >
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            viewBox="0 0 24 24"
-                                                            width="20"
-                                                            height="20"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                d="M11.9967 11.5C12.549 11.5 12.9967 11.9477 12.9967 12.5C12.9967 13.0523 12.549 13.5 11.9967 13.5C11.4444 13.5 10.9967 13.0523 10.9967 12.5C10.9967 11.9477 11.4444 11.5 11.9967 11.5Z"
-                                                                strokeWidth="1.5"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                            />
-                                                            <path
-                                                                d="M11.9967 5.5C12.549 5.5 12.9967 5.94772 12.9967 6.5C12.9967 7.05228 12.549 7.5 11.9967 7.5C11.4444 7.5 10.9967 7.05228 10.9967 6.5C10.9967 5.94772 11.4444 5.5 11.9967 5.5Z"
-                                                                strokeWidth="1.5"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                            />
-                                                            <path
-                                                                d="M11.9967 17.5C12.549 17.5 12.9967 17.9477 12.9967 18.5C12.9967 19.0523 12.549 19.5 11.9967 19.5C11.4444 19.5 10.9967 19.0523 10.9967 18.5C10.9967 17.9477 11.4444 17.5 11.9967 17.5Z"
-                                                                strokeWidth="1.5"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                            />
-                                                        </svg>
-                                                    </button>
 
-                                                    {openActions === task.id && (
-                                                        <div className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl ${theme === "dark"
-                                                            ? "bg-gray-800 text-gray-200 border-gray-700"
-                                                            : "bg-white text-gray-700 border-gray-200"
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[task.status]?.[theme === "dark" ? "dark" : "light"] || statusStyles.Pending.light
+                                                }`}>
+                                                {task.status}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                                {task.sales_person_id}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <PriorityDropdown
+                                                value={task.priority}
+                                                theme={theme}
+                                                onChange={(newPriority) => handlePriorityUpdate(task.id, newPriority)}
+                                            />
+                                        </div>
+                                    </td>
+
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2">
+                                            <div
+                                                className="relative"
+                                                data-actions-menu="true"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    aria-label="Open actions menu"
+                                                    onClick={() => handleToggleActions(task.id)}
+                                                    className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-hidden ${theme === "dark"
+                                                        ? "border-gray-700 text-gray-400 hover:text-gray-200"
+                                                        : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
+                                                        }`}
+                                                >
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 24 24"
+                                                        width="20"
+                                                        height="20"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            d="M11.9967 11.5C12.549 11.5 12.9967 11.9477 12.9967 12.5C12.9967 13.0523 12.549 13.5 11.9967 13.5C11.4444 13.5 10.9967 13.0523 10.9967 12.5C10.9967 11.9477 11.4444 11.5 11.9967 11.5Z"
+                                                            strokeWidth="1.5"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                        <path
+                                                            d="M11.9967 5.5C12.549 5.5 12.9967 5.94772 12.9967 6.5C12.9967 7.05228 12.549 7.5 11.9967 7.5C11.4444 7.5 10.9967 7.05228 10.9967 6.5C10.9967 5.94772 11.4444 5.5 11.9967 5.5Z"
+                                                            strokeWidth="1.5"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                        <path
+                                                            d="M11.9967 17.5C12.549 17.5 12.9967 17.9477 12.9967 18.5C12.9967 19.0523 12.549 19.5 11.9967 19.5C11.4444 19.5 10.9967 19.0523 10.9967 18.5C10.9967 17.9477 11.4444 17.5 11.9967 17.5Z"
+                                                            strokeWidth="1.5"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                    </svg>
+                                                </button>
+
+                                                {openActions === task.id && (
+                                                    <div className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl ${theme === "dark"
+                                                        ? "bg-gray-800 text-gray-200 border-gray-700"
+                                                        : "bg-white text-gray-700 border-gray-200"
                                                         }`}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMarkComplete(task)}
+                                                            className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                                                        >
+                                                            {task.status?.toLowerCase() === "completed" ? "Mark Pending" : "Mark Complete"}
+                                                        </button>
+                                                        {["View", "Edit"].map((action) => (
                                                             <button
+                                                                key={action}
                                                                 type="button"
-                                                                onClick={() => handleMarkComplete(task)}
                                                                 className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                                             >
-                                                                {task.status?.toLowerCase() === "completed" ? "Mark Pending" : "Mark Complete"}
+                                                                {action}
                                                             </button>
-                                                            {["View", "Edit"].map((action) => (
-                                                                <button
-                                                                    key={action}
-                                                                    type="button"
-                                                                    className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                                                >
-                                                                    {action}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2 max-w-[200px]">
-                                                {task.comments ? (
-                                                    <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                                        <div className="flex items-start gap-1.5">
-                                                            <svg 
-                                                                xmlns="http://www.w3.org/2000/svg" 
-                                                                viewBox="0 0 20 20" 
-                                                                fill="currentColor" 
-                                                                className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500"
-                                                            >
-                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
-                                                            </svg>
-                                                            <span className="line-clamp-2 break-words" title={task.comments}>
-                                                                {task.comments}
-                                                            </span>
-                                                        </div>
+                                                        ))}
                                                     </div>
-                                                ) : (
-                                                    <span className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                                        No comments
-                                                    </span>
                                                 )}
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-                {/* End Table */}
-
-                {/* Footer */}
-                <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                    <div className="inline-flex items-center gap-x-2">
-                        <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
-                            Showing: {filteredTasks.length} of {transformedTasks.length}
-                        </p>
-                    </div>
-
-                    <div>
-                        <div className="inline-flex gap-x-2">
-                            <button
-                                type="button"
-                                className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
-                                    ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
-                                    : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
-                                }`}
-                            >
-                                <svg
-                                    className="shrink-0 size-4"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="m15 18-6-6 6-6" />
-                                </svg>
-                                Prev
-                            </button>
-
-                            <button
-                                type="button"
-                                className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
-                                    ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
-                                    : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
-                                }`}
-                            >
-                                Next
-                                <svg
-                                    className="shrink-0 size-4"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="m9 18 6-6-6-6" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                {/* End Footer */}
+                                        </div>
+                                    </td>
+                                    <td className="size-px whitespace-nowrap">
+                                        <div className="px-6 py-2 max-w-[200px]">
+                                            {task.comments ? (
+                                                <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                                                    <div className="flex items-start gap-1.5">
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            viewBox="0 0 20 20"
+                                                            fill="currentColor"
+                                                            className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500"
+                                                        >
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
+                                                        </svg>
+                                                        <span className="line-clamp-2 break-words" title={task.comments}>
+                                                            {task.comments}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                    No comments
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
-   
+            {/* End Table */}
+
+            {/* Footer */}
+            <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                <div className="inline-flex items-center gap-x-2">
+                    <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
+                        Showing: {filteredTasks.length} of {transformedTasks.length}
+                    </p>
+                </div>
+
+                <div>
+                    <div className="inline-flex gap-x-2">
+                        <button
+                            type="button"
+                            className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
+                                ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
+                                : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            <svg
+                                className="shrink-0 size-4"
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="m15 18-6-6 6-6" />
+                            </svg>
+                            Prev
+                        </button>
+
+                        <button
+                            type="button"
+                            className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
+                                ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
+                                : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            Next
+                            <svg
+                                className="shrink-0 size-4"
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="m9 18 6-6-6-6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {/* End Footer */}
+        </div>
+
     );
 }

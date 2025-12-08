@@ -8,6 +8,7 @@ import { useTheme } from "../../context/themeContext";
 import EmailModal from "../../components/ui/email-modal";
 import OverveiwTab from "./components/overveiwTab";
 import ActivityTab from "./components/activityTab";
+import TasksTab from "./components/taskstab";
 import BookMeetingButton from "../../components/buttons/bookMeetingbtn";
 import EditLeadScoreModal from "../../components/buttons/editLeadScorebtn";
 import PriorityDropdown from "../../components/buttons/priorityTooglebtn";
@@ -493,7 +494,7 @@ export default function LeadDetailPage() {
     const tabs = [
         { id: "overview", label: "Overview" },
         { id: "activity", label: "Activity" },
-       
+        { id: "tasks", label: "Tasks" },
         { id: "notes", label: "Notes" },
 
     ];
@@ -846,6 +847,10 @@ export default function LeadDetailPage() {
             {/* ACTIVITY TAB */}
             {tab === "activity" && (
                 <ActivityTab leadId={leadId} />
+            )}
+             {/* TASKS TAB */}
+            {tab === "tasks" && (
+                <TasksTab theme={theme} leadId={leadId} leadName={lead.name} />
             )}
 
         

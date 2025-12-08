@@ -111,6 +111,18 @@ export async function POST(request) {
     lastActivity: formatLastActivity(data.last_activity),
   };
 
+  const initialTaskTitle = `Call to ${newLead.name}`;
+  await supabase
+    .from("tasks_table")
+    .insert({
+      lead_id: newLead.id,
+      title: initialTaskTitle,
+      type: "Call",
+      status: "Pending",
+      sales_person_id: data.assigned_to || null,
+      priority: data.priority || "Medium",
+    });
+
   return Response.json({ success: true, lead: newLead });
 }
 
@@ -124,7 +136,15 @@ export async function PATCH(request) {
     return Response.json({ error: "Lead ID is required" }, { status: 400 });
   }
 
-  // Build the update object based on what's provided
+  const { data: existingLead } = await supabase
+    .from("leads_table")
+    .select("id, lead_name, status, assigned_to, priority")
+    .eq("id", id)
+    .single();
+
+  const previousStatus = existingLead?.status;
+  const leadName = existingLead?.lead_name || "";
+
   const updateData = {};
   if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
@@ -149,6 +169,46 @@ export async function PATCH(request) {
     return Response.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  return Response.json({ success: true, data: data[0] });
-}
+  const updatedLead = data[0];
 
+  if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
+    const s = String(status).toLowerCase();
+    let title = `Task for ${leadName}`;
+    let type = "Follow-Up";
+    if (s === "new") {
+      title = `Call to ${leadName}`;
+      type = "Call";
+    } else if (s === "contacted") {
+      title = `Follow-up to ${leadName}`;
+      type = "Follow-Up";
+    } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
+      title = `Follow-up to ${leadName}`;
+      type = "Follow-Up";
+    } else if (s === "qualified") {
+      title = `Qualification call with ${leadName}`;
+      type = "Call";
+    } else if (s === "proposal") {
+      title = `Prepare proposal for ${leadName}`;
+      type = "Proposal";
+    } else if (s === "won") {
+      title = `Closure with ${leadName}`;
+      type = "Meeting";
+    } else if (s === "no response" || s === "no_response") {
+      title = `Re-attempt contact: ${leadName}`;
+      type = "Call";
+    }
+
+    await supabase
+      .from("tasks_table")
+      .insert({
+        lead_id: id,
+        title,
+        type,
+        status: "Pending",
+        sales_person_id: existingLead?.assigned_to || null,
+        priority: existingLead?.priority || "Medium",
+      });
+  }
+
+  return Response.json({ success: true, data: updatedLead });
+}
