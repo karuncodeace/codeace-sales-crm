@@ -152,3 +152,68 @@ body.dark ::-webkit-scrollbar-corner {
   background: #374151;
 }
 
+/* React Quill Editor Dark Mode Styles */
+.dark-editor .quill-dark .ql-toolbar,
+.dark-editor .quill-dark .ql-container {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: #f3f4f6;
+}
+
+.dark-editor .quill-dark .ql-toolbar .ql-stroke {
+  stroke: #d1d5db;
+}
+
+.dark-editor .quill-dark .ql-toolbar .ql-fill {
+  fill: #d1d5db;
+}
+
+.dark-editor .quill-dark .ql-toolbar button:hover,
+.dark-editor .quill-dark .ql-toolbar button.ql-active {
+  background-color: #374151;
+}
+
+.dark-editor .quill-dark .ql-editor {
+  background-color: #1f2937;
+  color: #f3f4f6;
+}
+
+.dark-editor .quill-dark .ql-editor.ql-blank::before {
+  color: #9ca3af;
+}
+
+.dark-editor .quill-dark .ql-snow .ql-picker {
+  color: #d1d5db;
+}
+
+.dark-editor .quill-dark .ql-snow .ql-picker-options {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.dark-editor .quill-dark .ql-snow .ql-picker-item:hover {
+  background-color: #374151;
+}
+
+/* Light mode Quill styles */
+.rich-text-editor:not(.dark-editor) .ql-toolbar,
+.rich-text-editor:not(.dark-editor) .ql-container {
+  border-color: #d1d5db;
+}
+
+.rich-text-editor:not(.dark-editor) .ql-editor {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+/* Custom Rich Text Editor Placeholder */
+[contenteditable][data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.dark [contenteditable][data-placeholder]:empty:before {
+  color: #6b7280;
+}
+

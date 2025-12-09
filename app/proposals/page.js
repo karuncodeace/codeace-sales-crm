@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useTheme } from "../context/themeContext";
-import { FileText, Download, Plus, Trash2, Save } from "lucide-react";
+import { FileText, Download, Plus, Trash2, Save, Bold, Italic, Underline, List } from "lucide-react";
 import jsPDF from "jspdf";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 export default function ProposalPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const scopeRef = useRef(null);
+  const scopeEditorRef = useRef(null);
+  const conclusionEditorRef = useRef(null);
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -36,7 +37,7 @@ export default function ProposalPage() {
     clientOrganization: "",
     organizationCategory: "",
     scopeDescription: "",
-    pricingRows: [{ description: "", amount: 0 }],
+    pricingRows: [{ description: "", amount: "" }],
     timelineMonths: "",
     timelineWeeks: "",
     timelinePhases: [{ week: "", phase: "" }],
@@ -56,32 +57,52 @@ export default function ProposalPage() {
     }));
   };
 
- 
+  const formatCurrencyInput = (value) => {
+    if (!value && value !== 0) return '';
+    // Remove all non-digit characters except decimal point
+    let cleaned = value.toString().replace(/[^\d.]/g, '');
+    // Remove leading zeros (but keep single zero or zero before decimal)
+    cleaned = cleaned.replace(/^0+(?=\d)/, '');
+    // Ensure only one decimal point
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return cleaned;
+  };
 
-
+  const parseCurrencyValue = (value) => {
+    const cleaned = formatCurrencyInput(value);
+    return parseFloat(cleaned) || 0;
+  };
 
   const calculateSubtotal = () => {
     if (Array.isArray(formData.pricingRows) && formData.pricingRows.length) {
-      return formData.pricingRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+      return formData.pricingRows.reduce((sum, r) => sum + parseCurrencyValue(r.amount || 0), 0);
     }
     return formData.items.reduce((sum, item) => sum + item.total, 0);
   };
 
   const addPricingRow = () => {
-    setFormData((prev) => ({ ...prev, pricingRows: [...(prev.pricingRows || []), { description: "", amount: 0 }] }));
+    setFormData((prev) => ({ ...prev, pricingRows: [...(prev.pricingRows || []), { description: "", amount: "" }] }));
   };
 
   const updatePricingRow = (idx, field, value) => {
     const rows = [...(formData.pricingRows || [])];
-    rows[idx] = { ...rows[idx], [field]: field === "amount" ? parseFloat(value) || 0 : value };
+    if (field === "amount") {
+      const cleaned = formatCurrencyInput(value);
+      rows[idx] = { ...rows[idx], [field]: cleaned };
+    } else {
+      rows[idx] = { ...rows[idx], [field]: value };
+    }
     setFormData((prev) => ({ ...prev, pricingRows: rows }));
   };
 
-  const removePricingRow = (idx) => {
-    const rows = [...(formData.pricingRows || [])];
-    rows.splice(idx, 1);
-    setFormData((prev) => ({ ...prev, pricingRows: rows.length ? rows : [{ description: "", amount: 0 }] }));
-  };
+    const removePricingRow = (idx) => {
+      const rows = [...(formData.pricingRows || [])];
+      rows.splice(idx, 1);
+      setFormData((prev) => ({ ...prev, pricingRows: rows.length ? rows : [{ description: "", amount: "" }] }));
+    };
 
   const addTimelinePhase = () => {
     setFormData((prev) => ({ ...prev, timelinePhases: [...(prev.timelinePhases || []), { week: "", phase: "" }] }));
@@ -99,17 +120,116 @@ export default function ProposalPage() {
     setFormData((prev) => ({ ...prev, timelinePhases: rows.length ? rows : [{ week: "", phase: "" }] }));
   };
 
-  const execCmd = (cmd) => {
-    try {
-      const d = typeof globalThis !== "undefined" && globalThis.document ? globalThis.document : null;
-      if (!d) return;
-      if (scopeRef.current && typeof scopeRef.current.focus === "function") {
-        scopeRef.current.focus();
+  // Rich text editor component
+  const RichTextEditor = ({ value, onChange, placeholder, editorRef }) => {
+    const execCommand = (command, value = null) => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+        document.execCommand(command, false, value);
       }
-      if (typeof d.execCommand === "function") {
-        d.execCommand(cmd, false, null);
+    };
+
+    const handleInput = () => {
+      if (editorRef.current) {
+        const html = editorRef.current.innerHTML;
+        onChange(html);
       }
-    } catch {}
+    };
+
+    const handleKeyDown = (e) => {
+      // Allow Ctrl+B, Ctrl+I, Ctrl+U for formatting
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'b') {
+          e.preventDefault();
+          execCommand('bold');
+        } else if (e.key === 'i') {
+          e.preventDefault();
+          execCommand('italic');
+        } else if (e.key === 'u') {
+          e.preventDefault();
+          execCommand('underline');
+        }
+      }
+    };
+
+    return (
+      <div className={`border rounded-lg overflow-hidden ${isDark ? "border-gray-700" : "border-gray-300"}`}>
+        {/* Toolbar */}
+        <div className={`flex gap-1 p-2 border-b ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              execCommand('bold');
+            }}
+            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Bold (Ctrl+B)"
+          >
+            <Bold className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              execCommand('italic');
+            }}
+            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Italic (Ctrl+I)"
+          >
+            <Italic className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              execCommand('underline');
+            }}
+            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Underline (Ctrl+U)"
+          >
+            <Underline className="w-4 h-4" />
+          </button>
+          <div className={`w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-300"}`} />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              execCommand('insertUnorderedList');
+            }}
+            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Bullet List"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              execCommand('insertOrderedList');
+            }}
+            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Numbered List"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
+        {/* Editor */}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          className={`min-h-[300px] w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+            isDark 
+              ? "bg-gray-800 text-white placeholder-gray-500" 
+              : "bg-white text-gray-900 placeholder-gray-400"
+          }`}
+          dangerouslySetInnerHTML={{ __html: value || "" }}
+          data-placeholder={placeholder}
+        />
+      </div>
+    );
   };
 
   const isDetailsValid = () => {
@@ -184,33 +304,41 @@ export default function ProposalPage() {
     if (typeof document === "undefined") {
       // Fallback for server-side: simple regex to remove HTML tags
       const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-      return text ? [text] : [];
+      return text ? [{ text, isListItem: false, isBold: false }] : [];
     }
     const tmp = document.createElement("DIV");
     tmp.innerHTML = html;
     
-    // Extract text and preserve list structure
+    // Extract text and preserve list structure and bold formatting
     const items = [];
-    const processNode = (node) => {
+    const processNode = (node, isBold = false, isListItem = false) => {
       if (node.nodeType === 3) { // Text node
         const text = node.textContent.trim();
-        if (text) items.push({ text, isListItem: false });
+        if (text) items.push({ text, isListItem, isBold });
       } else if (node.nodeType === 1) { // Element node
         const tagName = node.tagName.toLowerCase();
-        if (tagName === "li" || tagName === "ul" || tagName === "ol") {
-          const text = node.textContent.trim();
-          if (text) items.push({ text, isListItem: true });
+        const currentIsBold = isBold || tagName === "b" || tagName === "strong" || (node.style && node.style.fontWeight && (node.style.fontWeight === "bold" || parseInt(node.style.fontWeight) >= 700));
+        
+        if (tagName === "li") {
+          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, true));
+        } else if (tagName === "ul" || tagName === "ol") {
+          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false));
         } else if (tagName === "p" || tagName === "div") {
-          const text = node.textContent.trim();
-          if (text) items.push({ text, isListItem: false });
+          const hasChildren = Array.from(node.childNodes).some(child => child.nodeType === 1);
+          if (hasChildren) {
+            Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false));
+          } else {
+            const text = node.textContent.trim();
+            if (text) items.push({ text, isListItem: false, isBold: currentIsBold });
+          }
         } else {
-          Array.from(node.childNodes).forEach(processNode);
+          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, isListItem));
         }
       }
     };
     
-    Array.from(tmp.childNodes).forEach(processNode);
-    return items.length > 0 ? items : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false }];
+    Array.from(tmp.childNodes).forEach(node => processNode(node, false, false));
+    return items.length > 0 ? items : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false, isBold: false }];
   };
 
   const splitText = (doc, text, maxWidth, x, y) => {
@@ -223,7 +351,7 @@ export default function ProposalPage() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 15;
-    const headerHeight = 40;
+    const headerHeight = 25; // Changed to 20mm as requested
     const footerHeight = 30;
     const contentStartY = headerHeight + 10;
     const contentEndY = pageHeight - footerHeight - 10;
@@ -261,12 +389,12 @@ export default function ProposalPage() {
     titleLines.forEach((line, idx) => {
       doc.text(line, pageWidth / 2, y + (idx * 6), { align: "center" });
     });
-    y += titleLines.length * 6 + 8;
+    y += titleLines.length * 6 + 12; // Added more spacing after title
 
-    // Date
+    // Date - with margin top
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    y = checkNewPage(y);
+    y = checkNewPage(y, 8);
     doc.text(`Date : ${formatDate(formData.proposalDate)}`, marginX, y);
     y += 8;
 
@@ -361,7 +489,7 @@ export default function ProposalPage() {
     });
     y += 5;
 
-    // Scope Description (parse HTML and convert to text with bullet points)
+    // Scope Description (parse HTML and convert to text with bullet points and bold formatting)
     if (formData.scopeDescription) {
       const scopeItems = parseHtmlToText(formData.scopeDescription);
       scopeItems.forEach((item) => {
@@ -370,7 +498,11 @@ export default function ProposalPage() {
         const textLines = doc.splitTextToSize(text, maxContentWidth - 5);
         textLines.forEach((line) => {
           y = checkNewPage(y, 5);
+          // Set font style based on bold flag
+          doc.setFont("helvetica", item.isBold ? "bold" : "normal");
           doc.text(line, marginX + 3, y);
+          // Reset to normal font
+          doc.setFont("helvetica", "normal");
           y += 5;
         });
         y += 2; // Add spacing between items
@@ -413,19 +545,29 @@ export default function ProposalPage() {
       doc.setFontSize(9);
       formData.pricingRows.forEach((row, idx) => {
         y = checkNewPage(y, rowHeight);
+        const rowStartY = y;
         doc.text(String(idx + 1), marginX, y);
         const descLines = doc.splitTextToSize(row.description || "", col2Width);
+        let maxDescHeight = 0;
         descLines.forEach((line, lineIdx) => {
           if (lineIdx === 0) {
             doc.text(line, marginX + col1Width, y);
+            maxDescHeight = Math.max(maxDescHeight, 5);
           } else {
             y = checkNewPage(y, rowHeight);
             doc.text(line, marginX + col1Width, y);
+            maxDescHeight = Math.max(maxDescHeight, (lineIdx + 1) * 5);
           }
         });
-        const amount = `₹ ${(row.amount || 0).toLocaleString()}`;
-        doc.text(amount, pageWidth - marginX - col3Width, y, { align: "right" });
-        y += rowHeight;
+        // Format amount properly
+        const amountValue = parseCurrencyValue(row.amount || 0);
+        const formattedAmount = amountValue.toLocaleString('en-IN', { 
+          minimumFractionDigits: 0, 
+          maximumFractionDigits: 2 
+        });
+        const amount = `₹ ${formattedAmount}`;
+        doc.text(amount, pageWidth - marginX, rowStartY, { align: "right" });
+        y = Math.max(rowStartY + maxDescHeight, y) + 2;
       });
 
       // Total
@@ -434,8 +576,12 @@ export default function ProposalPage() {
       doc.line(marginX, y, pageWidth - marginX, y);
       y += 5;
       doc.setFont("helvetica", "bold");
-      const total = calculateSubtotal();
-      doc.text(`Total: ₹ ${total.toLocaleString()}`, pageWidth - marginX, y, { align: "right" });
+      const total = formData.pricingRows.reduce((sum, r) => sum + parseCurrencyValue(r.amount || 0), 0);
+      const formattedTotal = total.toLocaleString('en-IN', { 
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 2 
+      });
+      doc.text(`Total: ₹ ${formattedTotal}`, pageWidth - marginX, y, { align: "right" });
       y += 10;
     }
 
@@ -455,7 +601,12 @@ export default function ProposalPage() {
         y = checkNewPage(y, 15);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        const milestoneText = `${milestone.title || `Milestone ${idx + 1}`} - ₹${(milestone.amount || 0).toLocaleString()}`;
+        const milestoneAmount = parseCurrencyValue(milestone.amount || 0);
+        const formattedMilestoneAmount = milestoneAmount.toLocaleString('en-IN', { 
+          minimumFractionDigits: 0, 
+          maximumFractionDigits: 2 
+        });
+        const milestoneText = `${milestone.title || `Milestone ${idx + 1}`} - ₹${formattedMilestoneAmount}`;
         doc.text(milestoneText, marginX + 5, y);
         y += 5;
         doc.setFont("helvetica", "normal");
@@ -553,11 +704,11 @@ export default function ProposalPage() {
         doc.text(line, marginX + 5, y);
         y += 5;
       });
-      y += 2;
+      y += 3; // Consistent spacing like other sections
     });
 
     // Additional Notes Section
-    y = checkNewPage(y, 20);
+    y = checkNewPage(y, 40); // Increased margin top for Additional Notes
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Additional Notes", marginX, y);
@@ -579,7 +730,7 @@ export default function ProposalPage() {
     notesItems.forEach((note) => {
       y = checkNewPage(y, 8);
       doc.text(`• ${note}`, marginX + 5, y);
-      y += 6;
+      y += 5; // Consistent spacing with SRS section
     });
 
     // Conclusion paragraph
@@ -595,12 +746,18 @@ export default function ProposalPage() {
     // Custom conclusion notes if provided
     if (formData.conclusionNotes) {
       y = checkNewPage(y, 10);
-      const customNotes = stripHtml(formData.conclusionNotes);
-      const customNotesLines = doc.splitTextToSize(customNotes, maxContentWidth);
-      customNotesLines.forEach((line) => {
-        y = checkNewPage(y, 5);
-        doc.text(line, marginX, y);
-        y += 5;
+      // Parse HTML to preserve bold formatting
+      const customNotesItems = parseHtmlToText(formData.conclusionNotes);
+      customNotesItems.forEach((item) => {
+        const textLines = doc.splitTextToSize(item.text, maxContentWidth);
+        textLines.forEach((line) => {
+          y = checkNewPage(y, 5);
+          doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+          doc.text(line, marginX, y);
+          doc.setFont("helvetica", "normal");
+          y += 5;
+        });
+        y += 2;
       });
     }
 
@@ -715,22 +872,11 @@ export default function ProposalPage() {
 
             {activeTab === "Scope of Work" && (
               <div className="space-y-3 mb-6">
-                <div className="flex gap-2 mb-2">
-                  <button onClick={() => execCmd("bold")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Bold</button>
-                  <button onClick={() => execCmd("italic")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Italic</button>
-                  <button onClick={() => execCmd("underline")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Underline</button>
-                  <button onClick={() => execCmd("insertUnorderedList")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>List</button>
-                </div>
-                <div
-                  ref={scopeRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className={`min-h-[200px] w-full px-4 py-3 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-                  onInput={() => {
-                    const html = scopeRef.current?.innerHTML || "";
-                    setFormData((prev) => ({ ...prev, scopeDescription: html }));
-                  }}
-                  dangerouslySetInnerHTML={{ __html: formData.scopeDescription || "" }}
+                <RichTextEditor
+                  value={formData.scopeDescription || ""}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
+                  placeholder="Enter scope of work details..."
+                  editorRef={scopeEditorRef}
                 />
               </div>
             )}
@@ -759,7 +905,10 @@ export default function ProposalPage() {
                             <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
                           </td>
                           <td className="px-2 py-2">
-                            <input type="number" min="0" step="0.01" value={r.amount} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                            <div className="relative">
+                              <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                              <input type="text" value={r.amount || ""} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="0" />
+                            </div>
                           </td>
                           <td className="px-2 py-2 text-right">
                             <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
@@ -770,7 +919,7 @@ export default function ProposalPage() {
                   </table>
                 </div>
                 <div className="flex justify-end">
-                  <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString()}</div>
+                  <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString("en-IN")}</div>
                 </div>
               </div>
             )}
@@ -779,7 +928,7 @@ export default function ProposalPage() {
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center">
                   <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Milestone</span>
-                  <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: 0 }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                  <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: "" }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
                 </div>
                 <div className="space-y-3">
                   {(formData.milestones || []).map((m, idx) => (
@@ -790,13 +939,17 @@ export default function ProposalPage() {
                         }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Milestone *" />
                       </div>
                       <div className="col-span-2">
-                        <input type="number" min="0" step="0.01" value={m.amount} onChange={(e) => {
-                          const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: parseFloat(e.target.value) || 0 }; setFormData((prev) => ({ ...prev, milestones: arr }));
-                        }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
+                        <div className="relative">
+                          <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                          <input type="text" value={m.amount || ""} onChange={(e) => {
+                            const cleaned = formatCurrencyInput(e.target.value);
+                            const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: cleaned }; setFormData((prev) => ({ ...prev, milestones: arr }));
+                          }} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
+                        </div>
                       </div>
                       <div className="col-span-1 flex justify-end">
                         <button onClick={() => {
-                          const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: 0 }] }));
+                          const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: "" }] }));
                         }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
                       </div>
                     </div>
@@ -856,7 +1009,12 @@ export default function ProposalPage() {
               <div className="space-y-6 mb-6">
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
-                  <textarea name="conclusionNotes" value={formData.conclusionNotes} onChange={handleInputChange} rows={4} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  <RichTextEditor
+                    value={formData.conclusionNotes || ""}
+                    onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
+                    placeholder="Enter additional notes..."
+                    editorRef={conclusionEditorRef}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
