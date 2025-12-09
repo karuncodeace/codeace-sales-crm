@@ -386,14 +386,62 @@ export default function ProposalPage() {
     const lines = doc.splitTextToSize(text, maxWidth);
     return { lines, y };
   };
+  /* function to convert hex color to rgb color */
+  function hexToRgb(hex) {
+    const bigint = parseInt(hex.replace("#", ""), 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  }
 
+  /** function to use the gradient  */
+
+  function drawHorizontalGradientLine({
+    docInstance,
+    x1,
+    x2,
+    y,
+    height = 2.5, // 👈 stroke thickness control
+  }) {
+    const steps = 40;
+
+    const left = hexToRgb("#0B1E63");
+    const mid = hexToRgb("#0B1E63");
+    const right = hexToRgb("#FFFFFF");
+
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+
+      let color;
+      if (t <= 0.49) {
+        color = left;
+      } else {
+        const nt = (t - 0.49) / (1 - 0.49);
+        color = {
+          r: Math.round(mid.r + (right.r - mid.r) * nt),
+          g: Math.round(mid.g + (right.g - mid.g) * nt),
+          b: Math.round(mid.b + (right.b - mid.b) * nt),
+        };
+      }
+
+      docInstance.setDrawColor(color.r, color.g, color.b);
+      docInstance.setLineWidth((height / steps) * 6);
+
+      const x = x1 + (x2 - x1) * t;
+      docInstance.line(x, y, x + (x2 - x1) / steps + 0.6, y);
+    }
+  }
+  
+  
   const generatePDF = async () => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 15;
-    const headerHeight = 30; // Changed to 20mm as requested
-    const footerHeight = 30;
+    const headerHeight = 20; // Changed to 20mm as requested
+    const footerHeight = 20;
     const contentStartY = headerHeight + 10;
     const contentEndY = pageHeight - footerHeight - 10;
     const maxContentWidth = pageWidth - 2 * marginX;
@@ -428,7 +476,7 @@ export default function ProposalPage() {
     addWatermark(doc, pageWidth, pageHeight);
 
     let y = contentStartY;
-
+    y+=5;
     // Main Title (centered, bold)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -536,27 +584,22 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Scope Of Work", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
-
-    // Introduction
-    y = checkNewPage(y, 10);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const introText = `Implementation of a fully functional ${formData.organizationCategory || "Medical Care"} ERP, CRM & HRMS tailored for ${formData.clientOrganization || ""}, featuring:`;
-    const introLines = doc.splitTextToSize(introText, maxContentWidth);
-    introLines.forEach((line) => {
-      y = checkNewPage(y, 5);
-      doc.text(line, marginX, y);
-      y += 5;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
     });
-    y += 5;
+    y += 18;
 
     // Scope Description (parse HTML and convert to text with bullet points and bold formatting)
     if (formData.scopeDescription) {
       const scopeItems = parseHtmlToText(formData.scopeDescription);
+      // Ensure consistent font sizing/spacing with other content
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+
       scopeItems.forEach((item) => {
         const prefix = item.isListItem ? "• " : "";
         const text = prefix + item.text;
@@ -583,13 +626,19 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Pricing Summary", marginX, y);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
+    });
+    y += 18;
 
     if (formData.pricingRows?.length) {
-      const colNo = 12;
-      const colDesc = maxContentWidth - 60;
-      const colAmt = 48;
+      const colNo = 15;
+      const colAmt = 50;
+      const colDesc = maxContentWidth - colNo - colAmt; // fill remaining space
       const rowPadding = 4;
 
       // Header
@@ -602,19 +651,19 @@ export default function ProposalPage() {
 
       doc.text("No", marginX + 4, y + 5);
       doc.text("Description", marginX + colNo + 4, y + 5);
-      doc.text("Amount", pageWidth - marginX - 4, y + 5, { align: "right" });
+      doc.text("Amount", pageWidth - marginX - colAmt + colAmt - 6, y + 5, { align: "right" });
 
       y += 8;
 
       // Rows
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(10);
 
       let total = 0;
 
       formData.pricingRows.forEach((row, idx) => {
         const descLines = doc.splitTextToSize(row.description || "", colDesc - 8);
-        const rowHeight = Math.max(8, descLines.length * 5 + rowPadding);
+        const rowHeight = Math.max(10, descLines.length * 5 + rowPadding);
 
         y = checkNewPage(y, rowHeight);
 
@@ -622,45 +671,40 @@ export default function ProposalPage() {
         drawCell(marginX + colNo, y, colDesc, rowHeight);
         drawCell(pageWidth - marginX - colAmt, y, colAmt, rowHeight);
 
-        doc.text(String(idx + 1), marginX + 4, y + 6);
+        doc.text(String(idx + 1), marginX + 4, y + 7);
         descLines.forEach((line, lineIdx) => {
-          doc.text(line, marginX + colNo + 4, y + 6 + (lineIdx * 5));
+          doc.text(line, marginX + colNo + 4, y + 7 + lineIdx * 5);
         });
 
         const amt = parseCurrencyValue(row.amount || 0);
         total += amt;
-        const amountText = `₹ ${amt.toLocaleString("en-IN", {
+        const amountText = `INR ${amt.toLocaleString("en-IN", {
           minimumFractionDigits: 0,
-          maximumFractionDigits: 2
+          maximumFractionDigits: 2,
         })}`;
-        // Align amount to top of cell, regardless of description height
-        doc.text(
-          amountText,
-          pageWidth - marginX - 4,
-          y + 6,
-          { align: "right" }
-        );
+        // Place amount aligned to the right inside its cell
+        doc.text(amountText, pageWidth - marginX - 6, y + 7, { align: "right" });
 
         y += rowHeight;
       });
 
       // Total Row
-      y = checkNewPage(y, 10);
-      y+=5;
+      y = checkNewPage(y, 12);
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
 
-      drawCell(marginX, y, colNo + colDesc, 8);
-      drawCell(pageWidth - marginX - colAmt, y, colAmt, 8);
+      drawCell(marginX, y, colNo + colDesc, 10);
+      drawCell(pageWidth - marginX - colAmt, y, colAmt, 10);
 
-      doc.text("Total", marginX + colNo + 4, y + 5);
+      doc.text("Total", marginX + colNo + 4, y + 7);
       doc.text(
-        `₹ ${total.toLocaleString("en-IN")}`,
-        pageWidth - marginX - 4,
-        y + 5,
+        `INR ${total.toLocaleString("en-IN")}`,
+        pageWidth - marginX - 6,
+        y + 7,
         { align: "right" }
       );
 
-      y += 14;
+      y += 16;
     }
 
 
@@ -670,31 +714,38 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Payment Terms", marginX, y);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
+    });
+    y += 18;
 
     if (formData.milestones?.length) {
       const colMilestone = 40;
-      const colCondition = maxContentWidth - colMilestone - 50;
       const colAmount = 50;
+      const colCondition = maxContentWidth - colMilestone - colAmount; // remaining space
 
       // Header
       doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
       drawCell(marginX, y, colMilestone, 8);
       drawCell(marginX + colMilestone, y, colCondition, 8);
       drawCell(pageWidth - marginX - colAmount, y, colAmount, 8);
 
       doc.text("Milestone", marginX + 4, y + 5);
       doc.text("Condition", marginX + colMilestone + 4, y + 5);
-      doc.text("Amount", pageWidth - marginX - 4, y + 5, { align: "right" });
+      doc.text("Amount", pageWidth - marginX - 6, y + 5, { align: "right" });
 
       y += 8;
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(10);
 
       formData.milestones.forEach((m, i) => {
-        let condition =
+        const condition =
           i === 0
             ? "Due before project initiation"
             : i === 1
@@ -702,7 +753,7 @@ export default function ProposalPage() {
               : "On final delivery & acceptance";
 
         const conditionLines = doc.splitTextToSize(condition, colCondition - 8);
-        const rowHeight = Math.max(8, conditionLines.length * 5 + 4);
+        const rowHeight = Math.max(10, conditionLines.length * 5 + 4);
 
         y = checkNewPage(y, rowHeight);
 
@@ -710,22 +761,27 @@ export default function ProposalPage() {
         drawCell(marginX + colMilestone, y, colCondition, rowHeight);
         drawCell(pageWidth - marginX - colAmount, y, colAmount, rowHeight);
 
-        doc.text(m.title || `Milestone ${i + 1}`, marginX + 4, y + 6);
+        doc.text(m.title || `Milestone ${i + 1}`, marginX + 4, y + 7);
         conditionLines.forEach((line, lineIdx) => {
-          doc.text(line, marginX + colMilestone + 4, y + 6 + (lineIdx * 5));
+          doc.text(line, marginX + colMilestone + 4, y + 7 + lineIdx * 5);
         });
 
+        const amt = parseCurrencyValue(m.amount || 0);
+        const amountText = `INR ${amt.toLocaleString("en-IN", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}`;
         doc.text(
-          `₹ ${parseCurrencyValue(m.amount || 0).toLocaleString("en-IN")}`,
-          pageWidth - marginX - 4,
-          y + 6,
+          amountText,
+          pageWidth - marginX - 6,
+          y + 7,
           { align: "right" }
         );
 
         y += rowHeight;
       });
 
-      y += 10;
+      y += 12;
     }
 
 
@@ -735,10 +791,14 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Project Timeline", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
+    });
+    y += 18;
 
     y = checkNewPage(y, 15);
     doc.setFont("helvetica", "normal");
@@ -770,10 +830,14 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Software Requirements Specification (SRS)", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
+    });
+    y += 18;
 
     // Introduction
     y = checkNewPage(y, 15);
@@ -822,10 +886,14 @@ export default function ProposalPage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Additional Notes", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
-    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
-    y += 10;
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3 // 👈 increase for thicker stroke
+    });
+    y += 18;
 
     // Additional Notes Items
     y = checkNewPage(y, 10);
@@ -879,16 +947,19 @@ export default function ProposalPage() {
       doc.setFont("helvetica", "bold");
       doc.text(formData.creatorName, marginX, y);
       y += 5;
+      
     }
     doc.setFont("helvetica", "normal");
     if (formData.creatorDesignation) {
       doc.text(formData.creatorDesignation, marginX, y);
       y += 5;
     }
+    
     doc.text("CodeAce IT Solutions LLP", marginX, y);
     y += 5;
     doc.setFontSize(8);
     doc.text("(Issued with approval of the Founder)", marginX, y);
+    y += 5;
 
     // Save PDF
     const fileName = `${(formData.mainTitle || "proposal").replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate || ""}.pdf`;
