@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useTheme } from "../context/themeContext";
-import { FileText, Download, Plus, Trash2, Save, Bold, Italic, Underline, List } from "lucide-react";
+import { FileText, Download, Plus, Trash2, Save, Bold, Italic, Underline as UnderlineIcon, List } from "lucide-react";
 import jsPDF from "jspdf";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
 
 export const dynamic = "force-dynamic";
 
 export default function ProposalPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const scopeEditorRef = useRef(null);
-  const conclusionEditorRef = useRef(null);
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -120,37 +121,46 @@ export default function ProposalPage() {
     setFormData((prev) => ({ ...prev, timelinePhases: rows.length ? rows : [{ week: "", phase: "" }] }));
   };
 
-  // Rich text editor component
-  const RichTextEditor = ({ value, onChange, placeholder, editorRef }) => {
-    const execCommand = (command, value = null) => {
-      if (editorRef.current) {
-        editorRef.current.focus();
-        document.execCommand(command, false, value);
-      }
-    };
+  // Rich text editor component using Tiptap
+  const RichTextEditor = ({ value, onChange, placeholder }) => {
+    const editor = useEditor({
+      extensions: [
+        StarterKit.configure({
+          heading: {
+            levels: [1, 2, 3],
+          },
+        }),
+        Underline,
+      ],
+      content: value || "",
+      immediatelyRender: false,
+      onUpdate: ({ editor }) => {
+        onChange(editor.getHTML());
+      },
+      editorProps: {
+        attributes: {
+          class: `focus:outline-none min-h-[300px] px-4 py-3 ${
+            isDark 
+              ? "text-white" 
+              : "text-gray-900"
+          }`,
+          'data-placeholder': placeholder,
+        },
+      },
+    });
 
-    const handleInput = () => {
-      if (editorRef.current) {
-        const html = editorRef.current.innerHTML;
-        onChange(html);
+    // Update editor content when value prop changes externally
+    useEffect(() => {
+      if (editor && value !== editor.getHTML()) {
+        const { from, to } = editor.state.selection;
+        editor.commands.setContent(value || "", false);
+        editor.commands.setTextSelection({ from, to });
       }
-    };
+    }, [value, editor]);
 
-    const handleKeyDown = (e) => {
-      // Allow Ctrl+B, Ctrl+I, Ctrl+U for formatting
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'b') {
-          e.preventDefault();
-          execCommand('bold');
-        } else if (e.key === 'i') {
-          e.preventDefault();
-          execCommand('italic');
-        } else if (e.key === 'u') {
-          e.preventDefault();
-          execCommand('underline');
-        }
-      }
-    };
+    if (!editor) {
+      return null;
+    }
 
     return (
       <div className={`border rounded-lg overflow-hidden ${isDark ? "border-gray-700" : "border-gray-300"}`}>
@@ -160,9 +170,13 @@ export default function ProposalPage() {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              execCommand('bold');
+              editor.chain().focus().toggleBold().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            className={`p-2 rounded hover:bg-opacity-80 ${
+              editor.isActive('bold')
+                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Bold (Ctrl+B)"
           >
             <Bold className="w-4 h-4" />
@@ -171,9 +185,13 @@ export default function ProposalPage() {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              execCommand('italic');
+              editor.chain().focus().toggleItalic().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            className={`p-2 rounded hover:bg-opacity-80 ${
+              editor.isActive('italic')
+                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Italic (Ctrl+I)"
           >
             <Italic className="w-4 h-4" />
@@ -182,21 +200,29 @@ export default function ProposalPage() {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              execCommand('underline');
+              editor.chain().focus().toggleUnderline().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            className={`p-2 rounded hover:bg-opacity-80 ${
+              editor.isActive('underline')
+                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Underline (Ctrl+U)"
           >
-            <Underline className="w-4 h-4" />
+            <UnderlineIcon className="w-4 h-4" />
           </button>
           <div className={`w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-300"}`} />
           <button
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              execCommand('insertUnorderedList');
+              editor.chain().focus().toggleBulletList().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            className={`p-2 rounded hover:bg-opacity-80 ${
+              editor.isActive('bulletList')
+                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Bullet List"
           >
             <List className="w-4 h-4" />
@@ -205,29 +231,22 @@ export default function ProposalPage() {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              execCommand('insertOrderedList');
+              editor.chain().focus().toggleOrderedList().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+            className={`p-2 rounded hover:bg-opacity-80 ${
+              editor.isActive('orderedList')
+                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Numbered List"
           >
             <List className="w-4 h-4" />
           </button>
         </div>
         {/* Editor */}
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          className={`min-h-[300px] w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-            isDark 
-              ? "bg-gray-800 text-white placeholder-gray-500" 
-              : "bg-white text-gray-900 placeholder-gray-400"
-          }`}
-          dangerouslySetInnerHTML={{ __html: value || "" }}
-          data-placeholder={placeholder}
-        />
+        <div className={isDark ? "bg-gray-800" : "bg-white"}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
     );
   };
@@ -876,7 +895,6 @@ export default function ProposalPage() {
                   value={formData.scopeDescription || ""}
                   onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
                   placeholder="Enter scope of work details..."
-                  editorRef={scopeEditorRef}
                 />
               </div>
             )}
@@ -1013,7 +1031,6 @@ export default function ProposalPage() {
                     value={formData.conclusionNotes || ""}
                     onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
                     placeholder="Enter additional notes..."
-                    editorRef={conclusionEditorRef}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

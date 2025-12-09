@@ -13,6 +13,8 @@
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.86.0",
+    "@tiptap/react": "^3.13.0",
+    "@tiptap/starter-kit": "^3.13.0",
     "apexcharts": "^5.3.6",
     "date-fns": "^4.1.0",
     "html2pdf.js": "^0.12.1",
@@ -25,7 +27,6 @@
     "react-apexcharts": "^1.8.0",
     "react-datepicker": "^8.9.0",
     "react-dom": "19.2.0",
-    "react-quill": "^2.0.0",
     "resend": "^6.5.2",
     "swr": "^2.3.6"
   },
