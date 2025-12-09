@@ -99,11 +99,11 @@ export default function ProposalPage() {
     setFormData((prev) => ({ ...prev, pricingRows: rows }));
   };
 
-    const removePricingRow = (idx) => {
-      const rows = [...(formData.pricingRows || [])];
-      rows.splice(idx, 1);
-      setFormData((prev) => ({ ...prev, pricingRows: rows.length ? rows : [{ description: "", amount: "" }] }));
-    };
+  const removePricingRow = (idx) => {
+    const rows = [...(formData.pricingRows || [])];
+    rows.splice(idx, 1);
+    setFormData((prev) => ({ ...prev, pricingRows: rows.length ? rows : [{ description: "", amount: "" }] }));
+  };
 
   const addTimelinePhase = () => {
     setFormData((prev) => ({ ...prev, timelinePhases: [...(prev.timelinePhases || []), { week: "", phase: "" }] }));
@@ -139,11 +139,10 @@ export default function ProposalPage() {
       },
       editorProps: {
         attributes: {
-          class: `focus:outline-none min-h-[300px] px-4 py-3 ${
-            isDark 
-              ? "text-white" 
+          class: `focus:outline-none min-h-[300px] px-4 py-3 ${isDark
+              ? "text-white"
               : "text-gray-900"
-          }`,
+            }`,
           'data-placeholder': placeholder,
         },
       },
@@ -172,11 +171,10 @@ export default function ProposalPage() {
               e.preventDefault();
               editor.chain().focus().toggleBold().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${
-              editor.isActive('bold')
+            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('bold')
                 ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
                 : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Bold (Ctrl+B)"
           >
             <Bold className="w-4 h-4" />
@@ -187,11 +185,10 @@ export default function ProposalPage() {
               e.preventDefault();
               editor.chain().focus().toggleItalic().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${
-              editor.isActive('italic')
+            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('italic')
                 ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
                 : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Italic (Ctrl+I)"
           >
             <Italic className="w-4 h-4" />
@@ -202,11 +199,10 @@ export default function ProposalPage() {
               e.preventDefault();
               editor.chain().focus().toggleUnderline().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${
-              editor.isActive('underline')
+            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('underline')
                 ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
                 : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Underline (Ctrl+U)"
           >
             <UnderlineIcon className="w-4 h-4" />
@@ -218,11 +214,10 @@ export default function ProposalPage() {
               e.preventDefault();
               editor.chain().focus().toggleBulletList().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${
-              editor.isActive('bulletList')
+            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('bulletList')
                 ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
                 : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Bullet List"
           >
             <List className="w-4 h-4" />
@@ -233,11 +228,10 @@ export default function ProposalPage() {
               e.preventDefault();
               editor.chain().focus().toggleOrderedList().run();
             }}
-            className={`p-2 rounded hover:bg-opacity-80 ${
-              editor.isActive('orderedList')
+            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('orderedList')
                 ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
                 : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Numbered List"
           >
             <List className="w-4 h-4" />
@@ -327,36 +321,64 @@ export default function ProposalPage() {
     }
     const tmp = document.createElement("DIV");
     tmp.innerHTML = html;
-    
+
     // Extract text and preserve list structure and bold formatting
     const items = [];
-    const processNode = (node, isBold = false, isListItem = false) => {
+    const processNode = (node, isBold = false, isListItem = false, parentIsList = false) => {
       if (node.nodeType === 3) { // Text node
         const text = node.textContent.trim();
-        if (text) items.push({ text, isListItem, isBold });
+        if (text) {
+          items.push({ text, isListItem: isListItem || parentIsList, isBold });
+        }
       } else if (node.nodeType === 1) { // Element node
         const tagName = node.tagName.toLowerCase();
         const currentIsBold = isBold || tagName === "b" || tagName === "strong" || (node.style && node.style.fontWeight && (node.style.fontWeight === "bold" || parseInt(node.style.fontWeight) >= 700));
-        
+
         if (tagName === "li") {
-          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, true));
-        } else if (tagName === "ul" || tagName === "ol") {
-          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false));
-        } else if (tagName === "p" || tagName === "div") {
-          const hasChildren = Array.from(node.childNodes).some(child => child.nodeType === 1);
-          if (hasChildren) {
-            Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false));
-          } else {
-            const text = node.textContent.trim();
-            if (text) items.push({ text, isListItem: false, isBold: currentIsBold });
+          // Process all children of li as list items
+          const liText = node.textContent.trim();
+          if (liText) {
+            // Process children to preserve bold formatting
+            Array.from(node.childNodes).forEach(child => {
+              if (child.nodeType === 3) {
+                const text = child.textContent.trim();
+                if (text) items.push({ text, isListItem: true, isBold: currentIsBold });
+              } else {
+                processNode(child, currentIsBold, true, true);
+              }
+            });
           }
+        } else if (tagName === "ul" || tagName === "ol") {
+          // Process list items
+          Array.from(node.childNodes).forEach(child => {
+            if (child.tagName && child.tagName.toLowerCase() === "li") {
+              processNode(child, currentIsBold, true, true);
+            }
+          });
+        } else if (tagName === "p") {
+          // Paragraph - check if it's empty or has only whitespace
+          const pText = node.textContent.trim();
+          if (pText) {
+            const hasListChildren = Array.from(node.childNodes).some(child =>
+              child.nodeType === 1 && (child.tagName.toLowerCase() === "ul" || child.tagName.toLowerCase() === "ol")
+            );
+            if (hasListChildren) {
+              Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false, false));
+            } else {
+              items.push({ text: pText, isListItem: false, isBold: currentIsBold });
+            }
+          }
+        } else if (tagName === "div") {
+          // Div - process children
+          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false, false));
         } else {
-          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, isListItem));
+          // Other elements - process children
+          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, isListItem, parentIsList));
         }
       }
     };
-    
-    Array.from(tmp.childNodes).forEach(node => processNode(node, false, false));
+
+    Array.from(tmp.childNodes).forEach(node => processNode(node, false, false, false));
     return items.length > 0 ? items : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false, isBold: false }];
   };
 
@@ -370,7 +392,7 @@ export default function ProposalPage() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 15;
-    const headerHeight = 25; // Changed to 20mm as requested
+    const headerHeight = 30; // Changed to 20mm as requested
     const footerHeight = 30;
     const contentStartY = headerHeight + 10;
     const contentEndY = pageHeight - footerHeight - 10;
@@ -391,6 +413,13 @@ export default function ProposalPage() {
         return addPage();
       }
       return currentY;
+    };
+
+    // Helper function to draw a table cell
+    const drawCell = (x, y, width, height) => {
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(x, y, width, height);
     };
 
     // PAGE 1: Cover Page
@@ -441,22 +470,39 @@ export default function ProposalPage() {
     y += 5;
     doc.text("Calicut, Kerala, India", marginX, y);
     y += 5;
-    doc.text("Email: hello@axilume.com", marginX, y);
-    y += 5;
-    doc.text("Phone: +91 8089360215", marginX, y);
-    y += 8;
+
 
     // Subject
-    y = checkNewPage(y, 10);
+    y = checkNewPage(y, 12);
+    y+=5;
+    const label = "Subject:";
+    const labelWidth = 22; // fixed alignment width
+    const lineHeight = 5;
+
     doc.setFont("helvetica", "bold");
-    doc.text("Subject:", marginX, y);
+    doc.text(label, marginX, y);
+
     doc.setFont("helvetica", "normal");
-    const subjectText = formData.subTitle || "";
-    const subjectLines = doc.splitTextToSize(subjectText, maxContentWidth - 20);
-    subjectLines.forEach((line, idx) => {
-      doc.text(line, marginX + 20, y + (idx * 5));
-    });
-    y += subjectLines.length * 5 + 8;
+
+    const subjectText = formData.mainTitle || "";
+    const subjectLines = doc.splitTextToSize(
+      subjectText,
+      maxContentWidth - labelWidth
+    );
+
+    // First line (same baseline as "Subject:")
+    doc.text(subjectLines[0] || "", marginX + labelWidth, y);
+
+    // Wrapped lines (aligned exactly under content start)
+    for (let i = 1; i < subjectLines.length; i++) {
+      doc.text(
+        subjectLines[i],
+        marginX + labelWidth,
+        y + i * lineHeight
+      );
+    }
+
+    y += subjectLines.length * lineHeight + 6;
 
     // Salutation
     y = checkNewPage(y, 10);
@@ -485,7 +531,7 @@ export default function ProposalPage() {
 
     // PAGE 2: Scope of Work
     y = addPage();
-
+    y+=5;
     // Scope of Work Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -514,12 +560,14 @@ export default function ProposalPage() {
       scopeItems.forEach((item) => {
         const prefix = item.isListItem ? "• " : "";
         const text = prefix + item.text;
-        const textLines = doc.splitTextToSize(text, maxContentWidth - 5);
-        textLines.forEach((line) => {
+        const textLines = doc.splitTextToSize(text, maxContentWidth - (item.isListItem ? 8 : 5));
+        textLines.forEach((line, lineIdx) => {
           y = checkNewPage(y, 5);
           // Set font style based on bold flag
           doc.setFont("helvetica", item.isBold ? "bold" : "normal");
-          doc.text(line, marginX + 3, y);
+          // Adjust indentation for wrapped lines in list items
+          const indent = item.isListItem && lineIdx > 0 ? 8 : (item.isListItem ? 3 : 0);
+          doc.text(line, marginX + indent, y);
           // Reset to normal font
           doc.setFont("helvetica", "normal");
           y += 5;
@@ -530,118 +578,160 @@ export default function ProposalPage() {
 
     // PAGE 3: Pricing Summary
     y = addPage();
-
-    // Pricing Summary Title
+    y+=5;
+    // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Pricing Summary", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
     doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
     y += 10;
 
-    // Pricing rows table
-    if (formData.pricingRows && formData.pricingRows.length > 0) {
-      y = checkNewPage(y, 20);
-      const tableStartY = y;
-      const rowHeight = 8;
-      const col1Width = 15; // No
-      const col2Width = maxContentWidth - col1Width - 40; // Description
-      const col3Width = 25; // Amount
+    if (formData.pricingRows?.length) {
+      const colNo = 12;
+      const colDesc = maxContentWidth - 60;
+      const colAmt = 48;
+      const rowPadding = 4;
 
-      // Table header
+      // Header
+      doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.text("No", marginX, y);
-      doc.text("Description", marginX + col1Width, y);
-      doc.text("Amount", pageWidth - marginX - col3Width, y, { align: "right" });
-      y += rowHeight;
-      doc.setLineWidth(0.3);
-      doc.line(marginX, y - 2, pageWidth - marginX, y - 2);
 
-      // Table rows
+      drawCell(marginX, y, colNo, 8);
+      drawCell(marginX + colNo, y, colDesc, 8);
+      drawCell(pageWidth - marginX - colAmt, y, colAmt, 8);
+
+      doc.text("No", marginX + 4, y + 5);
+      doc.text("Description", marginX + colNo + 4, y + 5);
+      doc.text("Amount", pageWidth - marginX - 4, y + 5, { align: "right" });
+
+      y += 8;
+
+      // Rows
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
+
+      let total = 0;
+
       formData.pricingRows.forEach((row, idx) => {
+        const descLines = doc.splitTextToSize(row.description || "", colDesc - 8);
+        const rowHeight = Math.max(8, descLines.length * 5 + rowPadding);
+
         y = checkNewPage(y, rowHeight);
-        const rowStartY = y;
-        doc.text(String(idx + 1), marginX, y);
-        const descLines = doc.splitTextToSize(row.description || "", col2Width);
-        let maxDescHeight = 0;
+
+        drawCell(marginX, y, colNo, rowHeight);
+        drawCell(marginX + colNo, y, colDesc, rowHeight);
+        drawCell(pageWidth - marginX - colAmt, y, colAmt, rowHeight);
+
+        doc.text(String(idx + 1), marginX + 4, y + 6);
         descLines.forEach((line, lineIdx) => {
-          if (lineIdx === 0) {
-            doc.text(line, marginX + col1Width, y);
-            maxDescHeight = Math.max(maxDescHeight, 5);
-          } else {
-            y = checkNewPage(y, rowHeight);
-            doc.text(line, marginX + col1Width, y);
-            maxDescHeight = Math.max(maxDescHeight, (lineIdx + 1) * 5);
-          }
+          doc.text(line, marginX + colNo + 4, y + 6 + (lineIdx * 5));
         });
-        // Format amount properly
-        const amountValue = parseCurrencyValue(row.amount || 0);
-        const formattedAmount = amountValue.toLocaleString('en-IN', { 
-          minimumFractionDigits: 0, 
-          maximumFractionDigits: 2 
-        });
-        const amount = `₹ ${formattedAmount}`;
-        doc.text(amount, pageWidth - marginX, rowStartY, { align: "right" });
-        y = Math.max(rowStartY + maxDescHeight, y) + 2;
+
+        const amt = parseCurrencyValue(row.amount || 0);
+        total += amt;
+        const amountText = `₹ ${amt.toLocaleString("en-IN", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2
+        })}`;
+        // Align amount to top of cell, regardless of description height
+        doc.text(
+          amountText,
+          pageWidth - marginX - 4,
+          y + 6,
+          { align: "right" }
+        );
+
+        y += rowHeight;
       });
 
-      // Total
+      // Total Row
       y = checkNewPage(y, 10);
-      doc.setLineWidth(0.3);
-      doc.line(marginX, y, pageWidth - marginX, y);
-      y += 5;
+      y+=5;
       doc.setFont("helvetica", "bold");
-      const total = formData.pricingRows.reduce((sum, r) => sum + parseCurrencyValue(r.amount || 0), 0);
-      const formattedTotal = total.toLocaleString('en-IN', { 
-        minimumFractionDigits: 0, 
-        maximumFractionDigits: 2 
-      });
-      doc.text(`Total: ₹ ${formattedTotal}`, pageWidth - marginX, y, { align: "right" });
-      y += 10;
+
+      drawCell(marginX, y, colNo + colDesc, 8);
+      drawCell(pageWidth - marginX - colAmt, y, colAmt, 8);
+
+      doc.text("Total", marginX + colNo + 4, y + 5);
+      doc.text(
+        `₹ ${total.toLocaleString("en-IN")}`,
+        pageWidth - marginX - 4,
+        y + 5,
+        { align: "right" }
+      );
+
+      y += 14;
     }
+
 
     // Payment Terms Section
     y = checkNewPage(y, 20);
+    y+=5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("Payment Terms (3 Milestone-Based Installments)", marginX, y);
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(100, 100, 100);
+    doc.text("Payment Terms", marginX, y);
     doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
     y += 10;
 
-    // Milestones
-    if (formData.milestones && formData.milestones.length > 0) {
-      formData.milestones.forEach((milestone, idx) => {
-        y = checkNewPage(y, 15);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        const milestoneAmount = parseCurrencyValue(milestone.amount || 0);
-        const formattedMilestoneAmount = milestoneAmount.toLocaleString('en-IN', { 
-          minimumFractionDigits: 0, 
-          maximumFractionDigits: 2 
+    if (formData.milestones?.length) {
+      const colMilestone = 40;
+      const colCondition = maxContentWidth - colMilestone - 50;
+      const colAmount = 50;
+
+      // Header
+      doc.setFontSize(10);
+      drawCell(marginX, y, colMilestone, 8);
+      drawCell(marginX + colMilestone, y, colCondition, 8);
+      drawCell(pageWidth - marginX - colAmount, y, colAmount, 8);
+
+      doc.text("Milestone", marginX + 4, y + 5);
+      doc.text("Condition", marginX + colMilestone + 4, y + 5);
+      doc.text("Amount", pageWidth - marginX - 4, y + 5, { align: "right" });
+
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+
+      formData.milestones.forEach((m, i) => {
+        let condition =
+          i === 0
+            ? "Due before project initiation"
+            : i === 1
+              ? "After 50% project completion"
+              : "On final delivery & acceptance";
+
+        const conditionLines = doc.splitTextToSize(condition, colCondition - 8);
+        const rowHeight = Math.max(8, conditionLines.length * 5 + 4);
+
+        y = checkNewPage(y, rowHeight);
+
+        drawCell(marginX, y, colMilestone, rowHeight);
+        drawCell(marginX + colMilestone, y, colCondition, rowHeight);
+        drawCell(pageWidth - marginX - colAmount, y, colAmount, rowHeight);
+
+        doc.text(m.title || `Milestone ${i + 1}`, marginX + 4, y + 6);
+        conditionLines.forEach((line, lineIdx) => {
+          doc.text(line, marginX + colMilestone + 4, y + 6 + (lineIdx * 5));
         });
-        const milestoneText = `${milestone.title || `Milestone ${idx + 1}`} - ₹${formattedMilestoneAmount}`;
-        doc.text(milestoneText, marginX + 5, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        // Add condition text based on milestone index
-        let condition = "";
-        if (idx === 0) condition = "Due before project initiation";
-        else if (idx === 1) condition = "After 50% completion of the project";
-        else condition = "Due on project completion and user acceptance";
-        doc.text(`Condition: ${condition}`, marginX + 10, y);
-        y += 8;
+
+        doc.text(
+          `₹ ${parseCurrencyValue(m.amount || 0).toLocaleString("en-IN")}`,
+          pageWidth - marginX - 4,
+          y + 6,
+          { align: "right" }
+        );
+
+        y += rowHeight;
       });
+
+      y += 10;
     }
+
 
     // Project Timeline Section
     y = checkNewPage(y, 20);
+    y+=5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Project Timeline", marginX, y);
@@ -675,7 +765,7 @@ export default function ProposalPage() {
 
     // PAGE 4: SRS/Conclusion
     y = addPage();
-
+    y+=5;
     // SRS Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -727,7 +817,8 @@ export default function ProposalPage() {
     });
 
     // Additional Notes Section
-    y = checkNewPage(y, 40); // Increased margin top for Additional Notes
+    y = addPage();
+    y+=5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Additional Notes", marginX, y);
@@ -808,269 +899,267 @@ export default function ProposalPage() {
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
       <div className="w-full mt-10 ">
         <div className="mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-            Create Proposal
-          </h1>
-          <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            Fill in the required fields and download your proposal as PDF
-          </p>
-        </div>
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+              Create Proposal
+            </h1>
+            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+              Fill in the required fields and download your proposal as PDF
+            </p>
+          </div>
 
-        {/* Form */}
-        <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"}`}>
-          <div className="p-6">
-            <div className="flex gap-2 mb-6">
-              {[
-                "Details",
-                "Scope of Work",
-                "Pricing Summary",
-                "Milestone",
-                "Timeline",
-                "Conclusion",
-              ].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setActiveTab(t)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md ${
-                    activeTab === t
-                      ? isDark
-                        ? "border-b-2 border-orange-500 text-white bg-orange-500/10"
-                        : "border-b-2 border-orange-500 text-black bg-orange-500/10"
-                      : isDark
-                        ? "text-gray-300 hover:bg-gray-800/50"
-                        : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {activeTab === "Details" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-6">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Main Title *</label>
-                    <input type="text" name="mainTitle" value={formData.mainTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Sub Title *</label>
-                    <input type="text" name="subTitle" value={formData.subTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Technology *</label>
-                    <input type="text" name="technology" value={formData.technology} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Name *</label>
-                    <input type="text" name="clientName" value={formData.clientName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Organization *</label>
-                    <input type="text" name="clientOrganization" value={formData.clientOrganization} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Proposal Date *</label>
-                    <input type="date" name="proposalDate" value={formData.proposalDate} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Phone</label>
-                    <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Organization Category *</label>
-                    <input type="text" name="organizationCategory" value={formData.organizationCategory} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                  </div>
-                </div>
+          {/* Form */}
+          <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"}`}>
+            <div className="p-6">
+              <div className="flex gap-2 mb-6">
+                {[
+                  "Details",
+                  "Scope of Work",
+                  "Pricing Summary",
+                  "Milestone",
+                  "Timeline",
+                  "Conclusion",
+                ].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setActiveTab(t)}
+                    className={`px-3 py-2 text-sm font-medium rounded-md ${activeTab === t
+                        ? isDark
+                          ? "border-b-2 border-orange-500 text-white bg-orange-500/10"
+                          : "border-b-2 border-orange-500 text-black bg-orange-500/10"
+                        : isDark
+                          ? "text-gray-300 hover:bg-gray-800/50"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                  >
+                    {t}
+                  </button>
+                ))}
               </div>
-            )}
 
-            {activeTab === "Scope of Work" && (
-              <div className="space-y-3 mb-6">
-                <RichTextEditor
-                  value={formData.scopeDescription || ""}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
-                  placeholder="Enter scope of work details..."
-                />
-              </div>
-            )}
-
-            {activeTab === "Pricing Summary" && (
-              <div className="space-y-4 mb-6">
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Row</span>
-                  <button onClick={addPricingRow} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        <th className="text-left px-2 py-2">No</th>
-                        <th className="text-left px-2 py-2">Description *</th>
-                        <th className="text-left px-2 py-2">Amount *</th>
-                        <th className="text-right px-2 py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(formData.pricingRows || []).map((r, idx) => (
-                        <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                          <td className="px-2 py-2">{idx + 1}</td>
-                          <td className="px-2 py-2">
-                            <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="relative">
-                              <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
-                              <input type="text" value={r.amount || ""} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="0" />
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex justify-end">
-                  <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString("en-IN")}</div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "Milestone" && (
-              <div className="space-y-4 mb-6">
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Milestone</span>
-                  <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: "" }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                </div>
-                <div className="space-y-3">
-                  {(formData.milestones || []).map((m, idx) => (
-                    <div key={idx} className={`grid grid-cols-7 gap-3 ${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                      <div className="col-span-4">
-                        <input type="text" value={m.title} onChange={(e) => {
-                          const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData((prev) => ({ ...prev, milestones: arr }));
-                        }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Milestone *" />
-                      </div>
-                      <div className="col-span-2">
-                        <div className="relative">
-                          <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
-                          <input type="text" value={m.amount || ""} onChange={(e) => {
-                            const cleaned = formatCurrencyInput(e.target.value);
-                            const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: cleaned }; setFormData((prev) => ({ ...prev, milestones: arr }));
-                          }} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
-                        </div>
-                      </div>
-                      <div className="col-span-1 flex justify-end">
-                        <button onClick={() => {
-                          const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: "" }] }));
-                        }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
-                      </div>
+              {activeTab === "Details" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="space-y-6">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Main Title *</label>
+                      <input type="text" name="mainTitle" value={formData.mainTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === "Timeline" && (
-              <div className="space-y-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Months *</label>
-                    <input type="number" min="0" name="timelineMonths" value={formData.timelineMonths} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Sub Title *</label>
+                      <input type="text" name="subTitle" value={formData.subTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Technology *</label>
+                      <input type="text" name="technology" value={formData.technology} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Name *</label>
+                      <input type="text" name="clientName" value={formData.clientName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Organization *</label>
+                      <input type="text" name="clientOrganization" value={formData.clientOrganization} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Weeks *</label>
-                    <input type="number" min="0" name="timelineWeeks" value={formData.timelineWeeks} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  <div className="space-y-6">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Proposal Date *</label>
+                      <input type="date" name="proposalDate" value={formData.proposalDate} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Phone</label>
+                      <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Organization Category *</label>
+                      <input type="text" name="organizationCategory" value={formData.organizationCategory} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Timeline Phases</span>
-                  <button onClick={addTimelinePhase} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        <th className="text-left px-2 py-2">No</th>
-                        <th className="text-left px-2 py-2">Week *</th>
-                        <th className="text-left px-2 py-2">Phase *</th>
-                        <th className="text-right px-2 py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(formData.timelinePhases || []).map((r, idx) => (
-                        <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                          <td className="px-2 py-2">{idx + 1}</td>
-                          <td className="px-2 py-2">
-                            <input type="text" value={r.week} onChange={(e) => updateTimelinePhase(idx, "week", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                          </td>
-                          <td className="px-2 py-2">
-                            <input type="text" value={r.phase} onChange={(e) => updateTimelinePhase(idx, "phase", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <button onClick={() => removeTimelinePhase(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+              )}
 
-            {activeTab === "Conclusion" && (
-              <div className="space-y-6 mb-6">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
+              {activeTab === "Scope of Work" && (
+                <div className="space-y-3 mb-6">
                   <RichTextEditor
-                    value={formData.conclusionNotes || ""}
-                    onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
-                    placeholder="Enter additional notes..."
+                    value={formData.scopeDescription || ""}
+                    onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
+                    placeholder="Enter scope of work details..."
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Name *</label>
-                    <input type="text" name="creatorName" value={formData.creatorName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+              )}
+
+              {activeTab === "Pricing Summary" && (
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Row</span>
+                    <button onClick={addPricingRow} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Phone Number *</label>
-                    <input type="tel" name="creatorPhone" value={formData.creatorPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                          <th className="text-left px-2 py-2">No</th>
+                          <th className="text-left px-2 py-2">Description *</th>
+                          <th className="text-left px-2 py-2">Amount *</th>
+                          <th className="text-right px-2 py-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(formData.pricingRows || []).map((r, idx) => (
+                          <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                            <td className="px-2 py-2">{idx + 1}</td>
+                            <td className="px-2 py-2">
+                              <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                            </td>
+                            <td className="px-2 py-2">
+                              <div className="relative">
+                                <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                                <input type="text" value={r.amount || ""} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="0" />
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Designation *</label>
-                    <input type="text" name="creatorDesignation" value={formData.creatorDesignation} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  <div className="flex justify-end">
+                    <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString("en-IN")}</div>
                   </div>
                 </div>
-              </div>
-            )}
-            
+              )}
 
-            {/* Action Buttons */}
-            <div className={`mt-8 flex items-center justify-end gap-4 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-              <button
-                onClick={generatePDF}
-                disabled={!isFormValid()}
-                className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                  isDark
-                    ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                    : "bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                }`}
-              >
-                <Download className="w-5 h-5" />
-                Download PDF
-              </button>
+              {activeTab === "Milestone" && (
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Milestone</span>
+                    <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: "" }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                  </div>
+                  <div className="space-y-3">
+                    {(formData.milestones || []).map((m, idx) => (
+                      <div key={idx} className={`grid grid-cols-7 gap-3 ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                        <div className="col-span-4">
+                          <input type="text" value={m.title} onChange={(e) => {
+                            const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData((prev) => ({ ...prev, milestones: arr }));
+                          }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Milestone *" />
+                        </div>
+                        <div className="col-span-2">
+                          <div className="relative">
+                            <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                            <input type="text" value={m.amount || ""} onChange={(e) => {
+                              const cleaned = formatCurrencyInput(e.target.value);
+                              const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: cleaned }; setFormData((prev) => ({ ...prev, milestones: arr }));
+                            }} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
+                          </div>
+                        </div>
+                        <div className="col-span-1 flex justify-end">
+                          <button onClick={() => {
+                            const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: "" }] }));
+                          }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "Timeline" && (
+                <div className="space-y-6 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Months *</label>
+                      <input type="number" min="0" name="timelineMonths" value={formData.timelineMonths} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Weeks *</label>
+                      <input type="number" min="0" name="timelineWeeks" value={formData.timelineWeeks} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Timeline Phases</span>
+                    <button onClick={addTimelinePhase} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                          <th className="text-left px-2 py-2">No</th>
+                          <th className="text-left px-2 py-2">Week *</th>
+                          <th className="text-left px-2 py-2">Phase *</th>
+                          <th className="text-right px-2 py-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(formData.timelinePhases || []).map((r, idx) => (
+                          <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                            <td className="px-2 py-2">{idx + 1}</td>
+                            <td className="px-2 py-2">
+                              <input type="text" value={r.week} onChange={(e) => updateTimelinePhase(idx, "week", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input type="text" value={r.phase} onChange={(e) => updateTimelinePhase(idx, "phase", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <button onClick={() => removeTimelinePhase(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "Conclusion" && (
+                <div className="space-y-6 mb-6">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
+                    <RichTextEditor
+                      value={formData.conclusionNotes || ""}
+                      onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
+                      placeholder="Enter additional notes..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Name *</label>
+                      <input type="text" name="creatorName" value={formData.creatorName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Phone Number *</label>
+                      <input type="tel" name="creatorPhone" value={formData.creatorPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Designation *</label>
+                      <input type="text" name="creatorDesignation" value={formData.creatorDesignation} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              {/* Action Buttons */}
+              <div className={`mt-8 flex items-center justify-end gap-4 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <button
+                  onClick={generatePDF}
+                  disabled={!isFormValid()}
+                  className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${isDark
+                      ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      : "bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    }`}
+                >
+                  <Download className="w-5 h-5" />
+                  Download PDF
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
   );
-  
+
 }
