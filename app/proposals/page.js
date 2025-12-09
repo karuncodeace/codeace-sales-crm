@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTheme } from "../context/themeContext";
 import { FileText, Download, Plus, Trash2, Save } from "lucide-react";
 import jsPDF from "jspdf";
 
+export const dynamic = "force-dynamic";
+
 export default function ProposalPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const scopeRef = useRef(null);
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -27,7 +30,23 @@ export default function ProposalPage() {
       { description: "", quantity: 1, unitPrice: 0, total: 0 },
     ],
     milestones: [],
+    mainTitle: "",
+    subTitle: "",
+    technology: "",
+    clientOrganization: "",
+    organizationCategory: "",
+    scopeDescription: "",
+    pricingRows: [{ description: "", amount: 0 }],
+    timelineMonths: "",
+    timelineWeeks: "",
+    timelinePhases: [{ week: "", phase: "" }],
+    conclusionNotes: "",
+    creatorName: "",
+    creatorPhone: "",
+    creatorDesignation: "",
   });
+
+  const [activeTab, setActiveTab] = useState("Details");
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -37,249 +56,582 @@ export default function ProposalPage() {
     }));
   };
 
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
-    newItems[index][field] = field === "quantity" || field === "unitPrice" ? parseFloat(value) || 0 : value;
-    
-    // Calculate total
-    newItems[index].total = newItems[index].quantity * newItems[index].unitPrice;
-    
-    setFormData((prev) => ({
-      ...prev,
-      items: newItems,
-    }));
-  };
+ 
 
-  const addItem = () => {
-    setFormData((prev) => ({
-      ...prev,
-      items: [...prev.items, { description: "", quantity: 1, unitPrice: 0, total: 0 }],
-    }));
-  };
 
-  const removeItem = (index) => {
-    if (formData.items.length > 1) {
-      setFormData((prev) => ({
-        ...prev,
-        items: prev.items.filter((_, i) => i !== index),
-      }));
-    }
-  };
 
   const calculateSubtotal = () => {
+    if (Array.isArray(formData.pricingRows) && formData.pricingRows.length) {
+      return formData.pricingRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+    }
     return formData.items.reduce((sum, item) => sum + item.total, 0);
   };
 
-  const generatePDF = () => {
+  const addPricingRow = () => {
+    setFormData((prev) => ({ ...prev, pricingRows: [...(prev.pricingRows || []), { description: "", amount: 0 }] }));
+  };
+
+  const updatePricingRow = (idx, field, value) => {
+    const rows = [...(formData.pricingRows || [])];
+    rows[idx] = { ...rows[idx], [field]: field === "amount" ? parseFloat(value) || 0 : value };
+    setFormData((prev) => ({ ...prev, pricingRows: rows }));
+  };
+
+  const removePricingRow = (idx) => {
+    const rows = [...(formData.pricingRows || [])];
+    rows.splice(idx, 1);
+    setFormData((prev) => ({ ...prev, pricingRows: rows.length ? rows : [{ description: "", amount: 0 }] }));
+  };
+
+  const addTimelinePhase = () => {
+    setFormData((prev) => ({ ...prev, timelinePhases: [...(prev.timelinePhases || []), { week: "", phase: "" }] }));
+  };
+
+  const updateTimelinePhase = (idx, field, value) => {
+    const rows = [...(formData.timelinePhases || [])];
+    rows[idx] = { ...rows[idx], [field]: value };
+    setFormData((prev) => ({ ...prev, timelinePhases: rows }));
+  };
+
+  const removeTimelinePhase = (idx) => {
+    const rows = [...(formData.timelinePhases || [])];
+    rows.splice(idx, 1);
+    setFormData((prev) => ({ ...prev, timelinePhases: rows.length ? rows : [{ week: "", phase: "" }] }));
+  };
+
+  const execCmd = (cmd) => {
+    try {
+      const d = typeof globalThis !== "undefined" && globalThis.document ? globalThis.document : null;
+      if (!d) return;
+      if (scopeRef.current && typeof scopeRef.current.focus === "function") {
+        scopeRef.current.focus();
+      }
+      if (typeof d.execCommand === "function") {
+        d.execCommand(cmd, false, null);
+      }
+    } catch {}
+  };
+
+  const isDetailsValid = () => {
+    const f = formData;
+    return f.mainTitle && f.proposalDate && f.subTitle && f.technology && f.clientName && f.clientOrganization && f.organizationCategory;
+  };
+
+  const isTimelineValid = () => {
+    return formData.timelineMonths && formData.timelineWeeks;
+  };
+
+  const isConclusionValid = () => {
+    const f = formData;
+    return f.creatorName && f.creatorPhone && f.creatorDesignation;
+  };
+
+  const isFormValid = () => isDetailsValid() && isTimelineValid() && isConclusionValid();
+
+  const addHeader = (doc, pageWidth, headerHeight) => {
+    try {
+      const headerImg = "/pdf/header.png";
+      doc.addImage(headerImg, "PNG", 0, 0, pageWidth, headerHeight);
+    } catch (err) {
+      console.error("Error loading header:", err);
+    }
+  };
+
+  const addFooter = (doc, pageWidth, pageHeight, footerHeight) => {
+    try {
+      const footerImg = "/pdf/footer.png";
+      doc.addImage(footerImg, "PNG", 0, pageHeight - footerHeight, pageWidth, footerHeight);
+    } catch (err) {
+      console.error("Error loading footer:", err);
+    }
+  };
+
+  const addWatermark = (doc, pageWidth, pageHeight) => {
+    try {
+      const watermarkImg = "/pdf/watermark.png";
+      const watermarkSize = 80;
+      const x = (pageWidth - watermarkSize) / 2;
+      const y = (pageHeight - watermarkSize) / 2;
+      // Add watermark with fast rendering mode
+      doc.addImage(watermarkImg, "PNG", x, y, watermarkSize, watermarkSize, undefined, "FAST");
+    } catch (err) {
+      // Silently fail - watermark is optional
+      console.error("Error loading watermark:", err);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  const stripHtml = (html) => {
+    if (!html) return "";
+    if (typeof document === "undefined") {
+      return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    }
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  };
+
+  const parseHtmlToText = (html) => {
+    if (!html) return [];
+    if (typeof document === "undefined") {
+      // Fallback for server-side: simple regex to remove HTML tags
+      const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+      return text ? [text] : [];
+    }
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html;
+    
+    // Extract text and preserve list structure
+    const items = [];
+    const processNode = (node) => {
+      if (node.nodeType === 3) { // Text node
+        const text = node.textContent.trim();
+        if (text) items.push({ text, isListItem: false });
+      } else if (node.nodeType === 1) { // Element node
+        const tagName = node.tagName.toLowerCase();
+        if (tagName === "li" || tagName === "ul" || tagName === "ol") {
+          const text = node.textContent.trim();
+          if (text) items.push({ text, isListItem: true });
+        } else if (tagName === "p" || tagName === "div") {
+          const text = node.textContent.trim();
+          if (text) items.push({ text, isListItem: false });
+        } else {
+          Array.from(node.childNodes).forEach(processNode);
+        }
+      }
+    };
+    
+    Array.from(tmp.childNodes).forEach(processNode);
+    return items.length > 0 ? items : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false }];
+  };
+
+  const splitText = (doc, text, maxWidth, x, y) => {
+    const lines = doc.splitTextToSize(text, maxWidth);
+    return { lines, y };
+  };
+
+  const generatePDF = async () => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const accent = { r: 249, g: 115, b: 22 };
-    const lightGrey = { r: 240, g: 240, b: 240 };
+    const marginX = 15;
+    const headerHeight = 40;
+    const footerHeight = 30;
+    const contentStartY = headerHeight + 10;
+    const contentEndY = pageHeight - footerHeight - 10;
+    const maxContentWidth = pageWidth - 2 * marginX;
 
-    const addWrappedText = (text, x, y, maxWidth, fontSize = 10, fontStyle = "normal", color = { r: 0, g: 0, b: 0 }) => {
-      doc.setTextColor(color.r, color.g, color.b);
-      doc.setFontSize(fontSize);
-      doc.setFont("helvetica", fontStyle);
-      const lines = doc.splitTextToSize(text || "", maxWidth);
-      doc.text(lines, x, y);
-      return lines.length * (fontSize * 0.45);
+    // Helper function to add a new page with header/footer/watermark
+    const addPage = () => {
+      doc.addPage();
+      addHeader(doc, pageWidth, headerHeight);
+      addFooter(doc, pageWidth, pageHeight, footerHeight);
+      addWatermark(doc, pageWidth, pageHeight);
+      return contentStartY;
     };
 
-    const addFooter = () => {
-      const count = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= count; i++) {
-        doc.setPage(i);
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        const a = formData.companyName || "Company";
-        const w = formData.companyWebsite || "";
-        const e = formData.companyEmail || "";
-        const p = formData.companyPhone || "";
-        const footerLeft = [a, w, e, p].filter(Boolean).join(" | ");
-        doc.text(footerLeft, margin, pageHeight - 10);
-        doc.text(`Page ${i} of ${count}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+    // Helper function to check if we need a new page
+    const checkNewPage = (currentY, requiredSpace = 10) => {
+      if (currentY + requiredSpace > contentEndY) {
+        return addPage();
       }
+      return currentY;
     };
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(28);
-    doc.text("PROPOSAL", margin, 40);
-    doc.setFontSize(16);
-    addWrappedText(formData.proposalTitle || "", margin, 60, pageWidth - 2 * margin, 16, "bold", accent);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Prepared for: ${formData.clientName || ""}`, margin, 80);
-    doc.text(`Prepared by: ${formData.companyName || ""}`, margin, 88);
-    doc.text(`Date: ${formData.proposalDate || ""}`, margin, 96);
+    // PAGE 1: Cover Page
+    addHeader(doc, pageWidth, headerHeight);
+    addFooter(doc, pageWidth, pageHeight, footerHeight);
+    addWatermark(doc, pageWidth, pageHeight);
 
-    doc.addPage();
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Client Details", margin, 30);
-    doc.text("Company Details", pageWidth / 2 + 10, 30);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    let y = 40;
-    y += addWrappedText(`Name: ${formData.clientName || ""}`, margin, y, pageWidth / 2 - margin);
-    y += addWrappedText(`Email: ${formData.clientEmail || ""}`, margin, y, pageWidth / 2 - margin);
-    y += addWrappedText(`Phone: ${formData.clientPhone || ""}`, margin, y, pageWidth / 2 - margin);
-    let y2 = 40;
-    y2 += addWrappedText(`Company: ${formData.companyName || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
-    y2 += addWrappedText(`Website: ${formData.companyWebsite || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
-    y2 += addWrappedText(`Email: ${formData.companyEmail || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
-    y2 += addWrappedText(`Phone: ${formData.companyPhone || ""}`, pageWidth / 2 + 10, y2, pageWidth / 2 - margin);
-    const introTop = Math.max(y, y2) + 15;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Introduction", margin, introTop);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    addWrappedText(`Dear Sir,\n\n${formData.overview || ""}`, margin, introTop + 8, pageWidth - 2 * margin);
+    let y = contentStartY;
 
-    doc.addPage();
+    // Main Title (centered, bold)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Scope of Work", margin, 30);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const sections = (formData.overview || "").split(/\n\n+/).filter(Boolean);
-    let sy = 40;
-    sections.forEach((s, idx) => {
-      const title = `Section ${idx + 1}`;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      sy += addWrappedText(title, margin, sy, pageWidth - 2 * margin, 11, "bold");
-      doc.setFont("helvetica", "normal");
-      sy += addWrappedText(s, margin, sy, pageWidth - 2 * margin);
-      sy += 6;
-      if (sy > pageHeight - 30) {
-        doc.addPage();
-        sy = 30;
-      }
+    const mainTitle = formData.mainTitle || "";
+    const titleLines = doc.splitTextToSize(mainTitle, maxContentWidth);
+    titleLines.forEach((line, idx) => {
+      doc.text(line, pageWidth / 2, y + (idx * 6), { align: "center" });
     });
+    y += titleLines.length * 6 + 8;
 
-    doc.addPage();
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Pricing & Payment Terms", margin, 30);
-    doc.setTextColor(0, 0, 0);
+    // Date
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setFillColor(lightGrey.r, lightGrey.g, lightGrey.b);
-    doc.rect(margin, 40, pageWidth - 2 * margin, 8, "F");
-    doc.setFont("helvetica", "bold");
-    doc.text("Description", margin + 2, 46);
-    doc.text("Qty", pageWidth - 120, 46);
-    doc.text("Unit Price", pageWidth - 90, 46);
-    doc.text("Total", pageWidth - 50, 46);
-    let ty = 56;
+    y = checkNewPage(y);
+    doc.text(`Date : ${formatDate(formData.proposalDate)}`, marginX, y);
+    y += 8;
+
+    // To section
+    y = checkNewPage(y, 15);
     doc.setFont("helvetica", "normal");
-    formData.items.forEach((item) => {
-      if (item.description) {
-        const descLines = doc.splitTextToSize(item.description, pageWidth - 150);
-        doc.text(descLines, margin + 2, ty);
-        doc.text(String(item.quantity || 0), pageWidth - 120, ty);
-        doc.text(`$${Number(item.unitPrice || 0).toFixed(2)}`, pageWidth - 90, ty, { align: "left" });
-        doc.text(`$${Number(item.total || 0).toFixed(2)}`, pageWidth - 50, ty, { align: "left" });
-        ty += Math.max(descLines.length * 5, 8) + 2;
-      }
-    });
-    const subtotal = calculateSubtotal();
-    if (subtotal > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setDrawColor(accent.r, accent.g, accent.b);
-      doc.rect(pageWidth - margin - 70, ty + 6, 70, 12);
-      doc.text("Estimated Project Cost", pageWidth - margin - 68, ty + 12);
-      doc.text(`$${subtotal.toFixed(2)}`, pageWidth - margin - 68, ty + 18);
+    doc.setFontSize(10);
+    doc.text("To:", marginX, y);
+    y += 5;
+    doc.text(formData.clientOrganization || "", marginX, y);
+    y += 5;
+    if (formData.clientPhone) {
+      doc.text(formData.clientPhone, marginX, y);
+      y += 5;
     }
-    let my = ty + 30;
-    if (formData.milestones && formData.milestones.length) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(accent.r, accent.g, accent.b);
-      doc.text("Payment Milestones", margin, my);
-      doc.setTextColor(0, 0, 0);
-      my += 8;
-      formData.milestones.forEach((m) => {
-        doc.rect(margin, my, pageWidth - 2 * margin, 10);
-        doc.text(`${m.label || "Milestone"} - ${m.amount || ""}`, margin + 2, my + 6);
-        my += 14;
+    y += 5;
+
+    // From section
+    y = checkNewPage(y, 20);
+    doc.text("From:", marginX, y);
+    y += 5;
+    doc.text("CodeAce IT Solutions LLP", marginX, y);
+    y += 5;
+    doc.text("Sahya Building, Govt. Cyberpark,", marginX, y);
+    y += 5;
+    doc.text("Calicut, Kerala, India", marginX, y);
+    y += 5;
+    doc.text("Email: hello@axilume.com", marginX, y);
+    y += 5;
+    doc.text("Phone: +91 8089360215", marginX, y);
+    y += 8;
+
+    // Subject
+    y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Subject:", marginX, y);
+    doc.setFont("helvetica", "normal");
+    const subjectText = formData.subTitle || "";
+    const subjectLines = doc.splitTextToSize(subjectText, maxContentWidth - 20);
+    subjectLines.forEach((line, idx) => {
+      doc.text(line, marginX + 20, y + (idx * 5));
+    });
+    y += subjectLines.length * 5 + 8;
+
+    // Salutation
+    y = checkNewPage(y, 10);
+    doc.text("Dear Sir,", marginX, y);
+    y += 8;
+
+    // Body paragraphs
+    y = checkNewPage(y, 15);
+    const para1 = "We appreciate the opportunity to partner with you in digitizing and streamlining Medical Care operations.";
+    const para1Lines = doc.splitTextToSize(para1, maxContentWidth);
+    para1Lines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+    y += 3;
+
+    y = checkNewPage(y, 15);
+    const para2 = `Based on the detailed RFP requirements, please find below our comprehensive quotation and proposal for the development and deployment of a custom solution using the ${formData.technology || "Frappe ERPNext Framework"} - the world's most agile open-source ERP platform.`;
+    const para2Lines = doc.splitTextToSize(para2, maxContentWidth);
+    para2Lines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+
+    // PAGE 2: Scope of Work
+    y = addPage();
+
+    // Scope of Work Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Scope Of Work", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
+
+    // Introduction
+    y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const introText = `Implementation of a fully functional ${formData.organizationCategory || "Medical Care"} ERP, CRM & HRMS tailored for ${formData.clientOrganization || ""}, featuring:`;
+    const introLines = doc.splitTextToSize(introText, maxContentWidth);
+    introLines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+    y += 5;
+
+    // Scope Description (parse HTML and convert to text with bullet points)
+    if (formData.scopeDescription) {
+      const scopeItems = parseHtmlToText(formData.scopeDescription);
+      scopeItems.forEach((item) => {
+        const prefix = item.isListItem ? "• " : "";
+        const text = prefix + item.text;
+        const textLines = doc.splitTextToSize(text, maxContentWidth - 5);
+        textLines.forEach((line) => {
+          y = checkNewPage(y, 5);
+          doc.text(line, marginX + 3, y);
+          y += 5;
+        });
+        y += 2; // Add spacing between items
       });
     }
 
-    doc.addPage();
+    // PAGE 3: Pricing Summary
+    y = addPage();
+
+    // Pricing Summary Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Terms, SRS & Notes", margin, 30);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    let py = 40;
-    doc.setFont("helvetica", "bold");
-    doc.text("Project Objective", margin, py);
-    doc.setFont("helvetica", "normal");
-    py += addWrappedText(formData.overview || "", margin, py + 4, pageWidth - 2 * margin);
-    py += 8;
-    doc.setFont("helvetica", "bold");
-    doc.text("Scope", margin, py);
-    doc.setFont("helvetica", "normal");
-    py += addWrappedText((formData.overview || "").split(/\n\n+/).join("\n• "), margin, py + 4, pageWidth - 2 * margin);
-    py += 8;
-    doc.setFont("helvetica", "bold");
-    doc.text("Deliverables", margin, py);
-    doc.setFont("helvetica", "normal");
-    py += addWrappedText("As per scope sections.", margin, py + 4, pageWidth - 2 * margin);
-    py += 8;
-    doc.setFont("helvetica", "bold");
-    doc.text("Terms", margin, py);
-    doc.setFont("helvetica", "normal");
-    py += addWrappedText(formData.terms || "", margin, py + 4, pageWidth - 2 * margin);
-    py += 8;
-    doc.setFont("helvetica", "bold");
-    doc.text("Notes", margin, py);
-    doc.setFont("helvetica", "normal");
-    addWrappedText(formData.notes || "", margin, py + 4, pageWidth - 2 * margin);
+    doc.text("Pricing Summary", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
 
-    doc.addPage();
+    // Pricing rows table
+    if (formData.pricingRows && formData.pricingRows.length > 0) {
+      y = checkNewPage(y, 20);
+      const tableStartY = y;
+      const rowHeight = 8;
+      const col1Width = 15; // No
+      const col2Width = maxContentWidth - col1Width - 40; // Description
+      const col3Width = 25; // Amount
+
+      // Table header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("No", marginX, y);
+      doc.text("Description", marginX + col1Width, y);
+      doc.text("Amount", pageWidth - marginX - col3Width, y, { align: "right" });
+      y += rowHeight;
+      doc.setLineWidth(0.3);
+      doc.line(marginX, y - 2, pageWidth - marginX, y - 2);
+
+      // Table rows
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      formData.pricingRows.forEach((row, idx) => {
+        y = checkNewPage(y, rowHeight);
+        doc.text(String(idx + 1), marginX, y);
+        const descLines = doc.splitTextToSize(row.description || "", col2Width);
+        descLines.forEach((line, lineIdx) => {
+          if (lineIdx === 0) {
+            doc.text(line, marginX + col1Width, y);
+          } else {
+            y = checkNewPage(y, rowHeight);
+            doc.text(line, marginX + col1Width, y);
+          }
+        });
+        const amount = `₹ ${(row.amount || 0).toLocaleString()}`;
+        doc.text(amount, pageWidth - marginX - col3Width, y, { align: "right" });
+        y += rowHeight;
+      });
+
+      // Total
+      y = checkNewPage(y, 10);
+      doc.setLineWidth(0.3);
+      doc.line(marginX, y, pageWidth - marginX, y);
+      y += 5;
+      doc.setFont("helvetica", "bold");
+      const total = calculateSubtotal();
+      doc.text(`Total: ₹ ${total.toLocaleString()}`, pageWidth - marginX, y, { align: "right" });
+      y += 10;
+    }
+
+    // Payment Terms Section
+    y = checkNewPage(y, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text("Acceptance & Signature", margin, 30);
-    doc.setTextColor(0, 0, 0);
+    doc.text("Payment Terms (3 Milestone-Based Installments)", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
+
+    // Milestones
+    if (formData.milestones && formData.milestones.length > 0) {
+      formData.milestones.forEach((milestone, idx) => {
+        y = checkNewPage(y, 15);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        const milestoneText = `${milestone.title || `Milestone ${idx + 1}`} - ₹${(milestone.amount || 0).toLocaleString()}`;
+        doc.text(milestoneText, marginX + 5, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        // Add condition text based on milestone index
+        let condition = "";
+        if (idx === 0) condition = "Due before project initiation";
+        else if (idx === 1) condition = "After 50% completion of the project";
+        else condition = "Due on project completion and user acceptance";
+        doc.text(`Condition: ${condition}`, marginX + 10, y);
+        y += 8;
+      });
+    }
+
+    // Project Timeline Section
+    y = checkNewPage(y, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Project Timeline", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
+
+    y = checkNewPage(y, 15);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    addWrappedText("We hereby accept the terms and conditions outlined in this proposal.", margin, 42, pageWidth - 2 * margin);
-    doc.setDrawColor(180, 180, 180);
-    doc.line(margin, 70, pageWidth / 2, 70);
-    doc.text("Signature", margin, 75);
-    doc.line(pageWidth / 2 + 10, 70, pageWidth - margin, 70);
-    doc.text("Date", pageWidth / 2 + 10, 75);
+    const timelineText = `Total Duration: ${formData.timelineWeeks || ""} Weeks`;
+    doc.text(timelineText, marginX, y);
+    y += 5;
+    if (formData.timelineMonths) {
+      doc.text(`Approximately ${formData.timelineMonths} Months`, marginX, y);
+      y += 8;
+    }
 
-    addFooter();
+    // Timeline Phases
+    if (formData.timelinePhases && formData.timelinePhases.length > 0) {
+      y = checkNewPage(y, 10);
+      formData.timelinePhases.forEach((phase, idx) => {
+        y = checkNewPage(y, 8);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(`Week ${phase.week || ""}: ${phase.phase || ""}`, marginX + 5, y);
+        y += 6;
+      });
+    }
 
-    const fileName = formData.proposalTitle
-      ? `${formData.proposalTitle.replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate}.pdf`
-      : `Proposal_${formData.proposalDate}.pdf`;
+    // PAGE 4: SRS/Conclusion
+    y = addPage();
+
+    // SRS Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Software Requirements Specification (SRS)", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
+
+    // Introduction
+    y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const srsIntro = "A comprehensive SRS document will be shared before development begins. This will serve as the legal and binding agreement. It will include:";
+    const srsIntroLines = doc.splitTextToSize(srsIntro, maxContentWidth);
+    srsIntroLines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+    y += 5;
+
+    // SRS Items (numbered list)
+    const srsItems = [
+      "Project Objective - Summary of the Medical Care purpose and business impact",
+      "About the Client - Business overview and relevant background",
+      "Client Requirements - Functional and non-functional needs",
+      "Scope of Work - Features, configurations, and limitations",
+      "Expected Integrations - External APIs or third-party tools",
+      "Out of Scope Items - Clearly defined exclusions",
+      "Project Deliverables - Modules, codebase, hosting, training, etc.",
+      "Assumptions - Infrastructure, inputs, availability, etc.",
+      "Resources - Team members involved in execution",
+      "Timelines & Milestones - Delivery plan with date"
+    ];
+
+    srsItems.forEach((item, idx) => {
+      y = checkNewPage(y, 8);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const itemText = `${idx + 1}. ${item}`;
+      const itemLines = doc.splitTextToSize(itemText, maxContentWidth - 5);
+      itemLines.forEach((line) => {
+        y = checkNewPage(y, 5);
+        doc.text(line, marginX + 5, y);
+        y += 5;
+      });
+      y += 2;
+    });
+
+    // Additional Notes Section
+    y = checkNewPage(y, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Additional Notes", marginX, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(100, 100, 100);
+    doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+    y += 10;
+
+    // Additional Notes Items
+    y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const notesItems = [
+      "The quotation is valid for 15 days from the date of issue.",
+      "Annual hosting and technical support charges for Year 2 will be quoted separately.",
+      "6 months of post-implementation service support (bug fixes and minor updates) is included in this package. Remaining timeline details will be shared after project confirmation."
+    ];
+
+    notesItems.forEach((note) => {
+      y = checkNewPage(y, 8);
+      doc.text(`• ${note}`, marginX + 5, y);
+      y += 6;
+    });
+
+    // Conclusion paragraph
+    y = checkNewPage(y, 15);
+    const conclusionText = "We look forward to delivering a high-performing ERP, CRM & HRMS that aligns with your operational goals. Please don't hesitate to get in touch for any clarification or customization in scope.";
+    const conclusionLines = doc.splitTextToSize(conclusionText, maxContentWidth);
+    conclusionLines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+
+    // Custom conclusion notes if provided
+    if (formData.conclusionNotes) {
+      y = checkNewPage(y, 10);
+      const customNotes = stripHtml(formData.conclusionNotes);
+      const customNotesLines = doc.splitTextToSize(customNotes, maxContentWidth);
+      customNotesLines.forEach((line) => {
+        y = checkNewPage(y, 5);
+        doc.text(line, marginX, y);
+        y += 5;
+      });
+    }
+
+    // Closing
+    y = checkNewPage(y, 20);
+    doc.text("Warm Regards,", marginX, y);
+    y += 8;
+    if (formData.creatorName) {
+      doc.setFont("helvetica", "bold");
+      doc.text(formData.creatorName, marginX, y);
+      y += 5;
+    }
+    doc.setFont("helvetica", "normal");
+    if (formData.creatorDesignation) {
+      doc.text(formData.creatorDesignation, marginX, y);
+      y += 5;
+    }
+    doc.text("CodeAce IT Solutions LLP", marginX, y);
+    y += 5;
+    doc.setFontSize(8);
+    doc.text("(Issued with approval of the Founder)", marginX, y);
+
+    // Save PDF
+    const fileName = `${(formData.mainTitle || "proposal").replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate || ""}.pdf`;
     doc.save(fileName);
   };
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
-      <div className="pl-5 md:pl-0 2xl:pl-0 w-full mt-10">
+      <div className="w-full mt-10 ">
+        <div className="mx-auto">
         {/* Header */}
         <div className="mb-6">
           <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
@@ -293,384 +645,242 @@ export default function ProposalPage() {
         {/* Form */}
         <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"}`}>
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-6">
-                {/* Company Name */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Company Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="Enter company name"
-                  />
-                </div>
-
-                {/* Client Name */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Client Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="clientName"
-                    value={formData.clientName}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="Enter client name"
-                  />
-                </div>
-
-                {/* Client Email */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Client Email
-                  </label>
-                  <input
-                    type="email"
-                    name="clientEmail"
-                    value={formData.clientEmail}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="client@example.com"
-                  />
-                </div>
-
-                {/* Client Phone */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Client Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="clientPhone"
-                    value={formData.clientPhone}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
-                {/* Proposal Title */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Proposal Title <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="proposalTitle"
-                    value={formData.proposalTitle}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="e.g., Website Development Proposal"
-                  />
-                </div>
-
-                {/* Proposal Date */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Proposal Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="proposalDate"
-                    value={formData.proposalDate}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                  />
-                </div>
-
-                {/* Proposal Number */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Company Website
-                  </label>
-                  <input
-                    type="text"
-                    name="companyWebsite"
-                    value={formData.companyWebsite}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="https://www.example.com"
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Company Email
-                  </label>
-                  <input
-                    type="email"
-                    name="companyEmail"
-                    value={formData.companyEmail}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="sales@example.com"
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Company Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="companyPhone"
-                    value={formData.companyPhone}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="+91 0000000000"
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Proposal Number
-                  </label>
-                  <input
-                    type="text"
-                    name="proposalNumber"
-                    value={formData.proposalNumber}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                    } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    placeholder="PROP-2024-001"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Overview */}
-            <div className="mt-6">
-              <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Overview / Description
-              </label>
-              <textarea
-                name="overview"
-                value={formData.overview}
-                onChange={handleInputChange}
-                rows={4}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  isDark
-                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                placeholder="Describe the proposal, project scope, or services being offered..."
-              />
-            </div>
-
-            {/* Items/Services */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Services / Items
-                </label>
+            <div className="flex gap-2 mb-6">
+              {[
+                "Details",
+                "Scope of Work",
+                "Pricing Summary",
+                "Milestone",
+                "Timeline",
+                "Conclusion",
+              ].map((t) => (
                 <button
-                  type="button"
-                  onClick={addItem}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                    isDark
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "bg-blue-500 hover:bg-blue-600 text-white"
+                  key={t}
+                  onClick={() => setActiveTab(t)}
+                  className={`px-3 py-2 text-sm font-medium rounded-md ${
+                    activeTab === t
+                      ? isDark
+                        ? "border-b-2 border-orange-500 text-white bg-orange-500/10"
+                        : "border-b-2 border-orange-500 text-black bg-orange-500/10"
+                      : isDark
+                        ? "text-gray-300 hover:bg-gray-800/50"
+                        : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <Plus className="w-4 h-4" />
-                  Add Item
+                  {t}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              <div className="space-y-4">
-                {formData.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-lg border ${
-                      isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    <div className="grid grid-cols-12 gap-4 items-end">
-                      <div className="col-span-12 md:col-span-5">
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          Description
-                        </label>
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            isDark
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                          } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                          placeholder="Service or item description"
-                        />
-                      </div>
-                      <div className="col-span-4 md:col-span-2">
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          Quantity
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            isDark
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                          } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                        />
-                      </div>
-                      <div className="col-span-4 md:col-span-2">
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          Unit Price
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            isDark
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                          } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                        />
-                      </div>
-                      <div className="col-span-4 md:col-span-2">
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          Total
-                        </label>
-                        <input
-                          type="text"
-                          value={`$${item.total.toFixed(2)}`}
-                          readOnly
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            isDark
-                              ? "bg-gray-700 border-gray-600 text-gray-400"
-                              : "bg-gray-100 border-gray-300 text-gray-600"
-                          }`}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-1 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          disabled={formData.items.length === 1}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isDark
-                              ? "bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                              : "bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                          }`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+            {activeTab === "Details" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="space-y-6">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Main Title *</label>
+                    <input type="text" name="mainTitle" value={formData.mainTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
                   </div>
-                ))}
-              </div>
-
-              {/* Subtotal */}
-              {calculateSubtotal() > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <div className={`px-4 py-2 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      Subtotal: <span className="text-lg font-bold">${calculateSubtotal().toFixed(2)}</span>
-                    </span>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Sub Title *</label>
+                    <input type="text" name="subTitle" value={formData.subTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Technology *</label>
+                    <input type="text" name="technology" value={formData.technology} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Name *</label>
+                    <input type="text" name="clientName" value={formData.clientName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Organization *</label>
+                    <input type="text" name="clientOrganization" value={formData.clientOrganization} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
                   </div>
                 </div>
-              )}
-            </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Proposal Date *</label>
+                    <input type="date" name="proposalDate" value={formData.proposalDate} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Phone</label>
+                    <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Organization Category *</label>
+                    <input type="text" name="organizationCategory" value={formData.organizationCategory} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {/* Terms and Conditions */}
-            <div className="mt-6">
-              <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Terms and Conditions
-              </label>
-              <textarea
-                name="terms"
-                value={formData.terms}
-                onChange={handleInputChange}
-                rows={4}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  isDark
-                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                placeholder="Payment terms, delivery timeline, warranty, etc..."
-              />
-            </div>
+            {activeTab === "Scope of Work" && (
+              <div className="space-y-3 mb-6">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => execCmd("bold")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Bold</button>
+                  <button onClick={() => execCmd("italic")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Italic</button>
+                  <button onClick={() => execCmd("underline")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>Underline</button>
+                  <button onClick={() => execCmd("insertUnorderedList")} className={`px-2 py-1 text-xs rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"}`}>List</button>
+                </div>
+                <div
+                  ref={scopeRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  className={`min-h-[200px] w-full px-4 py-3 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                  onInput={() => {
+                    const html = scopeRef.current?.innerHTML || "";
+                    setFormData((prev) => ({ ...prev, scopeDescription: html }));
+                  }}
+                  dangerouslySetInnerHTML={{ __html: formData.scopeDescription || "" }}
+                />
+              </div>
+            )}
 
-            {/* Notes */}
-            <div className="mt-6">
-              <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Additional Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleInputChange}
-                rows={3}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  isDark
-                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                } focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                placeholder="Any additional information or special notes..."
-              />
-            </div>
+            {activeTab === "Pricing Summary" && (
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Row</span>
+                  <button onClick={addPricingRow} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                        <th className="text-left px-2 py-2">No</th>
+                        <th className="text-left px-2 py-2">Description *</th>
+                        <th className="text-left px-2 py-2">Amount *</th>
+                        <th className="text-right px-2 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(formData.pricingRows || []).map((r, idx) => (
+                        <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                          <td className="px-2 py-2">{idx + 1}</td>
+                          <td className="px-2 py-2">
+                            <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="number" min="0" step="0.01" value={r.amount} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end">
+                  <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Milestone" && (
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Milestone</span>
+                  <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: 0 }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.milestones || []).map((m, idx) => (
+                    <div key={idx} className={`grid grid-cols-7 gap-3 ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                      <div className="col-span-4">
+                        <input type="text" value={m.title} onChange={(e) => {
+                          const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData((prev) => ({ ...prev, milestones: arr }));
+                        }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Milestone *" />
+                      </div>
+                      <div className="col-span-2">
+                        <input type="number" min="0" step="0.01" value={m.amount} onChange={(e) => {
+                          const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: parseFloat(e.target.value) || 0 }; setFormData((prev) => ({ ...prev, milestones: arr }));
+                        }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <button onClick={() => {
+                          const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: 0 }] }));
+                        }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Timeline" && (
+              <div className="space-y-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Months *</label>
+                    <input type="number" min="0" name="timelineMonths" value={formData.timelineMonths} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Weeks *</label>
+                    <input type="number" min="0" name="timelineWeeks" value={formData.timelineWeeks} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Timeline Phases</span>
+                  <button onClick={addTimelinePhase} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                        <th className="text-left px-2 py-2">No</th>
+                        <th className="text-left px-2 py-2">Week *</th>
+                        <th className="text-left px-2 py-2">Phase *</th>
+                        <th className="text-right px-2 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(formData.timelinePhases || []).map((r, idx) => (
+                        <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                          <td className="px-2 py-2">{idx + 1}</td>
+                          <td className="px-2 py-2">
+                            <input type="text" value={r.week} onChange={(e) => updateTimelinePhase(idx, "week", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="text" value={r.phase} onChange={(e) => updateTimelinePhase(idx, "phase", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <button onClick={() => removeTimelinePhase(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Conclusion" && (
+              <div className="space-y-6 mb-6">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
+                  <textarea name="conclusionNotes" value={formData.conclusionNotes} onChange={handleInputChange} rows={4} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Name *</label>
+                    <input type="text" name="creatorName" value={formData.creatorName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Phone Number *</label>
+                    <input type="tel" name="creatorPhone" value={formData.creatorPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Designation *</label>
+                    <input type="text" name="creatorDesignation" value={formData.creatorDesignation} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  </div>
+                </div>
+              </div>
+            )}
+            
 
             {/* Action Buttons */}
-            <div className="mt-8 flex items-center justify-end gap-4 pt-6 border-t border-gray-700">
+            <div className={`mt-8 flex items-center justify-end gap-4 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
               <button
                 onClick={generatePDF}
-                disabled={!formData.companyName || !formData.clientName || !formData.proposalTitle || !formData.proposalDate}
+                disabled={!isFormValid()}
                 className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                   isDark
                     ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -683,8 +893,9 @@ export default function ProposalPage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
   );
+  
 }
-

@@ -16,3 +16,5 @@ export function generateCalUrl(lead = {}, salesperson = {}) {
   return query ? `${baseUrl}?${query}` : baseUrl;
 }
 
+
+

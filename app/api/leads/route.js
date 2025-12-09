@@ -119,8 +119,6 @@ export async function POST(request) {
       title: initialTaskTitle,
       type: "Call",
       status: "Pending",
-      sales_person_id: data.assigned_to || null,
-      priority: data.priority || "Medium",
     });
 
   return Response.json({ success: true, lead: newLead });
@@ -138,7 +136,7 @@ export async function PATCH(request) {
 
   const { data: existingLead } = await supabase
     .from("leads_table")
-    .select("id, lead_name, status, assigned_to, priority")
+    .select("id, lead_name, status")
     .eq("id", id)
     .single();
 
@@ -205,8 +203,6 @@ export async function PATCH(request) {
         title,
         type,
         status: "Pending",
-        sales_person_id: existingLead?.assigned_to || null,
-        priority: existingLead?.priority || "Medium",
       });
   }
 

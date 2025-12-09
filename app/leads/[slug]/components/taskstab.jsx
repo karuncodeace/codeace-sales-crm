@@ -24,7 +24,7 @@ function formatDate(date) {
   });
 }
 
-function TaskItem({ task, theme, onComplete }) {
+function TaskItem({ task, theme }) {
   const isDark = theme === "dark";
   const typeIcon = (() => {
     const t = (task.type || "").toLowerCase();
@@ -45,18 +45,8 @@ function TaskItem({ task, theme, onComplete }) {
           <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{task.type || "Task"}</span>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="text-right">
         <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{formatDate(task.completed_at || task.due_date || task.created_at)}</span>
-        {onComplete && (
-          <button
-            onClick={() => onComplete(task)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              isDark ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-            }`}
-          >
-            Mark Complete
-          </button>
-        )}
       </div>
     </div>
   );
@@ -65,7 +55,7 @@ function TaskItem({ task, theme, onComplete }) {
 export default function TasksTab({ leadId }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const { data: tasksData, mutate } = useSWR(leadId ? `/api/tasks?lead_id=${leadId}` : null, fetcher);
+  const { data: tasksData } = useSWR(leadId ? `/api/tasks?lead_id=${leadId}` : null, fetcher);
 
   const tasks = Array.isArray(tasksData) ? tasksData : [];
 
@@ -88,31 +78,6 @@ export default function TasksTab({ leadId }) {
     };
   }, [tasks]);
 
-  const handleMarkComplete = async (task) => {
-    if (!task?.id) return;
-    const now = new Date().toISOString();
-    mutate(
-      (current) => {
-        if (!Array.isArray(current)) return current;
-        return current.map((t) =>
-          t.id === task.id ? { ...t, status: "Completed", completed_at: now } : t
-        );
-      },
-      false
-    );
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: task.id, status: "Completed" }),
-      });
-      if (!res.ok) throw new Error("Failed to mark complete");
-      mutate();
-    } catch (e) {
-      mutate();
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className={`rounded-2xl p-6 ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
@@ -129,9 +94,7 @@ export default function TasksTab({ leadId }) {
           {upcoming.length === 0 ? (
             <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>No upcoming tasks</div>
           ) : (
-            upcoming.map((task) => (
-              <TaskItem key={task.id} task={task} theme={theme} onComplete={handleMarkComplete} />
-            ))
+            upcoming.map((task) => <TaskItem key={task.id} task={task} theme={theme} />)
           )}
         </div>
       </div>
