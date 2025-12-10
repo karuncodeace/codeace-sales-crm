@@ -69,7 +69,7 @@ export async function POST(req) {
                         customInputs.name?.value ||
                         null;
 
-    // Extract lead_id and salesperson_id
+    // Extract lead_id (string identifier from leads.text) and salesperson_id
     let lead_id = responses.lead_id?.value || 
                   responses.leadId?.value ||
                   customInputs.lead_id?.value ||
@@ -125,12 +125,12 @@ export async function POST(req) {
       try {
         const { data: lead, error: leadError } = await supabase
           .from("leads")
-          .select("lead_name, name, full_name")
-          .eq("id", lead_id)
+          .select("text, lead_name")
+          .eq("text", lead_id)
           .single();
 
         if (!leadError && lead) {
-          lead_name = lead.lead_name || lead.full_name || lead.name || lead_name || null;
+          lead_name = lead.lead_name || lead_name || null;
           console.log("  - lead_name (from DB):", lead_name);
         } else {
           console.log("  - lead_name: Not found in database");
@@ -215,7 +215,7 @@ export async function POST(req) {
         }
       }
 
-      // Prepare appointment data
+      // Prepare appointment data (lead_id maps to leads.text)
       const appointmentData = {
         cal_event_id: calEventId,
         title: payload.title || payload.eventTitle || payload.type || "Meeting",
@@ -244,12 +244,12 @@ export async function POST(req) {
           if (attendeeEmail) {
             const { data: leadByEmail, error: leadByEmailError } = await supabase
               .from("leads")
-              .select("id, lead_name, email")
+              .select("text, lead_name, email")
               .or(`email.eq.${attendeeEmail}`)
               .maybeSingle();
 
-            if (!leadByEmailError && leadByEmail?.id) {
-              appointmentData.lead_id = leadByEmail.id;
+            if (!leadByEmailError && leadByEmail?.text) {
+              appointmentData.lead_id = leadByEmail.text;
               appointmentData.lead_name = leadByEmail.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved by attendee_email:", appointmentData.lead_id);
             }
@@ -259,12 +259,12 @@ export async function POST(req) {
           if (!appointmentData.lead_id && attendeeName) {
             const { data: leadByName, error: leadByNameError } = await supabase
               .from("leads")
-              .select("id, lead_name")
+              .select("text, lead_name")
               .or(`lead_name.eq.${attendeeName}`)
               .maybeSingle();
 
-            if (!leadByNameError && leadByName?.id) {
-              appointmentData.lead_id = leadByName.id;
+            if (!leadByNameError && leadByName?.text) {
+              appointmentData.lead_id = leadByName.text;
               appointmentData.lead_name = leadByName.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved by attendee_name:", appointmentData.lead_id);
             }
