@@ -51,7 +51,8 @@ export default function weeklyLineChart() {
       },
       legend: {
         horizontalAlign: "left",
-        fontSize: "14px",
+        fontSize: "12px",
+        offsetY: 0 ,
         labels: {
           colors: isDark ? "#E2E8F0" : "#1E293B",
         },
@@ -63,7 +64,7 @@ export default function weeklyLineChart() {
         borderColor: isDark
           ? "rgba(255,255,255,0.12)"
           : "rgba(148,163,184,0.25)",
-        strokeDashArray: 4,
+        strokeDashArray: 8,
         padding: { left: 12, right: 12 },
       },
       tooltip: {
@@ -162,7 +163,7 @@ export default function weeklyLineChart() {
             <h3 className={`text-lg md:text-base 2xl:text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
               {card.title}
             </h3>
-            <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
+            <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/80"}`}>
               {card.subtitle}
             </p>
           </div>

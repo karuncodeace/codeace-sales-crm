@@ -57,10 +57,15 @@ export default function KPICallBarChart() {
         show: true,
         position: "bottom",
         horizontalAlign: "center",
-        fontSize: "13px",
+        fontSize: "12px",
         labels: {
           colors: isDark ? "#E2E8F0" : "#64748b",
         },
+        markers: {
+          shape: "circle",      // or "square" / "rect" / "triangle" / "line" / "invertedTriangle"
+          width: 12,
+          height: 12,
+        }
       },
 
       dataLabels: { enabled: false },
@@ -216,7 +221,7 @@ export default function KPICallBarChart() {
             </h3>
             <p
               className={`text-sm ${
-                isDark ? "text-gray-400" : "text-gray-500/70"
+                isDark ? "text-gray-400" : "text-gray-500/80"
               }`}
             >
               {card.subtitle}

@@ -92,7 +92,7 @@ export default function DonutChart() {
 
         legend: {
           position: "bottom",
-          fontSize: "14px",
+          fontSize: "12px",
           labels: {
             colors: isDark ? "#E2E8F0" : "#64748b",
           },
@@ -179,13 +179,13 @@ export default function DonutChart() {
         <h3 className={`text-lg md:text-base 2xl:text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
           Lead Source Breakdown
         </h3>
-        <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/50"}`}>
+        <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/80"}`}>
           Share of total Leads by acquisition channel
         </p>
       </div>
 
       {/* 🔄 Re-render when theme changes */}
-      <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
+      <div className="h-[430px] md:h-[300px] 2xl:h-[400px]">
       <ApexChart key={theme} options={options} series={series} type="donut" height="100%" 
       
       />

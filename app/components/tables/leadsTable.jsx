@@ -493,7 +493,7 @@ export default function LeadsTable() {
     <div className="">
       
 
-      <div className={`h-[calc(100vh-180px)] mt-5 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
+      <div className={`h-[calc(100vh-180px)] mt-4 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
         {/* Header */}
         <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
           {/* LEFT SIDE — Title + Search */}
@@ -1058,7 +1058,7 @@ export default function LeadsTable() {
                 return (
                   <div
                     key={status}
-                    className={`flex min-w-[350px] flex-col h-[1200px] ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
+                    className={`flex min-w-[350px] flex-col min-h-[700px] max-h-auto  ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
                       ? "  shadow-sm scale-[1.01]"
                       : " ring-transparent"
                       }`}

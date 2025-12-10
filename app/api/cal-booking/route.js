@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request) {
   try {
@@ -90,7 +90,10 @@ export async function POST(request) {
     // Resolve Salesperson
     // -------------------------------
 
-    const supabase = await supabaseServer();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
     let resolvedSalespersonId = salesperson_id;
 
     const { data: salesPerson } = await supabase

@@ -86,9 +86,9 @@ export default function TasksPage() {
 
     return (
         <div className="pl-5 md:pl-0 2xl:pl-0 w-full">
-            <div className="mt-10 flex justify-between items-center">
+            <div className="mt-8 flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold mb-1">Tasks</h1>
+                    <h1 className="text-2xl font-bold mb-1">Tasks</h1>
                 </div>
                 <div className="flex items-center gap-3 ">
                     <AddTaskModal 

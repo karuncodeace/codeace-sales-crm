@@ -285,7 +285,7 @@ export default function Sidebar2() {
 
 
             {/* Menu Items */}
-            <nav className="flex-1  py-4 pt-8 md:pt-4 2xl:pt-8 px-3 flex flex-col">
+            <nav className="flex-1  py-4 pt-8 md:pt-4 2xl:pt-4 px-3 flex flex-col">
                 <div className="space-y-5 md:space-y-3 2xl:space-y-5 flex-1">
                     {menuItems.map((item) => {
                         const active = isActive(item.path);

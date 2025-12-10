@@ -57,10 +57,16 @@ export default function SalesPersonComparisonChart() {
         show: true,
         position: "bottom",
         horizontalAlign: "center",
-        fontSize: "13px",
+        fontSize: "12px",
+        
         labels: {
           colors: isDark ? "#E2E8F0" : "#64748b",
         },
+        markers: {
+          shape: "circle",      // or "square" / "rect" / "triangle" / "line" / "invertedTriangle"
+          width: 12,
+          height: 12,
+        }
       },
 
       dataLabels: { enabled: false },

@@ -37,9 +37,9 @@ export default function Header() {
     );
 
     return (
-        <div className="mt-8 pt-0  md:mt-4 xl:mt-5 2xl:mt-8  w-[98%]">
+        <div className="mt-8 pt-0  md:mt-4 xl:mt-5 2xl:mt-8   w-[98%]">
             <div>
-                <h1 className={`text-3xl font-bold font-dyna-puff ${theme === "dark" ? "text-white" : "text-black"}`}>
+                <h1 className={`text-2xl font-bold font-dyna-puff ${theme === "dark" ? "text-white" : "text-black"}`}>
                     Hello {isLoading ? "..." : displayName || "User"} !!!
                 </h1>
             </div>

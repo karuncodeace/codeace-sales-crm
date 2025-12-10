@@ -3,8 +3,9 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useTheme } from "../context/themeContext";
 import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, X, ChevronRight, ChevronLeft, FileText, Check } from "lucide-react";
-import jsPDF from "jspdf";
 import { createClient } from "@supabase/supabase-js";
+import jsPDF from "jspdf";
+import { generatePDF as generatePDFService, generatePreviewPDF as generatePreviewPDFService } from "./pdfService";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +206,7 @@ export default function ProposalPage() {
   const [pdfList, setPdfList] = useState([]);
   const [loadingPdfs, setLoadingPdfs] = useState(true);
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
+  const [pdfUrls, setPdfUrls] = useState({});
   const defaultMilestones = useMemo(
     () => [
       { title: "Advance Payment on Contract Signing", amount: "" },
@@ -263,6 +265,31 @@ export default function ProposalPage() {
 
     fetchPdfs();
   }, [supabase]);
+
+  // Resolve public/signed URLs for PDFs so view/download/share work reliably
+  useEffect(() => {
+    const resolveUrls = async () => {
+      if (!supabase || !pdfList?.length) {
+        setPdfUrls({});
+        return;
+      }
+      const entries = await Promise.all(
+        pdfList.map(async (file) => {
+          const path = `proposals/${file.name}`;
+          // Try public URL first
+          const { data } = supabase.storage.from("proposal_pdf").getPublicUrl(path);
+          if (data?.publicUrl) return [file.name, data.publicUrl];
+
+          // Fallback to signed URL
+          const { data: signed } = await supabase.storage.from("proposal_pdf").createSignedUrl(path, 3600);
+          if (signed?.signedUrl) return [file.name, signed.signedUrl];
+          return [file.name, null];
+        })
+      );
+      setPdfUrls(Object.fromEntries(entries.filter(([, url]) => url)));
+    };
+    resolveUrls();
+  }, [pdfList, supabase]);
 
   // Ensure default milestones are present when entering milestones step
   useEffect(() => {
@@ -1297,7 +1324,7 @@ export default function ProposalPage() {
           const next = customNotesItems[idx + 1];
           const inlineContinuation =
             pendingX !== null &&
-            pendingY !== null &&
+            pendingY !== null &&  
             pendingListItem === item.isListItem &&
             !item.isBold &&
             !item.isBreak;
@@ -2049,7 +2076,7 @@ export default function ProposalPage() {
           </div>
 
           {/* PDF List Section */}
-          <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"} mb-6`}>
+          <div className={`rounded-lg border h-[78vh] ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"} mb-6`}>
             <div className="p-6">
               <h2 className={`text-xl font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
                 Downloaded PDFs
@@ -2065,7 +2092,16 @@ export default function ProposalPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {pdfList.map((pdf) => {
-                    const pdfUrl = getPdfUrl(pdf.name);
+                    const pdfUrl = pdfUrls[pdf.name] || getPdfUrl(pdf.name);
+                    const handleShare = async () => {
+                      if (!pdfUrl) return;
+                      try {
+                        await navigator.clipboard.writeText(pdfUrl);
+                        alert("Share link copied to clipboard");
+                      } catch (err) {
+                        alert("Unable to copy link");
+                      }
+                    };
                     return (
                       <div
                         key={pdf.id}
@@ -2082,34 +2118,51 @@ export default function ProposalPage() {
                             </p>
                           </div>
                         </div>
-                        {pdfUrl && (
-                          <div className="mt-3 flex gap-2">
-                            <a
-                              href={pdfUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors ${
-                                isDark
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => pdfUrl && window.open(pdfUrl, "_blank", "noopener,noreferrer")}
+                            disabled={!pdfUrl}
+                            className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                              pdfUrl
+                                ? isDark
                                   ? "bg-gray-700 hover:bg-gray-600 text-white"
                                   : "bg-gray-200 hover:bg-gray-300 text-gray-900"
-                              }`}
-                            >
-                              View
-                            </a>
-                            <a
-                              href={pdfUrl}
-                              download
-                              className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                                isDark
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                          >
+                            View
+                          </button>
+                          <a
+                            href={pdfUrl || "#"}
+                            download
+                            onClick={(e) => {
+                              if (!pdfUrl) e.preventDefault();
+                            }}
+                            className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                              pdfUrl
+                                ? isDark
                                   ? "bg-orange-600 hover:bg-orange-700 text-white"
                                   : "bg-orange-500 hover:bg-orange-600 text-white"
-                              }`}
-                            >
-                              <Download className="w-4 h-4" />
-                              Download
-                            </a>
-                          </div>
-                        )}
+                                : "bg-orange-200 text-orange-900 cursor-not-allowed"
+                            }`}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </a>
+                          <button
+                            onClick={handleShare}
+                            disabled={!pdfUrl}
+                            className={`px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center ${
+                              pdfUrl
+                                ? isDark
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                  : "bg-blue-500 hover:bg-blue-600 text-white"
+                                : "bg-blue-200 text-blue-900 cursor-not-allowed"
+                            }`}
+                          >
+                            Share
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

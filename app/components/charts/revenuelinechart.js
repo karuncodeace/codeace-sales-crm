@@ -49,7 +49,8 @@ export default function weeklyLineChart() {
       },
       legend: {
         horizontalAlign: "left",
-        fontSize: "14px",
+        fontSize: "12px",
+        offsetY: 10 ,
         labels: {
           colors: isDark ? "#E2E8F0" : "#1E293B",
         },
@@ -180,7 +181,7 @@ export default function weeklyLineChart() {
         >
           <div className="mb-4">
             <h3
-              className={`text-lg md:text-base 2xl:text-lg font-semibold ${
+              className={`text-lg md:text-base 2xl:text-[12px] font-semibold ${
                 isDark ? "text-gray-200" : "text-gray-900"
               }`}
             >
@@ -188,7 +189,7 @@ export default function weeklyLineChart() {
             </h3>
             <p
               className={`text-sm md:text-xs 2xl:text-sm ${
-                isDark ? "text-gray-400" : "text-gray-500/50"
+                isDark ? "text-gray-400" : "text-gray-500/80"
               }`}
             >
               {card.subtitle}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request) {
   try {
@@ -15,7 +15,10 @@ export async function POST(request) {
     }
 
     // Get Supabase client
-    const supabase = await supabaseServer();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
 
     // Insert booking click record into appointments table
     // Using a simplified structure for external booking clicks

@@ -12,7 +12,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 export default function AppointmentsPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("booked");
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -192,10 +192,10 @@ export default function AppointmentsPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
-      <div className="pl-5 md:pl-0 2xl:pl-0 w-full mt-10">
+      <div className="pl-5 md:pl-0 2xl:pl-0 w-full mt-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+          <h1 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
             Appointments
           </h1>
           <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
@@ -210,7 +210,7 @@ export default function AppointmentsPage() {
             Filter by Status:
           </span>
           <div className="flex gap-2">
-            {["all", "booked", "rescheduled", "cancelled"].map((status) => (
+            {["booked", "rescheduled", "cancelled"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -316,9 +316,7 @@ export default function AppointmentsPage() {
                           <div className="flex items-start gap-3">
                             <Clock className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                             <div>
-                              <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                Date & Time
-                              </p>
+                              
                               <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
                                 {startTime.full}
                               </p>
@@ -335,9 +333,7 @@ export default function AppointmentsPage() {
                             <div className="flex items-start gap-3">
                               <User className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                               <div>
-                                <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                  Lead
-                                </p>
+                               
                                 <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
                                   {appointment.lead_name}
                                 </p>
@@ -359,9 +355,7 @@ export default function AppointmentsPage() {
                             <div className="flex items-start gap-3">
                               <Video className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                               <div>
-                                <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                  Meeting Link
-                                </p>
+                                
                                 <a
                                   href={appointment.join_url}
                                   target="_blank"
