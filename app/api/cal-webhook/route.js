@@ -192,7 +192,7 @@ export async function POST(req) {
       if (lead_id) {
         try {
           const { data: pendingAppointments, error: searchError } = await supabase
-            .from("appointments")
+            .from("appoiintments")
             .select("*")
             .eq("lead_id", lead_id)
             .eq("status", "pending")
@@ -237,36 +237,24 @@ export async function POST(req) {
         appointmentData.salesperson_id = resolvedSalespersonId;
       }
 
-      // If lead_id is still missing, try to resolve by attendee email/name
+      // If lead_id is still missing, try to resolve by attendee email/name (leads_table.text)
       if (!appointmentData.lead_id && (attendeeEmail || attendeeName)) {
         try {
-          // First try email match (exact on email)
-          if (attendeeEmail) {
-            const { data: leadByEmail, error: leadByEmailError } = await supabase
-              .from("leads_table")
-              .select("text, lead_name, email")
-              .or(`email.eq.${attendeeEmail}`)
-              .maybeSingle();
+          const conditions = [];
+          if (attendeeEmail) conditions.push(`email.eq.${attendeeEmail}`);
+          if (attendeeName) conditions.push(`lead_name.eq.${attendeeName}`);
 
-            if (!leadByEmailError && leadByEmail?.text) {
-              appointmentData.lead_id = leadByEmail.text;
-              appointmentData.lead_name = leadByEmail.lead_name || appointmentData.lead_name;
-              console.log("  - lead_id resolved by attendee_email:", appointmentData.lead_id);
-            }
-          }
-
-          // If still missing, try lead_name exact match
-          if (!appointmentData.lead_id && attendeeName) {
-            const { data: leadByName, error: leadByNameError } = await supabase
+          if (conditions.length > 0) {
+            const { data: leadMatch, error: leadMatchError } = await supabase
               .from("leads_table")
               .select("text, lead_name")
-              .or(`lead_name.eq.${attendeeName}`)
+              .or(conditions.join(","))
               .maybeSingle();
 
-            if (!leadByNameError && leadByName?.text) {
-              appointmentData.lead_id = leadByName.text;
-              appointmentData.lead_name = leadByName.lead_name || appointmentData.lead_name;
-              console.log("  - lead_id resolved by attendee_name:", appointmentData.lead_id);
+            if (!leadMatchError && leadMatch?.text) {
+              appointmentData.lead_id = leadMatch.text;
+              appointmentData.lead_name = leadMatch.lead_name || appointmentData.lead_name;
+              console.log("  - lead_id resolved via lookup:", appointmentData.lead_id);
             }
           }
         } catch (resolveErr) {
@@ -290,7 +278,7 @@ export async function POST(req) {
         console.log("📝 Updating existing pending appointment:", existingPendingAppointment.id);
         
         const { data: updatedData, error: updateError } = await supabase
-          .from("appointments")
+          .from("appoiintments")
           .update(appointmentData)
           .eq("id", existingPendingAppointment.id)
           .select()
@@ -338,12 +326,12 @@ export async function POST(req) {
         
         // Log what we're about to insert
         console.log("📤 Attempting Supabase insert...");
-        console.log("   - Table: appointments");
+        console.log("   - Table: appoiintments");
         console.log("   - Data keys:", Object.keys(appointmentData));
         
         try {
           const { data: insertedData, error: insertError } = await supabase
-            .from("appointments")
+            .from("appoiintments")
             .insert(appointmentData)
             .select()
             .single();
@@ -443,7 +431,7 @@ export async function POST(req) {
 
       // Try to find appointment by cal_event_id or lead_id
       let updateQuery = supabase
-        .from("appointments")
+        .from("appoiintments")
         .update({
           status: "cancelled",
           raw_payload: body,
@@ -503,7 +491,7 @@ export async function POST(req) {
       if (startTime) updateData.start_time = startTime;
       if (endTime) updateData.end_time = endTime;
 
-      let updateQuery = supabase.from("appointments").update(updateData);
+      let updateQuery = supabase.from("appoiintments").update(updateData);
 
       if (calEventId && calEventId !== `cal-${Date.now()}`) {
         updateQuery = updateQuery.eq("cal_event_id", calEventId);
