@@ -192,7 +192,7 @@ export async function POST(req) {
       if (lead_id) {
         try {
           const { data: pendingAppointments, error: searchError } = await supabase
-            .from("appoiintments")
+            .from("appointments")
             .select("*")
             .eq("lead_id", lead_id)
             .eq("status", "pending")
@@ -262,6 +262,15 @@ export async function POST(req) {
         }
       }
 
+      // Fallback: if still missing, derive a soft lead_id from attendee email or name
+      if (!appointmentData.lead_id) {
+        if (attendeeEmail) {
+          appointmentData.lead_id = `lead:${attendeeEmail}`;
+        } else if (attendeeName) {
+          appointmentData.lead_id = `lead:${attendeeName}`.replace(/\s+/g, "-").toLowerCase();
+        }
+      }
+
       // Remove null values that might cause issues (except for optional fields)
       Object.keys(appointmentData).forEach(key => {
         if (appointmentData[key] === null && key !== 'salesperson_id' && key !== 'location') {
@@ -278,7 +287,7 @@ export async function POST(req) {
         console.log("📝 Updating existing pending appointment:", existingPendingAppointment.id);
         
         const { data: updatedData, error: updateError } = await supabase
-          .from("appoiintments")
+          .from("appointments")
           .update(appointmentData)
           .eq("id", existingPendingAppointment.id)
           .select()
@@ -299,14 +308,6 @@ export async function POST(req) {
         console.log("   Appointment data:", JSON.stringify(appointmentData, null, 2));
         
         // Validate required fields before insert
-        if (!appointmentData.lead_id) {
-          console.error("❌ Missing required field: lead_id");
-          return NextResponse.json(
-            { error: "Missing required field: lead_id" },
-            { status: 400 }
-          );
-        }
-
         if (!appointmentData.start_time) {
           console.error("❌ Missing required field: start_time");
           return NextResponse.json(
@@ -326,12 +327,12 @@ export async function POST(req) {
         
         // Log what we're about to insert
         console.log("📤 Attempting Supabase insert...");
-        console.log("   - Table: appoiintments");
+        console.log("   - Table: appointments");
         console.log("   - Data keys:", Object.keys(appointmentData));
         
         try {
           const { data: insertedData, error: insertError } = await supabase
-            .from("appoiintments")
+            .from("appointments")
             .insert(appointmentData)
             .select()
             .single();
