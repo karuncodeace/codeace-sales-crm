@@ -244,9 +244,9 @@ export async function POST(req) {
           if (attendeeEmail) {
             const { data: leadByEmail, error: leadByEmailError } = await supabase
               .from("leads")
-              .select("id, lead_name, full_name, name")
-              .ilike("email", attendeeEmail)
-              .single();
+              .select("id, lead_name, full_name, name, email, lead_email")
+              .or(`email.ilike.${attendeeEmail},lead_email.ilike.${attendeeEmail}`)
+              .maybeSingle();
 
             if (!leadByEmailError && leadByEmail?.id) {
               appointmentData.lead_id = leadByEmail.id;
@@ -260,7 +260,7 @@ export async function POST(req) {
             const { data: leadByName, error: leadByNameError } = await supabase
               .from("leads")
               .select("id, lead_name, full_name, name")
-              .ilike("lead_name", attendeeName)
+              .or(`lead_name.ilike.${attendeeName},name.ilike.${attendeeName}`)
               .maybeSingle();
 
             if (!leadByNameError && leadByName?.id) {
@@ -280,6 +280,10 @@ export async function POST(req) {
           delete appointmentData[key];
         }
       });
+
+      if (!appointmentData.lead_id) {
+        console.error("❌ lead_id still missing after resolution attempts. Attendee email:", attendeeEmail, "attendee name:", attendeeName);
+      }
 
       // Update existing pending appointment or insert new one
       if (existingPendingAppointment) {
