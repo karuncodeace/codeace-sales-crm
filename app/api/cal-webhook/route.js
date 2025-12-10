@@ -70,11 +70,13 @@ export async function POST(req) {
                         null;
 
     // Extract lead_id and salesperson_id
-    const lead_id = responses.lead_id?.value || 
-                    responses.leadId?.value ||
-                    customInputs.lead_id?.value ||
-                    customInputs.leadId?.value ||
-                    null;
+    let lead_id = responses.lead_id?.value || 
+                  responses.leadId?.value ||
+                  customInputs.lead_id?.value ||
+                  customInputs.leadId?.value ||
+                  body?.lead_id ||
+                  body?.leadId ||
+                  null;
     
     const salesperson_id = responses.salesperson_id?.value || 
                           responses.salespersonId?.value ||
@@ -233,6 +235,43 @@ export async function POST(req) {
       // Only include salesperson_id if it's resolved and exists
       if (resolvedSalespersonId) {
         appointmentData.salesperson_id = resolvedSalespersonId;
+      }
+
+      // If lead_id is still missing, try to resolve by attendee email/name
+      if (!appointmentData.lead_id && (attendeeEmail || attendeeName)) {
+        try {
+          // First try email match
+          if (attendeeEmail) {
+            const { data: leadByEmail, error: leadByEmailError } = await supabase
+              .from("leads")
+              .select("id, lead_name, full_name, name")
+              .ilike("email", attendeeEmail)
+              .single();
+
+            if (!leadByEmailError && leadByEmail?.id) {
+              appointmentData.lead_id = leadByEmail.id;
+              appointmentData.lead_name = leadByEmail.lead_name || leadByEmail.full_name || leadByEmail.name || appointmentData.lead_name;
+              console.log("  - lead_id resolved by attendee_email:", appointmentData.lead_id);
+            }
+          }
+
+          // If still missing, try name match (best-effort)
+          if (!appointmentData.lead_id && attendeeName) {
+            const { data: leadByName, error: leadByNameError } = await supabase
+              .from("leads")
+              .select("id, lead_name, full_name, name")
+              .ilike("lead_name", attendeeName)
+              .maybeSingle();
+
+            if (!leadByNameError && leadByName?.id) {
+              appointmentData.lead_id = leadByName.id;
+              appointmentData.lead_name = leadByName.lead_name || leadByName.full_name || leadByName.name || appointmentData.lead_name;
+              console.log("  - lead_id resolved by attendee_name:", appointmentData.lead_id);
+            }
+          }
+        } catch (resolveErr) {
+          console.log("  - lead_id resolution attempt failed:", resolveErr.message);
+        }
       }
 
       // Remove null values that might cause issues (except for optional fields)
