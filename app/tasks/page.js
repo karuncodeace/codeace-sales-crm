@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../context/themeContext";
 import PriorityDropdown from "../components/buttons/priorityTooglebtn";
-import RescheduleButton from "../components/buttons/RescheduleButton";
 import FilterBtn from "../components/buttons/filterbtn";
 import AddTaskModal from "../components/buttons/addTaskbtn";
 import TasksTable from "../components/tables/tasksTable";

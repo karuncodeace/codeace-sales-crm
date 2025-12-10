@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
-import RescheduleButton from "../buttons/RescheduleButton";
 import FilterBtn from "../buttons/filterbtn";
 import AddTaskModal from "../buttons/addTaskbtn";
 
@@ -60,10 +59,7 @@ const dueStyles = {
         light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-100",
         dark: "text-red-400 bg-red-900/40 ring-1 ring-inset ring-red-700",
     },
-    rescheduled: {
-        light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
-        dark: "text-purple-400 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
-    },
+    
     completed: {
         light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-200",
         dark: "text-gray-300 bg-gray-900/40 ring-1 ring-inset ring-gray-700",
@@ -126,6 +122,8 @@ export default function TasksPage() {
     const [openFilter, setOpenFilter] = useState(false);
     const [openAddTask, setOpenAddTask] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
     const [advancedFilters, setAdvancedFilters] = useState({
         source: "",
         status: "",
@@ -251,12 +249,16 @@ export default function TasksPage() {
 
         const mappedTasks = tasksData.map((task) => {
             const lead = leadsMap[task.lead_id];
-            const salesPerson = salesPersonsMap[task.sales_person_id];
+            // Use task's sales_person_id, or fallback to lead's assigned_to
+            const salesPersonId = task.sales_person_id || lead?.assignedTo;
 
             // Get due date from activities or default to 1 day
             const calculatedDueDate = getTaskDueDate(task);
             const hasActivityDueDate = !!activitiesDueDateMap[task.lead_id]?.due_date;
             const dueStatus = getDueStatus(calculatedDueDate.toISOString(), task.status);
+
+            // Display sales_person_id directly (or lead's assigned_to as fallback)
+            const assignedToId = salesPersonId || "—";
 
             return {
                 id: task.id,
@@ -273,7 +275,7 @@ export default function TasksPage() {
                 hasUpdatedDue: hasActivityDueDate,
                 priority: task.priority || "Warm",
                 status: task.status || "Pending",
-                assignedTo: salesPerson?.name || salesPerson?.sales_person_name || salesPerson?.full_name || task.sales_person_id || "—",
+                assignedTo: assignedToId,
                 comments: task.comments || "",
                 recentLog: null,
                 recentLogDisplay: "",
@@ -341,6 +343,17 @@ export default function TasksPage() {
 
         return result;
     }, [transformedTasks, searchTerm, filter, advancedFilters]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filter, advancedFilters]);
 
     const handlePriorityUpdate = async (taskId, newPriority) => {
         try {
@@ -465,9 +478,6 @@ export default function TasksPage() {
     }
 
     return (
-
-
-
         <div className={`h-[calc(100vh-180px)] mt-8 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
             {/* Header */}
             <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
@@ -527,8 +537,8 @@ export default function TasksPage() {
                 </div>
 
                 {/* RIGHT SIDE — Tab Filters */}
-                <div className="grid grid-cols-4 items-center overflow-x-auto  ">
-                    {["all", "overdue", "rescheduled", "completed"].map((f) => (
+                <div className="grid grid-cols-3 items-center overflow-x-auto  ">
+                    {["all", "overdue","completed"].map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
@@ -575,7 +585,7 @@ export default function TasksPage() {
                                 "Priority",
 
                                 "Actions",
-                                "Comments",
+                                
                             ].map((column) => (
                                 <th
                                     key={column}
@@ -603,7 +613,7 @@ export default function TasksPage() {
                                 </td>
                             </tr>
                         ) : (
-                            filteredTasks.map((task) => (
+                            paginatedTasks.map((task) => (
                                 <tr key={task.id} className={task.status?.toLowerCase() === "completed" ? "opacity-60" : ""}>
                                     <td className="size-px whitespace-nowrap">
                                         <div className="ps-6 py-2">
@@ -691,7 +701,7 @@ export default function TasksPage() {
                                     <td className="size-px whitespace-nowrap">
                                         <div className="px-6 py-2">
                                             <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                {task.sales_person_id}
+                                                {task.assignedTo}
                                             </span>
                                         </div>
                                     </td>
@@ -754,13 +764,6 @@ export default function TasksPage() {
                                                         ? "bg-gray-800 text-gray-200 border-gray-700"
                                                         : "bg-white text-gray-700 border-gray-200"
                                                         }`}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleMarkComplete(task)}
-                                                            className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                                        >
-                                                            {task.status?.toLowerCase() === "completed" ? "Mark Pending" : "Mark Complete"}
-                                                        </button>
                                                         {["View", "Edit"].map((action) => (
                                                             <button
                                                                 key={action}
@@ -775,7 +778,7 @@ export default function TasksPage() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="size-px whitespace-nowrap">
+                                   {/* <td className="size-px whitespace-nowrap">
                                         <div className="px-6 py-2 max-w-[200px]">
                                             {task.comments ? (
                                                 <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
@@ -799,7 +802,7 @@ export default function TasksPage() {
                                                 </span>
                                             )}
                                         </div>
-                                    </td>
+                                    </td>*/}
                                 </tr>
                             ))
                         )}
@@ -812,7 +815,7 @@ export default function TasksPage() {
             <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                 <div className="inline-flex items-center gap-x-2">
                     <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
-                        Showing: {filteredTasks.length} of {transformedTasks.length}
+                        Showing: {filteredTasks.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredTasks.length)} of {filteredTasks.length}
                     </p>
                 </div>
 
@@ -820,6 +823,8 @@ export default function TasksPage() {
                     <div className="inline-flex gap-x-2">
                         <button
                             type="button"
+                            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
                             className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                                 ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                                 : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
@@ -844,6 +849,8 @@ export default function TasksPage() {
 
                         <button
                             type="button"
+                            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages || totalPages === 0}
                             className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                                 ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                                 : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
@@ -870,6 +877,5 @@ export default function TasksPage() {
             </div>
             {/* End Footer */}
         </div>
-
     );
 }

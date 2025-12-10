@@ -22,6 +22,8 @@ export default function ProspectsTable() {
     const { theme } = useTheme();
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
     const [advancedFilters, setAdvancedFilters] = useState({
         source: "",
         status: "",
@@ -78,6 +80,17 @@ export default function ProspectsTable() {
 
         return result;
     }, [prospectsData, searchTerm, advancedFilters]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredProspects.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedProspects = filteredProspects.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, advancedFilters]);
 
     const handleStatusUpdate = async (prospectId, newStatus) => {
         try {
@@ -235,7 +248,7 @@ export default function ProspectsTable() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredProspects.map((prospect) => (
+                                paginatedProspects.map((prospect) => (
                                     <tr key={prospect.id} className={`${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="ps-6 py-2">
@@ -432,7 +445,7 @@ export default function ProspectsTable() {
                 <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                     <div className="inline-flex items-center gap-x-2">
                         <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
-                            Showing: {filteredProspects.length} of {prospectsData?.length || 0}
+                            Showing: {filteredProspects.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredProspects.length)} of {filteredProspects.length}
                         </p>
                     </div>
 
@@ -440,6 +453,8 @@ export default function ProspectsTable() {
                         <div className="inline-flex gap-x-2">
                             <button
                                 type="button"
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
                                 className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                                     ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                                     : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
@@ -464,6 +479,8 @@ export default function ProspectsTable() {
 
                             <button
                                 type="button"
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages || totalPages === 0}
                                 className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                                     ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                                     : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"

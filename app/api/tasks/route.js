@@ -35,6 +35,20 @@ export async function POST(request) {
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
 
+  // If sales_person_id is not provided, get it from the lead's assigned_to
+  let finalSalesPersonId = sales_person_id;
+  if (!finalSalesPersonId) {
+    const { data: lead, error: leadError } = await supabase
+      .from("leads_table")
+      .select("assigned_to")
+      .eq("id", lead_id)
+      .single();
+
+    if (!leadError && lead?.assigned_to) {
+      finalSalesPersonId = lead.assigned_to;
+    }
+  }
+
   const insertData = {
     lead_id,
     type: type || "Call",
@@ -43,7 +57,7 @@ export async function POST(request) {
   };
 
   // Add optional fields
-  if (sales_person_id) insertData.sales_person_id = sales_person_id;
+  if (finalSalesPersonId) insertData.sales_person_id = finalSalesPersonId;
   if (title) insertData.title = title;
   if (due_date) insertData.due_date = due_date;
 

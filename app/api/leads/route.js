@@ -1,5 +1,30 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 
+// Task title mapping based on lead status
+const taskTitles = {
+  "New":        (name) => `Contact ${name} for the first time`,
+  "Contacted":  (name) => `Qualify the needs of ${name}`,
+  "Demo":       (name) => `Follow up with ${name} after the demo`,
+  "Proposal":   (name) => `Discuss proposal details with ${name}`,
+  "Follow-Up":  (name) => `Follow up with ${name} for decision update`,
+  "Won":        (name) => `Begin onboarding process for ${name}`,
+};
+
+// Helper function to normalize status to match taskTitles keys
+function normalizeStatus(status) {
+  if (!status) return null;
+  const s = String(status).toLowerCase().trim();
+  
+  if (s === "new") return "New";
+  if (s === "contacted") return "Contacted";
+  if (s === "demo") return "Demo";
+  if (s === "proposal") return "Proposal";
+  if (s === "follow-up" || s === "follow_up" || s === "follow up") return "Follow-Up";
+  if (s === "won") return "Won";
+  
+  return null;
+}
+
 export async function GET() {
   const supabase = await supabaseServer();
   
@@ -111,15 +136,27 @@ export async function POST(request) {
     lastActivity: formatLastActivity(data.last_activity),
   };
 
-  const initialTaskTitle = `Call to ${newLead.name}`;
+  // Generate task title based on status using the new mapping
+  const normalizedStatus = normalizeStatus(newLead.status || "New");
+  const initialTaskTitle = normalizedStatus && taskTitles[normalizedStatus]
+    ? taskTitles[normalizedStatus](newLead.name)
+    : `Contact ${newLead.name} for the first time`; // Default to "New" mapping
+  
+  const taskInsertData = {
+    lead_id: newLead.id,
+    title: initialTaskTitle,
+    type: "Call",
+    status: "Pending",
+  };
+  
+  // Set sales_person_id from lead's assigned_to if available
+  if (data.assigned_to) {
+    taskInsertData.sales_person_id = data.assigned_to;
+  }
+  
   await supabase
     .from("tasks_table")
-    .insert({
-      lead_id: newLead.id,
-      title: initialTaskTitle,
-      type: "Call",
-      status: "Pending",
-    });
+    .insert(taskInsertData);
 
   return Response.json({ success: true, lead: newLead });
 }
@@ -170,30 +207,20 @@ export async function PATCH(request) {
   const updatedLead = data[0];
 
   if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
-    const s = String(status).toLowerCase();
+    // Generate task title based on status using the new mapping
+    const normalizedStatus = normalizeStatus(status);
     let title = `Task for ${leadName}`;
     let type = "Follow-Up";
-    if (s === "new") {
-      title = `Call to ${leadName}`;
-      type = "Call";
-    } else if (s === "contacted") {
-      title = `Follow-up to ${leadName}`;
-      type = "Follow-Up";
-    } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
-      title = `Follow-up to ${leadName}`;
-      type = "Follow-Up";
-    } else if (s === "qualified") {
-      title = `Qualification call with ${leadName}`;
-      type = "Call";
-    } else if (s === "proposal") {
-      title = `Prepare proposal for ${leadName}`;
-      type = "Proposal";
-    } else if (s === "won") {
-      title = `Closure with ${leadName}`;
-      type = "Meeting";
-    } else if (s === "no response" || s === "no_response") {
-      title = `Re-attempt contact: ${leadName}`;
-      type = "Call";
+    
+    if (normalizedStatus && taskTitles[normalizedStatus]) {
+      title = taskTitles[normalizedStatus](leadName);
+      // Set type based on status
+      if (normalizedStatus === "New") type = "Call";
+      else if (normalizedStatus === "Contacted") type = "Follow-Up";
+      else if (normalizedStatus === "Demo") type = "Follow-Up";
+      else if (normalizedStatus === "Proposal") type = "Proposal";
+      else if (normalizedStatus === "Follow-Up") type = "Follow-Up";
+      else if (normalizedStatus === "Won") type = "Meeting";
     }
 
     await supabase

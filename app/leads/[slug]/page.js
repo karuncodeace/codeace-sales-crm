@@ -487,15 +487,15 @@ export default function LeadDetailPage() {
         recipientEmail: "",
         recipientName: "",
     });
-    const [copiedEmail, setCopiedEmail] = useState(false);
-    const [showActionsMenu, setShowActionsMenu] = useState(false);
+ 
     const [isEditScoreModalOpen, setIsEditScoreModalOpen] = useState(false);
 
     const tabs = [
         { id: "overview", label: "Overview" },
-        { id: "activity", label: "Activity" },
         { id: "tasks", label: "Tasks" },
+        { id: "activity", label: "Activity" },
         { id: "notes", label: "Notes" },
+        { id : "objections", label: "Objections" },
 
     ];
 
@@ -564,8 +564,7 @@ export default function LeadDetailPage() {
         );
     }
 
-    const priorityStyle = priorityStyles[lead.priority] || priorityStyles.Warm;
-    const statusStyle = statusStyles[lead.status] || statusStyles.New;
+
 
     const handlePriorityUpdate = async (newPriority) => {
         if (!leadId) return;
@@ -603,134 +602,18 @@ export default function LeadDetailPage() {
         }
     };
 
-    // Helper functions for formatting dates in Asia/Calcutta timezone
-    const formatToCalcuttaTime = (dateString) => {
-        if (!dateString) return "—";
-        try {
-            const date = new Date(dateString);
-            const options = {
-                timeZone: 'Asia/Calcutta',
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            };
-            return date.toLocaleString('en-IN', options);
-        } catch (error) {
-            return dateString;
-        }
-    };
+    
 
-    const formatRelativeTime = (dateString) => {
-        if (!dateString) return "—";
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffTime = Math.abs(now - date);
-        const diffMins = Math.floor(diffTime / (1000 * 60));
-        const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        const timeOptions = {
-            timeZone: 'Asia/Calcutta',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        };
-
-        if (diffMins < 60) {
-            return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
-        } else if (diffHours < 24) {
-            return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-        } else if (diffDays === 1) {
-            return `Yesterday, ${date.toLocaleTimeString('en-IN', timeOptions)}`;
-        } else if (diffDays < 7) {
-            return `${diffDays} days ago`;
-        } else {
-            const dateOptions = {
-                timeZone: 'Asia/Calcutta',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            };
-            return date.toLocaleDateString('en-IN', dateOptions);
-        }
-    };
-
-    const formatTaskDueDate = (dateStr) => {
-        if (!dateStr) return "No due date";
-        const date = new Date(dateStr);
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-        const timeOptions = {
-            timeZone: 'Asia/Calcutta',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        };
-
-        if (dateOnly.getTime() === today.getTime()) {
-            return `Today, ${date.toLocaleTimeString('en-IN', timeOptions)}`;
-        }
-        if (dateOnly.getTime() === tomorrow.getTime()) {
-            return `Tomorrow, ${date.toLocaleTimeString('en-IN', timeOptions)}`;
-        }
-        if (dateOnly < today) return "Overdue";
-        
-        const dateOptions = {
-            timeZone: 'Asia/Calcutta',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        };
-        return date.toLocaleString('en-IN', dateOptions);
-    };
+    
 
     // Helper to get due_date from task (supporting both due_date and due_datetime for backward compatibility)
     const getTaskDueDate = (task) => {
         return task.due_date || task.due_datetime;
     };
 
-    // Get activity icon and color based on type
-    const getActivityIcon = (type) => {
-        const icons = {
-            call: { icon: Phone, bg: theme === "dark" ? "bg-blue-900/40" : "bg-blue-100", color: theme === "dark" ? "text-blue-400" : "text-blue-600" },
-            email: { icon: Mail, bg: theme === "dark" ? "bg-green-900/40" : "bg-green-100", color: theme === "dark" ? "text-green-400" : "text-green-600" },
-            note: { icon: FileText, bg: theme === "dark" ? "bg-purple-900/40" : "bg-purple-100", color: theme === "dark" ? "text-purple-400" : "text-purple-600" },
-            status: { icon: TrendingUp, bg: theme === "dark" ? "bg-orange-900/40" : "bg-orange-100", color: theme === "dark" ? "text-orange-400" : "text-orange-600" },
-            meeting: { icon: Calendar, bg: theme === "dark" ? "bg-indigo-900/40" : "bg-indigo-100", color: theme === "dark" ? "text-indigo-400" : "text-indigo-600" },
-        };
-        return icons[type] || icons.note;
-    };
+   
 
-    const getActivityTitle = (activity) => {
-        if (activity.activity) return activity.activity;
-        const titles = {
-            call: "Phone call",
-            email: "Email sent",
-            note: "Note added",
-            status: "Status changed",
-            meeting: "Meeting",
-        };
-        return titles[activity.type] || "Activity";
-    };
-
-    const getPriorityStyle = (priority) => {
-        const styles = {
-            High: theme === "dark" ? "bg-yellow-900/40 text-yellow-400" : "bg-yellow-100 text-yellow-700",
-            Medium: theme === "dark" ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700",
-            Low: theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600",
-        };
-        return styles[priority] || styles.Medium;
-    };
-
+   
     const typeIcons = {
         Call: Phone,
         Email: Mail,

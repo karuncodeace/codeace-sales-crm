@@ -20,6 +20,31 @@ const fetchLeads = async () => {
   return res.json();
 };
 
+// Task title mapping based on lead status
+const taskTitles = {
+  "New":        (name) => `Contact ${name} for the first time`,
+  "Contacted":  (name) => `Qualify the needs of ${name}`,
+  "Demo":       (name) => `Follow up with ${name} after the demo`,
+  "Proposal":   (name) => `Discuss proposal details with ${name}`,
+  "Follow-Up":  (name) => `Follow up with ${name} for decision update`,
+  "Won":        (name) => `Begin onboarding process for ${name}`,
+};
+
+// Helper function to normalize status to match taskTitles keys
+function normalizeStatus(status) {
+  if (!status) return null;
+  const s = String(status).toLowerCase().trim();
+  
+  if (s === "new") return "New";
+  if (s === "contacted") return "Contacted";
+  if (s === "demo") return "Demo";
+  if (s === "proposal") return "Proposal";
+  if (s === "follow-up" || s === "follow_up" || s === "follow up") return "Follow-Up";
+  if (s === "won") return "Won";
+  
+  return null;
+}
+
 
 const statusStyles = {
   New: {
@@ -91,6 +116,8 @@ export default function LeadsTable() {
     recipientName: "",
   });
   const [copiedEmailId, setCopiedEmailId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [advancedFilters, setAdvancedFilters] = useState({
     source: "",
     status: "",
@@ -131,11 +158,11 @@ export default function LeadsTable() {
     () => [
       { id: "New", name: "New", style: "border-l-4 border-[#3B82F6]" },
       { id: "Contacted", name: "Contacted", style: "border-l-4 border-[#10B981]" },
-      { id: "Follow-Up", name: "Follow-Up", style: "border-l-4 border-[#EAB308]" },
-      { id: "Qualified", name: "Qualified", style: "border-l-4 border-[#F97316]" },
+      { id: "Demo", name: "Demo", style: "border-l-4 border-[#EAB308]" },
       { id: "Proposal", name: "Proposal", style: "border-l-4 border-[#8B5CF6]" },
+      { id: "Qualified", name: "Qualified", style: "border-l-4 border-[#F97316]" },
+      { id: "Follow-Up", name: "Follow-Up", style: "border-l-4 border-[#0EA5E9]" },
       { id: "Won", name: "Won", style: "border-l-4 border-[#22C55E]" },
-      { id: "No Response", name: "No Response", style: "border-l-4 border-[#9CA3AF]" },
     ],
     []
   );
@@ -198,6 +225,17 @@ export default function LeadsTable() {
 
     return result;
   }, [leadData, searchTerm, advancedFilters]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, advancedFilters]);
 
   const groupedLeads = useMemo(() => {
     return kanbanStatuses.reduce((acc, status) => {
@@ -284,17 +322,24 @@ export default function LeadsTable() {
 
   // Get task title and type based on status
   const getTaskDetailsForStatus = (status, leadName) => {
-    const statusLower = status?.toLowerCase();
-    if (statusLower === "contacted" || statusLower === "follow-up") {
-      return { title: `Follow Up with ${leadName}`, type: "Follow Up" };
+    const normalizedStatus = normalizeStatus(status);
+    
+    if (!normalizedStatus || !taskTitles[normalizedStatus]) {
+      return null; // No task update for unmapped statuses
     }
-    if (statusLower === "proposal") {
-      return { title: "Follow Up", type: "Follow Up" };
-    }
-    if (statusLower === "qualified") {
-      return { title: "Schedule Meeting", type: "Meeting" };
-    }
-    return null; // No task update for other statuses
+    
+    const title = taskTitles[normalizedStatus](leadName);
+    
+    // Set type based on status
+    let type = "Follow-Up";
+    if (normalizedStatus === "New") type = "Call";
+    else if (normalizedStatus === "Contacted") type = "Follow-Up";
+    else if (normalizedStatus === "Demo") type = "Follow-Up";
+    else if (normalizedStatus === "Proposal") type = "Proposal";
+    else if (normalizedStatus === "Follow-Up") type = "Follow-Up";
+    else if (normalizedStatus === "Won") type = "Meeting";
+    
+    return { title, type };
   };
 
   // Confirm status change with comment
@@ -657,7 +702,7 @@ export default function LeadsTable() {
                 </thead>
 
                 <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
-                  {filteredLeads.length === 0 ? (
+                  {leadData.length === 0 ? (
                    <tr className="h-[600px]">
                    <td colSpan={11} className="px-6 text-center">
                      <div className="flex flex-col items-center justify-center h-full">
@@ -675,12 +720,18 @@ export default function LeadsTable() {
                      </div>
                    </td>
                  </tr>
-                 
-                  
-                  
-                  
+                  ) : filteredLeads.length === 0 ? (
+                    <tr className="h-[600px]">
+                      <td colSpan={11} className="px-6 text-center">
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                            No leads found
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : (
-                    filteredLeads.map((lead) => (
+                    paginatedLeads.map((lead) => (
                       <tr key={lead.id}  className={`${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}>
                         <td className="size-px whitespace-nowrap">
                           <div className="ps-6 py-2">
@@ -826,8 +877,8 @@ export default function LeadsTable() {
                                 type="button"
                                 aria-label="Open actions menu"
                                 onClick={() => handleToggleActions(lead.id)}
-                                className={`inline-flex items-center justify-center rounded-full border p-2 text-gray-500 hover:text-gray-900  focus:outline-hidden 
-                                ${theme === "dark" ? "border-gray-700 text-gray-400" : "border-gray-200 hover:border-gray-300 text-gray-700 "}
+                                className={`inline-flex items-center justify-center rounded-full border p-2 text-gray-500   focus:outline-hidden 
+                                ${theme === "dark" ? "border-gray-700 text-gray-400 " : "border-gray-200 hover:border-gray-300 text-gray-700 hover:bg-gray-100"}
                                 `}
                               >
                                 <svg
@@ -931,13 +982,17 @@ export default function LeadsTable() {
             {/* Footer */}
             <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
               <div className="inline-flex items-center gap-x-2">
-                <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>Showing:10 of 20</p>
+                <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
+                  Showing: {filteredLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredLeads.length)} of {filteredLeads.length}
+                </p>
               </div>
 
               <div>
                 <div className="inline-flex gap-x-2">
                   <button
                     type="button"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
                     className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                       ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                       : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
@@ -962,6 +1017,8 @@ export default function LeadsTable() {
 
                   <button
                     type="button"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
                     className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg shadow-2xs focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${theme === "dark"
                       ? "bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
                       : "bg-white text-gray-800 border border-gray-200 hover:bg-gray-100"
@@ -992,7 +1049,7 @@ export default function LeadsTable() {
           <div className={`px-6 py-6 overflow-x-auto divide-y-3 h-[calc(100vh-190px)] 
           ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}
           `}>
-            <div className="flex items-start gap-4 ">
+            <div className="flex items-start gap-4 h-full">
               {kanbanStatuses.map((status) => {
                 const statusMeta =
                   statusDefinitions.find((definition) => definition.id === status) ||
@@ -1001,9 +1058,9 @@ export default function LeadsTable() {
                 return (
                   <div
                     key={status}
-                    className={`flex min-w-[350px] flex-col r ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
-                      ? "ring-1  shadow-sm scale-[1.01]"
-                      : "ring-1 ring-transparent"
+                    className={`flex min-w-[350px] flex-col h-[1200px] ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
+                      ? "  shadow-sm scale-[1.01]"
+                      : " ring-transparent"
                       }`}
                     onDragOver={handleDragOver}
                     onDragEnter={() => handleDragEnter(status)}
@@ -1025,7 +1082,7 @@ export default function LeadsTable() {
                       
                     </div>
                     <div
-                      className="mt-4 space-y-3 min-h-[100px]"
+                      className="mt-4 space-y-3 flex-1 min-h-[400px] h-full overflow-y-auto"
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(status)}
                     >

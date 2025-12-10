@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useTheme } from "../context/themeContext";
-import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered } from "lucide-react";
+import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, X, ChevronRight, ChevronLeft, FileText, Check } from "lucide-react";
 import jsPDF from "jspdf";
 import { createClient } from "@supabase/supabase-js";
 
@@ -200,7 +200,84 @@ export default function ProposalPage() {
     creatorDesignation: "",
   });
 
-  const [activeTab, setActiveTab] = useState("Details");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [pdfList, setPdfList] = useState([]);
+  const [loadingPdfs, setLoadingPdfs] = useState(true);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
+  const defaultMilestones = useMemo(
+    () => [
+      { title: "Advance Payment on Contract Signing", amount: "" },
+      { title: "Progress Payment at 50% Completion", amount: "" },
+      { title: "Final Settlement upon Delivery", amount: "" },
+    ],
+    []
+  );
+
+  const steps = ["Details", "Scope of Work", "Pricing Summary", "Timeline Phases", "Milestones", "Additional Notes", "Preview"];
+
+  // Supabase client (browser) - Initialize before useEffect
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const supabase = useMemo(() => {
+    if (!supabaseUrl || !supabaseKey) return null;
+    return createClient(supabaseUrl, supabaseKey);
+  }, [supabaseUrl, supabaseKey]);
+
+  // Fetch PDFs from Supabase
+  useEffect(() => {
+    const fetchPdfs = async () => {
+      if (!supabase) {
+        setLoadingPdfs(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase.storage
+          .from("proposal_pdf")
+          .list("proposals", {
+            limit: 100,
+            offset: 0,
+            sortBy: { column: "created_at", order: "desc" },
+          });
+
+        if (error) {
+          console.error("Error fetching PDFs:", error);
+          setPdfList([]);
+        } else {
+          const pdfs = (data || [])
+            .filter((file) => file.name.endsWith(".pdf"))
+            .map((file) => ({
+              name: file.name,
+              created_at: file.created_at,
+              id: file.id,
+            }));
+          setPdfList(pdfs);
+        }
+      } catch (err) {
+        console.error("Error fetching PDFs:", err);
+        setPdfList([]);
+      } finally {
+        setLoadingPdfs(false);
+      }
+    };
+
+    fetchPdfs();
+  }, [supabase]);
+
+  // Ensure default milestones are present when entering milestones step
+  useEffect(() => {
+    if (currentStep === 4 && (!formData.milestones || formData.milestones.length === 0)) {
+      setFormData((prev) => ({ ...prev, milestones: defaultMilestones }));
+    }
+  }, [currentStep, formData.milestones, defaultMilestones]);
+
+  const getPdfUrl = (fileName) => {
+    if (!supabase) return null;
+    const { data } = supabase.storage
+      .from("proposal_pdf")
+      .getPublicUrl(`proposals/${fileName}`);
+    return data?.publicUrl || null;
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -273,6 +350,24 @@ export default function ProposalPage() {
     setFormData((prev) => ({ ...prev, timelinePhases: rows.length ? rows : [{ week: "", phase: "" }] }));
   };
 
+  const updateMilestoneAmount = (idx, value) => {
+    const total = calculateSubtotal();
+    const cleaned = formatCurrencyInput(value);
+    const amountNum = parseCurrencyValue(cleaned);
+
+    const currentMilestones = [...(formData.milestones || [])];
+    const othersSum = currentMilestones.reduce((sum, m, i) => {
+      if (i === idx) return sum;
+      return sum + parseCurrencyValue(m.amount || 0);
+    }, 0);
+
+    const remaining = Math.max(total - othersSum, 0);
+    const finalAmount = Math.min(amountNum, remaining);
+
+    currentMilestones[idx] = { ...currentMilestones[idx], amount: finalAmount ? String(finalAmount) : "" };
+    setFormData((prev) => ({ ...prev, milestones: currentMilestones }));
+  };
+
   const isDetailsValid = () => {
     const f = formData;
     return f.mainTitle && f.proposalDate && f.subTitle && f.technology && f.clientName && f.clientOrganization && f.organizationCategory;
@@ -288,14 +383,6 @@ export default function ProposalPage() {
   };
 
   const isFormValid = () => isDetailsValid() && isTimelineValid() && isConclusionValid();
-
-  // Supabase client (browser)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  const supabase = useMemo(() => {
-    if (!supabaseUrl || !supabaseKey) return null;
-    return createClient(supabaseUrl, supabaseKey);
-  }, [supabaseUrl, supabaseKey]);
 
   const addHeader = (doc, pageWidth, headerHeight) => {
     try {
@@ -484,7 +571,7 @@ export default function ProposalPage() {
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 15;
     const headerHeight = 20; // Changed to 20mm as requested
-    const footerHeight = 20;
+    const footerHeight = 15;
     const contentStartY = headerHeight + 10;
     const contentEndY = pageHeight - footerHeight - 10;
     const maxContentWidth = pageWidth - 2 * marginX;
@@ -666,7 +753,7 @@ export default function ProposalPage() {
           lines.forEach((line) => {
             y = checkNewPage(y, 6);
             doc.text(line, marginX, y);
-            y += 6;
+            y += 2.5;
           });
         }
       } else {
@@ -942,19 +1029,16 @@ export default function ProposalPage() {
     y += 18;
 
     if (formData.milestones?.length) {
-      const colMilestone = 40;
       const colAmount = 50;
-      const colCondition = maxContentWidth - colMilestone - colAmount; // remaining space
+      const colMilestone = maxContentWidth - colAmount; // two columns: Milestone, Amount
 
       // Header
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       drawCell(marginX, y, colMilestone, 8);
-      drawCell(marginX + colMilestone, y, colCondition, 8);
       drawCell(pageWidth - marginX - colAmount, y, colAmount, 8);
 
       doc.text("Milestone", marginX + 4, y + 5);
-      doc.text("Condition", marginX + colMilestone + 4, y + 5);
       doc.text("Amount", pageWidth - marginX - 6, y + 5, { align: "right" });
 
       y += 8;
@@ -963,25 +1047,17 @@ export default function ProposalPage() {
       doc.setFontSize(10);
 
       formData.milestones.forEach((m, i) => {
-        const condition =
-          i === 0
-            ? "Due before project initiation"
-            : i === 1
-              ? "After 50% project completion"
-              : "On final delivery & acceptance";
-
-        const conditionLines = doc.splitTextToSize(condition, colCondition - 8);
-        const rowHeight = Math.max(10, conditionLines.length * 5 + 4);
+        const milestoneText = m.title || `Milestone ${i + 1}`;
+        const descLines = doc.splitTextToSize(milestoneText, colMilestone - 8);
+        const rowHeight = Math.max(10, descLines.length * 5 + 4);
 
         y = checkNewPage(y, rowHeight);
 
         drawCell(marginX, y, colMilestone, rowHeight);
-        drawCell(marginX + colMilestone, y, colCondition, rowHeight);
         drawCell(pageWidth - marginX - colAmount, y, colAmount, rowHeight);
 
-        doc.text(m.title || `Milestone ${i + 1}`, marginX + 4, y + 7);
-        conditionLines.forEach((line, lineIdx) => {
-          doc.text(line, marginX + colMilestone + 4, y + 7 + lineIdx * 5);
+        descLines.forEach((line, lineIdx) => {
+          doc.text(line, marginX + 4, y + 7 + lineIdx * 5);
         });
 
         const amt = parseCurrencyValue(m.amount || 0);
@@ -989,12 +1065,7 @@ export default function ProposalPage() {
           minimumFractionDigits: 0,
           maximumFractionDigits: 2,
         })}`;
-        doc.text(
-          amountText,
-          pageWidth - marginX - 6,
-          y + 7,
-          { align: "right" }
-        );
+        doc.text(amountText, pageWidth - marginX - 6, y + 7, { align: "right" });
 
         y += rowHeight;
       });
@@ -1036,7 +1107,7 @@ export default function ProposalPage() {
         y = checkNewPage(y, 8);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.text(`Week ${phase.week || ""}: ${phase.phase || ""}`, marginX + 5, y);
+        doc.text(`${phase.week || ""}: ${phase.phase || ""}`, marginX + 5, y);
         y += 6;
       });
     }
@@ -1157,6 +1228,7 @@ export default function ProposalPage() {
     // Custom conclusion notes if provided
     if (formData.conclusionNotes) {
       y = checkNewPage(y, 10);
+      y += 10; // Add gap above additional notes
       let customNotesItems = parseHtmlToText(formData.conclusionNotes);
       const hasContent =
         customNotesItems &&
@@ -1348,13 +1420,13 @@ export default function ProposalPage() {
 
     // Closing
     y = checkNewPage(y, 20);
+    y += 10; // Add gap above Warm Regards
     doc.text("Warm Regards,", marginX, y);
     y += 5;
     if (formData.creatorName) {
       doc.setFont("helvetica", "bold");
       doc.text(formData.creatorName, marginX, y);
       y += 5;
-      
     }
     doc.setFont("helvetica", "normal");
     if (formData.creatorDesignation) {
@@ -1369,7 +1441,7 @@ export default function ProposalPage() {
     y += 5;
 
     // Save PDF locally and upload to Supabase if available
-    const fileName = `${(formData.mainTitle || "proposal").replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate || ""}.pdf`;
+    const fileName = `${(formData.clientOrganization || "proposal").replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate || ""}.pdf`;
     const pdfBlob = doc.output("blob");
 
     // Upload to Supabase bucket if keys are configured
@@ -1393,272 +1465,1080 @@ export default function ProposalPage() {
 
     // Trigger browser download
     doc.save(fileName);
+    
+    // Refresh PDF list after upload
+    if (supabase) {
+      const { data } = await supabase.storage
+        .from("proposal_pdf")
+        .list("proposals", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+      if (data) {
+        const pdfs = (data || [])
+          .filter((file) => file.name.endsWith(".pdf"))
+          .map((file) => ({
+            name: file.name,
+            created_at: file.created_at,
+            id: file.id,
+          }));
+        setPdfList(pdfs);
+      }
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+      if (currentStep === steps.length - 2) {
+        // Generate preview PDF when moving to preview step (step 5)
+        generatePreviewPDF();
+      }
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const generatePreviewPDF = async () => {
+    // Use the same generatePDF logic but create a blob URL instead of downloading
+    // We'll create a temporary version that generates the full PDF
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 15;
+    const headerHeight = 20;
+    const footerHeight = 13;
+    const contentStartY = headerHeight + 10;
+    const contentEndY = pageHeight - footerHeight - 10; 
+    const maxContentWidth = pageWidth - 2 * marginX;
+
+    const addPage = () => {
+      doc.addPage();
+      addFooter(doc, pageWidth, pageHeight, footerHeight);
+      addWatermark(doc, pageWidth, pageHeight);
+      return contentStartY;
+    };
+
+    const checkNewPage = (currentY, requiredSpace = 10) => {
+      if (currentY + requiredSpace > contentEndY) {
+        return addPage();
+      }
+      return currentY;
+    };
+
+    const drawCell = (x, y, width, height) => {
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(x, y, width, height);
+    };
+
+    // PAGE 1: Cover Page (same as generatePDF)
+    addHeader(doc, pageWidth, headerHeight);
+    addFooter(doc, pageWidth, pageHeight, footerHeight);
+    addWatermark(doc, pageWidth, pageHeight);
+
+    let y = contentStartY;
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    const mainTitle = formData.mainTitle || "";
+    const titleLines = doc.splitTextToSize(mainTitle, maxContentWidth);
+    titleLines.forEach((line, idx) => {
+      doc.text(line, pageWidth / 2, y + (idx * 6), { align: "center" });
+    });
+    y += titleLines.length * 6 + 12;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    y = checkNewPage(y, 8);
+    doc.text(`Date : ${formatDate(formData.proposalDate)}`, marginX, y);
+    y += 8;
+
+    y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("To:", marginX, y);
+    y += 5;
+    doc.text(formData.clientOrganization || "", marginX, y);
+    y += 5;
+    if (formData.clientPhone) {
+      doc.text(formData.clientPhone, marginX, y);
+      y += 5;
+    }
+    y += 5;
+
+    y = checkNewPage(y, 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("From:", marginX, y);
+    y += 5;
+    doc.text("CodeAce IT Solutions LLP", marginX, y);
+    y += 5;
+    doc.text("Sahya Building, Govt. Cyberpark,", marginX, y);
+    y += 5;
+    doc.text("Calicut, Kerala, India", marginX, y);
+    y += 5;
+
+    y = checkNewPage(y, 12);
+    y += 5;
+    const label = "Subject:";
+    const labelWidth = 16;
+    const lineHeight = 5;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(label, marginX, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const subjectText = formData.mainTitle || "";
+    const subjectLines = doc.splitTextToSize(subjectText, maxContentWidth - labelWidth);
+    doc.text(subjectLines[0] || "", marginX + labelWidth, y);
+    for (let i = 1; i < subjectLines.length; i++) {
+      doc.text(subjectLines[i], marginX + labelWidth, y + i * lineHeight);
+    }
+    y += subjectLines.length * lineHeight + 6;
+
+    y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Dear Sir,", marginX, y);
+    y += 8;
+
+    y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const para1 = "We appreciate the opportunity to partner with you in digitizing and streamlining Medical Care operations.";
+    const para1Lines = doc.splitTextToSize(para1, maxContentWidth);
+    para1Lines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+    y += 3;
+
+    y = checkNewPage(y, 15);
+    const para2 = `Based on the detailed RFP requirements, we are pleased to present a comprehensive quotation and technical proposal for the development and implementation of a custom-built solution using the ${formData.technology || "Frappe ERPNext Framework"}. Leveraging its modular architecture, extensive customization capabilities, and proven reliability, our team will design a system tailored specifically to your organizational workflows. The objective is to streamline operations, enhance data visibility, support cross-department collaboration, and create a scalable digital ecosystem that can evolve with your future business needs.`;
+    const para2Lines = doc.splitTextToSize(para2, maxContentWidth);
+    para2Lines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+
+    // PAGE 2: Scope of Work
+    y = addPage();
+    y -= 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Scope Of Work", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    if (formData.scopeDescription) {
+      let scopeItems = parseHtmlToText(formData.scopeDescription);
+      const hasContent = scopeItems && scopeItems.some((i) => (i.text || "").replace(/[\s\u00A0]+/g, "").length > 0);
+      if (!hasContent) {
+        const plain = stripHtml(formData.scopeDescription).replace(/\u00A0/g, " ");
+        if (plain) {
+          scopeItems = [{ text: plain, isListItem: false, isBold: false }];
+        }
+      }
+      if (scopeItems && scopeItems.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        scopeItems.forEach((item) => {
+          if (item.isBreak) {
+            y += 5;
+            return;
+          }
+          const text = item.text || "";
+          if (text.trim()) {
+            doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+            const lines = doc.splitTextToSize(text, maxContentWidth - (item.isListItem ? 8 : 0));
+            lines.forEach((line) => {
+              y = checkNewPage(y, 5);
+              const xPos = item.isListItem ? marginX + 8 : marginX;
+              doc.text(line, xPos, y);
+              y += 5;
+            });
+          }
+        });
+      }
+    }
+
+    // PAGE 3: Pricing Summary
+    y = addPage();
+    y -= 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Pricing Summary", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    if (formData.pricingRows?.length) {
+      const colNo = 15;
+      const colAmt = 50;
+      const colDesc = maxContentWidth - colNo - colAmt;
+      const rowPadding = 4;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      drawCell(marginX, y, colNo, 8);
+      drawCell(marginX + colNo, y, colDesc, 8);
+      drawCell(pageWidth - marginX - colAmt, y, colAmt, 8);
+      doc.text("No", marginX + 4, y + 5);
+      doc.text("Description", marginX + colNo + 4, y + 5);
+      doc.text("Amount", pageWidth - marginX - colAmt + colAmt - 6, y + 5, { align: "right" });
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      let total = 0;
+
+      formData.pricingRows.forEach((row, idx) => {
+        const descLines = doc.splitTextToSize(row.description || "", colDesc - 8);
+        const rowHeight = Math.max(10, descLines.length * 5 + rowPadding);
+        y = checkNewPage(y, rowHeight);
+        drawCell(marginX, y, colNo, rowHeight);
+        drawCell(marginX + colNo, y, colDesc, rowHeight);
+        drawCell(pageWidth - marginX - colAmt, y, colAmt, rowHeight);
+        doc.text(String(idx + 1), marginX + 4, y + 7);
+        descLines.forEach((line, lineIdx) => {
+          doc.text(line, marginX + colNo + 4, y + 7 + lineIdx * 5);
+        });
+        const amt = parseCurrencyValue(row.amount || 0);
+        total += amt;
+        const amountText = `INR ${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        doc.text(amountText, pageWidth - marginX - 6, y + 7, { align: "right" });
+        y += rowHeight;
+      });
+
+      y = checkNewPage(y, 12);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      drawCell(marginX, y, colNo + colDesc, 10);
+      drawCell(pageWidth - marginX - colAmt, y, colAmt, 10);
+      doc.text("Total", marginX + colNo + 4, y + 7);
+      doc.text(`INR ${total.toLocaleString("en-IN")}`, pageWidth - marginX - 6, y + 7, { align: "right" });
+      y += 16;
+    }
+
+    // Payment Terms Section
+    y = checkNewPage(y, 20);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Payment Terms", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    if (formData.milestones?.length) {
+      const colAmount = 50;
+      const colMilestone = maxContentWidth - colAmount; // two columns: Milestone, Amount
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      drawCell(marginX, y, colMilestone, 8);
+      drawCell(pageWidth - marginX - colAmount, y, colAmount, 8);
+      doc.text("Milestone", marginX + 4, y + 5);
+      doc.text("Amount", pageWidth - marginX - 6, y + 5, { align: "right" });
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+
+      formData.milestones.forEach((m, i) => {
+        const milestoneText = m.title || `Milestone ${i + 1}`;
+        const descLines = doc.splitTextToSize(milestoneText, colMilestone - 8);
+        const rowHeight = Math.max(10, descLines.length * 5 + 4);
+        y = checkNewPage(y, rowHeight);
+        drawCell(marginX, y, colMilestone, rowHeight);
+        drawCell(pageWidth - marginX - colAmount, y, colAmount, rowHeight);
+        descLines.forEach((line, lineIdx) => {
+          doc.text(line, marginX + 4, y + 7 + lineIdx * 5);
+        });
+        const amt = parseCurrencyValue(m.amount || 0);
+        const amountText = `INR ${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        doc.text(amountText, pageWidth - marginX - 6, y + 7, { align: "right" });
+        y += rowHeight;
+      });
+      y += 12;
+    }
+
+    // Project Timeline Section
+    y = checkNewPage(y, 20);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Project Timeline", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const timelineText = `Total Duration: ${formData.timelineWeeks || ""} Weeks`;
+    doc.text(timelineText, marginX, y);
+    y += 5;
+    if (formData.timelineMonths) {
+      doc.text(`Approximately ${formData.timelineMonths} Months`, marginX, y);
+      y += 8;
+    }
+
+    if (formData.timelinePhases && formData.timelinePhases.length > 0) {
+      y = checkNewPage(y, 10);
+      formData.timelinePhases.forEach((phase, idx) => {
+        y = checkNewPage(y, 8);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(`Week ${phase.week || ""}: ${phase.phase || ""}`, marginX + 5, y);
+        y += 6;
+      });
+    }
+
+    // PAGE 4: SRS/Conclusion
+    y = addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Software Requirements Specification (SRS)", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const srsIntro = "A comprehensive SRS document will be shared before development begins. This will serve as the legal and binding agreement. It will include:";
+    const srsIntroLines = doc.splitTextToSize(srsIntro, maxContentWidth);
+    srsIntroLines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+    y += 5;
+
+    const srsItems = [
+      "Project Objective - Summary of the Medical Care purpose and business impact",
+      "About the Client - Business overview and relevant background",
+      "Client Requirements - Functional and non-functional needs",
+      "Scope of Work - Features, configurations, and limitations",
+      "Expected Integrations - External APIs or third-party tools",
+      "Out of Scope Items - Clearly defined exclusions",
+      "Project Deliverables - Modules, codebase, hosting, training, etc.",
+      "Assumptions - Infrastructure, inputs, availability, etc.",
+      "Resources - Team members involved in execution",
+      "Timelines & Milestones - Delivery plan with date"
+    ];
+
+    srsItems.forEach((item, idx) => {
+      y = checkNewPage(y, 8);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const itemText = `${idx + 1}. ${item}`;
+      const itemLines = doc.splitTextToSize(itemText, maxContentWidth - 5);
+      itemLines.forEach((line) => {
+        y = checkNewPage(y, 5);
+        doc.text(line, marginX + 5, y);
+        y += 5;
+      });
+      y += 3;
+    });
+
+    // Additional Notes Section
+    y = addPage();
+    y -= 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Additional Notes", marginX, y);
+    drawHorizontalGradientLine({
+      docInstance: doc,
+      x1: marginX,
+      x2: pageWidth - marginX,
+      y: y + 6,
+      height: 3
+    });
+    y += 18;
+
+    y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const notesItems = [
+      "The quotation is valid for 15 days from the date of issue.",
+      "Annual hosting and technical support charges for Year 2 will be quoted separately.",
+      "6 months of post-implementation service support (bug fixes and minor updates) is included in this package. Remaining timeline details will be shared after project confirmation."
+    ];
+
+    notesItems.forEach((note) => {
+      y = checkNewPage(y, 8);
+      doc.setFont("helvetica", "normal");
+      const bulletWidth = doc.getTextWidth("• ");
+      const noteLines = doc.splitTextToSize(note, maxContentWidth - 5 - bulletWidth);
+      noteLines.forEach((line, lineIdx) => {
+        y = checkNewPage(y, 5);
+        const bulletX = marginX + 3;
+        const textX = marginX + 3 + bulletWidth;
+        if (lineIdx === 0) {
+          doc.text("• ", bulletX, y);
+        }
+        const lineX = lineIdx === 0 ? textX : marginX + 8;
+        doc.text(line, lineX, y);
+        y += 5;
+      });
+      y += 3;
+    });
+
+    // Conclusion paragraph
+    y = checkNewPage(y, 15);
+    const conclusionText = "We look forward to delivering a high-performing ERP, CRM & HRMS that aligns with your operational goals. Please don't hesitate to get in touch for any clarification or customization in scope.";
+    const conclusionLines = doc.splitTextToSize(conclusionText, maxContentWidth);
+    conclusionLines.forEach((line) => {
+      y = checkNewPage(y, 5);
+      doc.text(line, marginX, y);
+      y += 5;
+    });
+
+    // Custom conclusion notes if provided
+    if (formData.conclusionNotes) {
+      y = checkNewPage(y, 10);
+      y += 3; // Add gap above additional notes
+      let customNotesItems = parseHtmlToText(formData.conclusionNotes);
+      const hasContent = customNotesItems && customNotesItems.some((i) => (i.text || "").replace(/[\s\u00A0]+/g, "").length > 0);
+      if (!hasContent) {
+        const plain = stripHtml(formData.conclusionNotes).replace(/\u00A0/g, " ");
+        if (plain) {
+          customNotesItems = [{ text: plain, isBold: false, isListItem: false }];
+        }
+      }
+      if (customNotesItems && customNotesItems.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        customNotesItems.forEach((item) => {
+          if (item.isBreak) {
+            y += 5;
+            return;
+          }
+          const text = item.text || "";
+          if (text.trim()) {
+            doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+            const lines = doc.splitTextToSize(text, maxContentWidth - (item.isListItem ? 8 : 0));
+            lines.forEach((line) => {
+              y = checkNewPage(y, 5);
+              const xPos = item.isListItem ? marginX + 8 : marginX;
+              doc.text(line, xPos, y);
+              y += 5;
+            });
+          }
+        });
+      }
+    }
+
+    // Closing
+    y = checkNewPage(y, 20);
+    y += 10; // Add gap above Warm Regards
+    doc.text("Warm Regards,", marginX, y);
+    y += 5;
+    if (formData.creatorName) {
+      doc.setFont("helvetica", "bold");
+      doc.text(formData.creatorName, marginX, y);
+      y += 5;
+    }
+    doc.setFont("helvetica", "normal");
+    if (formData.creatorDesignation) {
+      doc.text(formData.creatorDesignation, marginX, y);
+      y += 5;
+    }
+    doc.text("CodeAce IT Solutions LLP", marginX, y);
+    y += 5;
+    doc.setFontSize(8);
+    doc.text("(Issued with approval of the Founder)", marginX, y);
+
+    // Create blob URL for preview
+    const pdfBlob = doc.output("blob");
+    const url = URL.createObjectURL(pdfBlob);
+    setPreviewPdfUrl(url);
+  };
+
+  const handlePreview = () => {
+    if (previewPdfUrl) {
+      window.open(previewPdfUrl, '_blank');
+    }
+  };
+
+  const handleDownloadFromPreview = async () => {
+    await generatePDF();
+    setIsModalOpen(false);
+    setCurrentStep(0);
+    if (previewPdfUrl) {
+      URL.revokeObjectURL(previewPdfUrl);
+      setPreviewPdfUrl(null);
+    }
+  };
+
+  const canProceedToNext = () => {
+    if (currentStep === 0) return isDetailsValid();
+    if (currentStep === 1) return true; // Scope of Work is optional
+    if (currentStep === 2) return formData.pricingRows?.length > 0 && formData.pricingRows.some(r => r.description && r.amount);
+    if (currentStep === 3) return true; // Timeline Phases is optional
+    if (currentStep === 4) return true; // Milestones is optional
+    if (currentStep === 5) return true; // Additional Notes is optional
+    return true;
   };
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
       <div className="w-full mt-10 ">
-        <div className="mx-auto">
+        <div className="mx-auto ">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+                Proposals
+              </h1>
+              <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                Manage and create your proposals
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setIsModalOpen(true);
+                setCurrentStep(0);
+                setPreviewPdfUrl(null);
+              }}
+              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                isDark
+                  ? "bg-orange-600 hover:bg-orange-700 text-white"
+                  : "bg-orange-500 hover:bg-orange-600 text-white"
+              }`}
+            >
+              <Plus className="w-5 h-5" />
               Create Proposal
-            </h1>
-            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              Fill in the required fields and download your proposal as PDF
-            </p>
+            </button>
           </div>
 
-          {/* Form */}
-          <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"}`}>
+          {/* PDF List Section */}
+          <div className={`rounded-lg border ${isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"} mb-6`}>
             <div className="p-6">
-              <div className="flex gap-2 mb-6">
-                {[
-                  "Details",
-                  "Scope of Work",
-                  "Pricing Summary",
-                  "Milestone",
-                  "Timeline",
-                  "Conclusion",
-                ].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setActiveTab(t)}
-                    className={`px-3 py-2 text-sm font-medium rounded-md ${activeTab === t
-                        ? isDark
-                          ? "border-b-2 border-orange-500 text-white bg-orange-500/10"
-                          : "border-b-2 border-orange-500 text-black bg-orange-500/10"
-                        : isDark
-                          ? "text-gray-300 hover:bg-gray-800/50"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === "Details" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="space-y-6">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Main Title *</label>
-                      <input type="text" name="mainTitle" value={formData.mainTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Sub Title *</label>
-                      <input type="text" name="subTitle" value={formData.subTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Technology *</label>
-                      <input type="text" name="technology" value={formData.technology} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Name *</label>
-                      <input type="text" name="clientName" value={formData.clientName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Organization *</label>
-                      <input type="text" name="clientOrganization" value={formData.clientOrganization} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                  </div>
-                  <div className="space-y-6">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Proposal Date *</label>
-                      <input type="date" name="proposalDate" value={formData.proposalDate} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Phone</label>
-                      <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Organization Category *</label>
-                      <input type="text" name="organizationCategory" value={formData.organizationCategory} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                  </div>
+              <h2 className={`text-xl font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                Downloaded PDFs
+              </h2>
+              {loadingPdfs ? (
+                <div className={`text-center py-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  Loading PDFs...
                 </div>
-              )}
-
-              {activeTab === "Scope of Work" && (
-                <div className="space-y-3 mb-6">
-                  <CustomRichTextEditor
-                    isDark={isDark}
-                    value={formData.scopeDescription || ""}
-                    onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
-                    placeholder=""
-                  />
+              ) : pdfList.length === 0 ? (
+                <div className={`text-center py-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  No PDFs found. Create your first proposal!
                 </div>
-              )}
-
-              {activeTab === "Pricing Summary" && (
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Row</span>
-                    <button onClick={addPricingRow} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                          <th className="text-left px-2 py-2">No</th>
-                          <th className="text-left px-2 py-2">Description *</th>
-                          <th className="text-left px-2 py-2">Amount *</th>
-                          <th className="text-right px-2 py-2">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(formData.pricingRows || []).map((r, idx) => (
-                          <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                            <td className="px-2 py-2">{idx + 1}</td>
-                            <td className="px-2 py-2">
-                              <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                            </td>
-                            <td className="px-2 py-2">
-                              <div className="relative">
-                                <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
-                                <input type="text" value={r.amount || ""} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="0" />
-                              </div>
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex justify-end">
-                    <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>Total: ₹ {calculateSubtotal().toLocaleString("en-IN")}</div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "Milestone" && (
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Add Milestone</span>
-                    <button onClick={() => setFormData((prev) => ({ ...prev, milestones: [...(prev.milestones || []), { title: "", amount: "" }] }))} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                  </div>
-                  <div className="space-y-3">
-                    {(formData.milestones || []).map((m, idx) => (
-                      <div key={idx} className={`grid grid-cols-7 gap-3 ${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                        <div className="col-span-4">
-                          <input type="text" value={m.title} onChange={(e) => {
-                            const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData((prev) => ({ ...prev, milestones: arr }));
-                          }} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Milestone *" />
-                        </div>
-                        <div className="col-span-2">
-                          <div className="relative">
-                            <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
-                            <input type="text" value={m.amount || ""} onChange={(e) => {
-                              const cleaned = formatCurrencyInput(e.target.value);
-                              const arr = [...(formData.milestones || [])]; arr[idx] = { ...arr[idx], amount: cleaned }; setFormData((prev) => ({ ...prev, milestones: arr }));
-                            }} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Amount *" />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {pdfList.map((pdf) => {
+                    const pdfUrl = getPdfUrl(pdf.name);
+                    return (
+                      <div
+                        key={pdf.id}
+                        className={`p-4 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"} hover:shadow-lg transition-shadow`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <FileText className={`w-8 h-8 ${isDark ? "text-orange-500" : "text-orange-600"} flex-shrink-0 mt-1`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+                              {pdf.name.replace(/_/g, " ").replace(/\.pdf$/i, "")}
+                            </p>
+                            <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                              {pdf.created_at ? new Date(pdf.created_at).toLocaleDateString() : "Unknown date"}
+                            </p>
                           </div>
                         </div>
-                        <div className="col-span-1 flex justify-end">
-                          <button onClick={() => {
-                            const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [{ title: "", amount: "" }] }));
-                          }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
+                        {pdfUrl && (
+                          <div className="mt-3 flex gap-2">
+                            <a
+                              href={pdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                                isDark
+                                  ? "bg-gray-700 hover:bg-gray-600 text-white"
+                                  : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+                              }`}
+                            >
+                              View
+                            </a>
+                            <a
+                              href={pdfUrl}
+                              download
+                              className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                                isDark
+                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
+                                  : "bg-orange-500 hover:bg-orange-600 text-white"
+                              }`}
+                            >
+                              <Download className="w-4 h-4" />
+                              Download
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Modal */}
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+              <div className={`w-full max-w-[1400px] max-h-[90vh] rounded-lg ${isDark ? "bg-[#262626]" : "bg-white"} shadow-xl flex flex-col`}>
+                {/* Modal Header */}
+                <div className={`flex items-center justify-between p-6 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                  <h2 className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                    Create Proposal
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setCurrentStep(0);
+                      if (previewPdfUrl) {
+                        URL.revokeObjectURL(previewPdfUrl);
+                        setPreviewPdfUrl(null);
+                      }
+                    }}
+                    className={`p-2 rounded-lg ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-100 text-gray-600"}`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Stepper */}
+                <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                  <div className="flex items-center justify-between gap-4">
+                    {steps.map((step, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold flex-shrink-0 ${
+                              index <= currentStep
+                                ? isDark
+                                  ? "bg-orange-600 text-white"
+                                  : "bg-orange-500 text-white"
+                                : isDark
+                                  ? "bg-gray-700 text-gray-400"
+                                  : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {index < currentStep ? (
+                              <Check className="w-5 h-5" />
+                            ) : (
+                              index + 1
+                            )}
+                          </div>
+                          <span
+                            className={`text-sm font-medium whitespace-nowrap ${
+                              index <= currentStep
+                                ? isDark
+                                  ? "text-white"
+                                  : "text-gray-900"
+                                : isDark
+                                  ? "text-gray-400"
+                                  : "text-gray-600"
+                            }`}
+                          >
+                            {step}
+                          </span>
                         </div>
+                        {index < steps.length - 1 && (
+                          <div
+                            className={`h-0.5 w-8 flex-shrink-0 ${
+                              index < currentStep
+                                ? isDark
+                                  ? "bg-orange-600"
+                                  : "bg-orange-500"
+                                : isDark
+                                  ? "bg-gray-700"
+                                  : "bg-gray-200"
+                            }`}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {activeTab === "Timeline" && (
-                <div className="space-y-6 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Months *</label>
-                      <input type="number" min="0" name="timelineMonths" value={formData.timelineMonths} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                {/* Modal Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {currentStep === 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-6">
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Main Title *</label>
+                          <input type="text" name="mainTitle" value={formData.mainTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Sub Title *</label>
+                          <input type="text" name="subTitle" value={formData.subTitle} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Technology *</label>
+                          <input type="text" name="technology" value={formData.technology} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Name *</label>
+                          <input type="text" name="clientName" value={formData.clientName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Organization *</label>
+                          <input type="text" name="clientOrganization" value={formData.clientOrganization} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                      </div>
+                      <div className="space-y-6">
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Proposal Date *</label>
+                          <input type="date" name="proposalDate" value={formData.proposalDate} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Client Phone</label>
+                          <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Organization Category *</label>
+                          <input type="text" name="organizationCategory" value={formData.organizationCategory} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Name *</label>
+                          <input type="text" name="creatorName" value={formData.creatorName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Phone *</label>
+                          <input type="tel" name="creatorPhone" value={formData.creatorPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Designation  *</label>
+                          <input type="text" name="creatorDesignation" value={formData.creatorDesignation} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        
+                      </div>
                     </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Weeks *</label>
-                      <input type="number" min="0" name="timelineWeeks" value={formData.timelineWeeks} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                  )}
+
+                  {currentStep === 1 && (
+                    <div className="space-y-3">
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Scope of Work</label>
+                      <CustomRichTextEditor
+                        isDark={isDark}
+                        value={formData.scopeDescription || ""}
+                        onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
+                        placeholder="Enter scope of work..."
+                      />
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Timeline Phases</span>
-                    <button onClick={addTimelinePhase} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}><Plus className="w-4 h-4" />Add</button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                          <th className="text-left px-2 py-2">No</th>
-                          <th className="text-left px-2 py-2">Week *</th>
-                          <th className="text-left px-2 py-2">Phase *</th>
-                          <th className="text-right px-2 py-2">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(formData.timelinePhases || []).map((r, idx) => (
-                          <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                            <td className="px-2 py-2">{idx + 1}</td>
-                            <td className="px-2 py-2">
-                              <input type="text" value={r.week} onChange={(e) => updateTimelinePhase(idx, "week", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input type="text" value={r.phase} onChange={(e) => updateTimelinePhase(idx, "phase", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              <button onClick={() => removeTimelinePhase(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}><Trash2 className="w-4 h-4" />Remove</button>
-                            </td>
-                          </tr>
+                  )}
+
+                  {currentStep === 2 && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Pricing Summary</span>
+                        <button onClick={addPricingRow} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}>
+                          <Plus className="w-4 h-4" />Add Row
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                              <th className="text-left px-2 py-2">No</th>
+                              <th className="text-left px-2 py-2">Description *</th>
+                              <th className="text-left px-2 py-2">Amount *</th>
+                              <th className="text-right px-2 py-2">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(formData.pricingRows || []).map((r, idx) => (
+                              <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                                <td className="px-2 py-2">{idx + 1}</td>
+                                <td className="px-2 py-2">
+                                  <input type="text" value={r.description} onChange={(e) => updatePricingRow(idx, "description", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <div className="relative">
+                                    <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                                    <input type="text" value={r.amount || ""} onChange={(e) => updatePricingRow(idx, "amount", e.target.value)} className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="0" />
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 text-right">
+                                  <button onClick={() => removePricingRow(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}>
+                                    <Trash2 className="w-4 h-4" />Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end">
+                        <div className={`px-4 py-2 rounded ${isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>
+                          Total: ₹ {calculateSubtotal().toLocaleString("en-IN")}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentStep === 3 && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Total Duration (Months) *</label>
+                          <input type="number" min="0" name="timelineMonths" value={formData.timelineMonths} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Total Duration (Weeks) *</label>
+                          <input type="number" min="0" name="timelineWeeks" value={formData.timelineWeeks} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Timeline Phases</label>
+                        <button onClick={addTimelinePhase} className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}>
+                          <Plus className="w-4 h-4" />Add Row
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className={`${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                              <th className="text-left px-2 py-2">No</th>
+                              <th className="text-left px-2 py-2">Week *</th>
+                              <th className="text-left px-2 py-2">Phase *</th>
+                              <th className="text-right px-2 py-2">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(formData.timelinePhases || []).map((r, idx) => (
+                              <tr key={idx} className={`${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                                <td className="px-2 py-2">{idx + 1}</td>
+                                <td className="px-2 py-2">
+                                  <input type="text" value={r.week} onChange={(e) => updateTimelinePhase(idx, "week", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Week" />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <input type="text" value={r.phase} onChange={(e) => updateTimelinePhase(idx, "phase", e.target.value)} className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`} placeholder="Phase" />
+                                </td>
+                                <td className="px-2 py-2 text-right">
+                                  <button onClick={() => removeTimelinePhase(idx)} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}>
+                                    <Trash2 className="w-4 h-4" />Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!formData.timelinePhases || formData.timelinePhases.length === 0) && (
+                              <tr>
+                                <td colSpan="4" className={`text-center py-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                                  No timeline phases added yet. Click "Add Row" to get started.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentStep === 4 && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Milestones</label>
+                          <button
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                milestones: [...(prev.milestones || []), { title: "", amount: "" }],
+                              }))
+                            }
+                            className={`${isDark ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-3 py-1.5 rounded flex items-center gap-2`}
+                          >
+                            <Plus className="w-4 h-4" />Add Milestone
+                          </button>
+                        </div>
+                      <div className="space-y-3">
+                        {(formData.milestones || []).map((m, idx) => (
+                          <div key={idx} className={`grid grid-cols-7 gap-3 ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                value={m.title}
+                                onChange={(e) => {
+                                  const arr = [...(formData.milestones || [])];
+                                  arr[idx] = { ...arr[idx], title: e.target.value };
+                                  setFormData((prev) => ({ ...prev, milestones: arr }));
+                                }}
+                                className={`w-full px-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                                placeholder="Milestone"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <div className="relative">
+                                <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                                <input
+                                  type="text"
+                                  value={m.amount || ""}
+                                  onChange={(e) => updateMilestoneAmount(idx, e.target.value)}
+                                  className={`w-full pl-8 pr-3 py-2 rounded border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                                  placeholder="Amount"
+                                />
+                              </div>
+                            </div>
+                            <div className="col-span-1 flex justify-end">
+                              <button onClick={() => {
+                                const arr = [...(formData.milestones || [])]; arr.splice(idx, 1); setFormData((prev) => ({ ...prev, milestones: arr.length ? arr : [] }));
+                              }} className={`${isDark ? "bg-red-600 hover:bg-red-700" : "bg-red-500 hover:bg-red-600"} text-white px-2 py-1 rounded flex items-center gap-1`}>
+                                <Trash2 className="w-4 h-4" />Remove
+                              </button>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        {(!formData.milestones || formData.milestones.length === 0) && (
+                          <div className={`text-center py-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            No milestones added yet. Click "Add Milestone" to get started.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentStep === 5 && (
+                    <div className="space-y-3">
+                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
+                      <CustomRichTextEditor
+                        isDark={isDark}
+                        value={formData.conclusionNotes || ""}
+                        onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
+                        placeholder="Enter additional notes..."
+                      />
+                    </div>
+                  )}
+
+                  {currentStep === 6 && (
+                    <div className="space-y-4">
+                      <div className={`p-8 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-50"} flex flex-col items-center justify-center min-h-[400px]`}>
+                        <h3 className={`text-2xl font-semibold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+                          Ready to Download
+                        </h3>
+                        <p className={`text-sm mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                          Your proposal PDF is ready. Preview it in a new tab or download it directly.
+                        </p>
+                        {previewPdfUrl ? (
+                          <div className="flex gap-4">
+                            <button
+                              onClick={handlePreview}
+                              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                isDark
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                  : "bg-blue-500 hover:bg-blue-600 text-white"
+                              }`}
+                            >
+                              <FileText className="w-5 h-5" />
+                              Preview
+                            </button>
+                            <button
+                              onClick={handleDownloadFromPreview}
+                              className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                isDark
+                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
+                                  : "bg-orange-500 hover:bg-orange-600 text-white"
+                              }`}
+                            >
+                              <Download className="w-5 h-5" />
+                              Download PDF
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={`text-center py-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                            Generating preview...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {activeTab === "Conclusion" && (
-                <div className="space-y-6 mb-6">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
-                    <CustomRichTextEditor
-                      isDark={isDark}
-                      value={formData.conclusionNotes || ""}
-                      onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
-                      placeholder="Enter additional notes..."
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Name *</label>
-                      <input type="text" name="creatorName" value={formData.creatorName} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Creator Phone Number *</label>
-                      <input type="tel" name="creatorPhone" value={formData.creatorPhone} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Designation *</label>
-                      <input type="text" name="creatorDesignation" value={formData.creatorDesignation} onChange={handleInputChange} className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-orange-500`} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-              {/* Action Buttons */}
-              <div className={`mt-8 flex items-center justify-end gap-4 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                <button
-                  onClick={generatePDF}
-                  disabled={!isFormValid()}
-                  className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${isDark
-                      ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      : "bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                {/* Modal Footer */}
+                <div className={`flex items-center justify-between p-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                  <button
+                    onClick={handlePrevious}
+                    disabled={currentStep === 0}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                      currentStep === 0
+                        ? isDark
+                          ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : isDark
+                          ? "bg-gray-700 hover:bg-gray-600 text-white"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-900"
                     }`}
-                >
-                  <Download className="w-5 h-5" />
-                  Download PDF
-                </button>
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  <div className="flex gap-2">
+                    {currentStep === steps.length - 1 ? (
+                      <div className="flex gap-2">
+                        
+                        
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleNext}
+                        disabled={!canProceedToNext()}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                          !canProceedToNext()
+                            ? isDark
+                              ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : isDark
+                              ? "bg-orange-600 hover:bg-orange-700 text-white"
+                              : "bg-orange-500 hover:bg-orange-600 text-white"
+                        }`}
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
