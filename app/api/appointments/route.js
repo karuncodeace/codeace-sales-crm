@@ -6,78 +6,44 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const leadId = searchParams.get("lead_id");
-
-    let query = supabase
-      .from("appointments")
-      .select("*")
-      .order("start_time", { ascending: false });
-
-    // Filter by status if provided
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    // Filter by lead_id if provided
-    if (leadId) {
-      query = query.eq("lead_id", leadId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Appointments API Error:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to fetch appointments" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(data || []);
-  } catch (err) {
-    console.error("Appointments API Exception:", err);
-    return NextResponse.json(
-      { error: err.message || "Internal server error" },
-      { status: 500 }
-    );
-  }
+// Basic health/check endpoint (keep disabled for reads until needed)
+export async function GET() {
+  return NextResponse.json({ message: "Appointments POST available" });
 }
 
-// Create a new appointment (book)
+// Insert a new appointment row into the appointments table.
 export async function POST(request) {
   try {
     const body = await request.json();
-    if (!body) {
-      return NextResponse.json({ error: "Missing payload" }, { status: 400 });
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    // Normalize and require lead_id
-    const leadId = body.lead_id ?? body.leadId;
-    if (!leadId) {
-      console.error("❌ [appointments/POST] Missing lead_id in request body");
+    const requiredFields = ["title", "start_time", "end_time", "lead_id"];
+    const missing = requiredFields.filter((key) => !body[key]);
+    if (missing.length) {
       return NextResponse.json(
-        { error: "Missing required field: lead_id" },
+        { error: `Missing required field(s): ${missing.join(", ")}` },
         { status: 400 }
       );
     }
 
-    // Debug logging to trace insert issues
-    console.log("📥 [appointments/POST] Incoming payload:", JSON.stringify(body, null, 2));
-    console.log("🔑 [appointments/POST] Supabase env present:", {
-      url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      serviceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    });
-
-    // Default status is "booked" unless explicitly provided
+    // Normalize payload to match table columns
     const payload = {
-      status: "booked",
-      ...body,
-      lead_id: leadId,
-      created_at: body?.created_at || new Date().toISOString(),
+      cal_event_id: body.cal_event_id ?? null,
+      title: body.title,
+      start_time: body.start_time,
+      end_time: body.end_time,
+      location: body.location ?? null,
+      join_url: body.join_url ?? null,
+      status: body.status ?? "booked",
+      lead_id: body.lead_id,
+      lead_name: body.lead_name ?? null,
+      salesperson_id: body.salesperson_id ?? null,
+      attendee_name: body.attendee_name ?? null,
+      attendee_email: body.attendee_email ?? null,
+      raw_payload: body.raw_payload ?? body, // keep original payload for audit
+      created_at: body.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
@@ -88,18 +54,16 @@ export async function POST(request) {
       .single();
 
     if (error) {
-      console.error("❌ [appointments/POST] Supabase insert error:", error);
-      console.error("❌ [appointments/POST] Payload that failed:", JSON.stringify(payload, null, 2));
+      console.error("Appointments POST insert error:", error);
       return NextResponse.json(
         { error: error.message || "Failed to create appointment" },
         { status: 500 }
       );
     }
 
-    console.log("✅ [appointments/POST] Appointment created:", data?.id || data);
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
-    console.error("❌ [appointments/POST] Exception:", err);
+    console.error("Appointments POST exception:", err);
     return NextResponse.json(
       { error: err.message || "Internal server error" },
       { status: 500 }
