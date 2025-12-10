@@ -18,6 +18,10 @@ const PriorityDropdown = ({ value = "Hot", onChange = () => {}, theme: themeProp
       light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-200",
       dark: "text-blue-300 bg-blue-900/40 ring-1 ring-inset ring-blue-800",
     },
+    Unqualified: {
+      light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-200",
+      dark: "text-gray-300 bg-gray-900/40 ring-1 ring-inset ring-gray-700",
+    },
   };
   
 

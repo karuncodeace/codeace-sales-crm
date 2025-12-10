@@ -236,7 +236,7 @@ export default function ProspectsTable() {
                                 </tr>
                             ) : (
                                 filteredProspects.map((prospect) => (
-                                    <tr key={prospect.id}>
+                                    <tr key={prospect.id} className={`${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}>
                                         <td className="size-px whitespace-nowrap">
                                             <div className="ps-6 py-2">
                                                 <label

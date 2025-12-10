@@ -2,13 +2,165 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useTheme } from "../context/themeContext";
-import { FileText, Download, Plus, Trash2, Save, Bold, Italic, Underline as UnderlineIcon, List } from "lucide-react";
+import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered } from "lucide-react";
 import jsPDF from "jspdf";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+export const cleanEditorHtml = (html = "") => {
+  // Normalize user HTML so jsPDF receives predictable tags
+  const temp = document.createElement("div");
+  temp.innerHTML = html || "";
+
+  // Draft/execCommand can emit <div>/<b>/<i>; normalize to semantic tags
+  temp.querySelectorAll("b").forEach((node) => {
+    const strong = document.createElement("strong");
+    strong.innerHTML = node.innerHTML;
+    node.replaceWith(strong);
+  });
+  temp.querySelectorAll("i").forEach((node) => {
+    const em = document.createElement("em");
+    em.innerHTML = node.innerHTML;
+    node.replaceWith(em);
+  });
+
+  // Convert block-level divs to paragraphs for cleaner PDF parsing
+  temp.querySelectorAll("div").forEach((div) => {
+    const p = document.createElement("p");
+    p.innerHTML = div.innerHTML || "<br>";
+    div.replaceWith(p);
+  });
+
+  // Ensure empty paragraphs still preserve spacing
+  temp.querySelectorAll("p").forEach((p) => {
+    const text = p.textContent.replace(/\u00a0/g, " ").trim();
+    if (!text && !p.querySelector("br")) {
+      p.innerHTML = "<br>";
+    }
+  });
+
+  return temp.innerHTML;
+};
+
+// Lightweight, cursor-safe rich text editor built on contenteditable
+export const CustomRichTextEditor = ({
+  value,
+  onChange,
+  placeholder,
+  isDark = false,
+}) => {
+  const editorRef = useRef(null);
+  const lastValueRef = useRef(value || "");
+
+  // Sync incoming value safely
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const next = value || "";
+    if (next !== lastValueRef.current && next !== el.innerHTML) {
+      el.innerHTML = next;
+      lastValueRef.current = next;
+    }
+  }, [value]);
+
+  const emitChange = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    const cleaned = cleanEditorHtml(el.innerHTML);
+    lastValueRef.current = cleaned;
+    onChange?.(cleaned);
+  };
+
+  const exec = (command) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false);
+    emitChange();
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+  };
+
+  return (
+    <div className={`border rounded-lg overflow-hidden ${isDark ? "border-gray-700" : "border-gray-300"}`}>
+      {/* Toolbar */}
+      <div className={`flex gap-1 p-2 border-b ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+        {[
+          { icon: Bold, cmd: "bold" },
+          { icon: Italic, cmd: "italic" },
+          { icon: UnderlineIcon, cmd: "underline" },
+          { icon: List, cmd: "insertUnorderedList" },
+          { icon: ListOrdered, cmd: "insertOrderedList" },
+        ].map(({ icon: Icon, cmd }) => (
+          <button
+            key={cmd}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              exec(cmd);
+            }}
+            className={`p-2 rounded ${isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}
+          >
+            <Icon className="w-4 h-4" />
+          </button>
+        ))}
+      </div>
+
+      {/* Editor */}
+      <div className={`${isDark ? "bg-gray-900" : "bg-white"}`}>
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={emitChange}
+          onBlur={emitChange}
+          onPaste={handlePaste}
+          data-placeholder={placeholder}
+          className={`min-h-[160px] px-3 py-2 outline-none
+            ${isDark ? "text-gray-100" : "text-gray-900"}`}
+          style={{
+            lineHeight: "1.2",
+            fontSize: "14px",
+            whiteSpace: "pre-wrap",
+          }}
+        />
+      </div>
+
+      {/* Placeholder */}
+      <style jsx>{`
+        [contenteditable][data-placeholder]:empty:before {
+          content: attr(data-placeholder);
+          color: ${isDark ? "#6b7280" : "#9ca3af"};
+          pointer-events: none;
+        }
+
+        /* REMOVE DEFAULT BLOCK MARGINS */
+        [contenteditable] p {
+          margin: 0 0 6px;
+          padding: 0;
+          line-height: 1.3;
+        }
+
+        [contenteditable] ul,
+        [contenteditable] ol {
+          margin: 0 0 6px;
+          padding-left: 18px;
+          line-height: 1.3;
+        }
+
+        [contenteditable] li {
+          margin: 0 0 4px;
+          padding: 0;
+          line-height: 1.3;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+
 
 export default function ProposalPage() {
   const { theme } = useTheme();
@@ -121,130 +273,6 @@ export default function ProposalPage() {
     setFormData((prev) => ({ ...prev, timelinePhases: rows.length ? rows : [{ week: "", phase: "" }] }));
   };
 
-  // Rich text editor component using Tiptap
-  const RichTextEditor = ({ value, onChange, placeholder }) => {
-    const editor = useEditor({
-      extensions: [
-        StarterKit.configure({
-          heading: {
-            levels: [1, 2, 3],
-          },
-        }),
-        Underline,
-      ],
-      content: value || "",
-      immediatelyRender: false,
-      onUpdate: ({ editor }) => {
-        onChange(editor.getHTML());
-      },
-      editorProps: {
-        attributes: {
-          class: `focus:outline-none min-h-[300px] px-4 py-3 ${isDark
-              ? "text-white"
-              : "text-gray-900"
-            }`,
-          'data-placeholder': placeholder,
-        },
-      },
-    });
-
-    // Update editor content when value prop changes externally
-    useEffect(() => {
-      if (editor && value !== editor.getHTML()) {
-        const { from, to } = editor.state.selection;
-        editor.commands.setContent(value || "", false);
-        editor.commands.setTextSelection({ from, to });
-      }
-    }, [value, editor]);
-
-    if (!editor) {
-      return null;
-    }
-
-    return (
-      <div className={`border rounded-lg overflow-hidden ${isDark ? "border-gray-700" : "border-gray-300"}`}>
-        {/* Toolbar */}
-        <div className={`flex gap-1 p-2 border-b ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              editor.chain().focus().toggleBold().run();
-            }}
-            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('bold')
-                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
-                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-              }`}
-            title="Bold (Ctrl+B)"
-          >
-            <Bold className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              editor.chain().focus().toggleItalic().run();
-            }}
-            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('italic')
-                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
-                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-              }`}
-            title="Italic (Ctrl+I)"
-          >
-            <Italic className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              editor.chain().focus().toggleUnderline().run();
-            }}
-            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('underline')
-                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
-                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-              }`}
-            title="Underline (Ctrl+U)"
-          >
-            <UnderlineIcon className="w-4 h-4" />
-          </button>
-          <div className={`w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-300"}`} />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              editor.chain().focus().toggleBulletList().run();
-            }}
-            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('bulletList')
-                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
-                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-              }`}
-            title="Bullet List"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              editor.chain().focus().toggleOrderedList().run();
-            }}
-            className={`p-2 rounded hover:bg-opacity-80 ${editor.isActive('orderedList')
-                ? isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
-                : isDark ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"
-              }`}
-            title="Numbered List"
-          >
-            <List className="w-4 h-4" />
-          </button>
-        </div>
-        {/* Editor */}
-        <div className={isDark ? "bg-gray-800" : "bg-white"}>
-          <EditorContent editor={editor} />
-        </div>
-      </div>
-    );
-  };
-
   const isDetailsValid = () => {
     const f = formData;
     return f.mainTitle && f.proposalDate && f.subTitle && f.technology && f.clientName && f.clientOrganization && f.organizationCategory;
@@ -260,6 +288,14 @@ export default function ProposalPage() {
   };
 
   const isFormValid = () => isDetailsValid() && isTimelineValid() && isConclusionValid();
+
+  // Supabase client (browser)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const supabase = useMemo(() => {
+    if (!supabaseUrl || !supabaseKey) return null;
+    return createClient(supabaseUrl, supabaseKey);
+  }, [supabaseUrl, supabaseKey]);
 
   const addHeader = (doc, pageWidth, headerHeight) => {
     try {
@@ -315,71 +351,78 @@ export default function ProposalPage() {
   const parseHtmlToText = (html) => {
     if (!html) return [];
     if (typeof document === "undefined") {
-      // Fallback for server-side: simple regex to remove HTML tags
-      const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-      return text ? [{ text, isListItem: false, isBold: false }] : [];
+      const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ");
+      return text ? [{ text, isListItem: false, isBold: false, addSpacing: true }] : [];
     }
+
     const tmp = document.createElement("DIV");
     tmp.innerHTML = html;
 
-    // Extract text and preserve list structure and bold formatting
     const items = [];
-    const processNode = (node, isBold = false, isListItem = false, parentIsList = false) => {
-      if (node.nodeType === 3) { // Text node
-        const text = node.textContent.trim();
-        if (text) {
-          items.push({ text, isListItem: isListItem || parentIsList, isBold });
-        }
-      } else if (node.nodeType === 1) { // Element node
-        const tagName = node.tagName.toLowerCase();
-        const currentIsBold = isBold || tagName === "b" || tagName === "strong" || (node.style && node.style.fontWeight && (node.style.fontWeight === "bold" || parseInt(node.style.fontWeight) >= 700));
 
-        if (tagName === "li") {
-          // Process all children of li as list items
-          const liText = node.textContent.trim();
-          if (liText) {
-            // Process children to preserve bold formatting
-            Array.from(node.childNodes).forEach(child => {
-              if (child.nodeType === 3) {
-                const text = child.textContent.trim();
-                if (text) items.push({ text, isListItem: true, isBold: currentIsBold });
-              } else {
-                processNode(child, currentIsBold, true, true);
-              }
-            });
-          }
-        } else if (tagName === "ul" || tagName === "ol") {
-          // Process list items
-          Array.from(node.childNodes).forEach(child => {
-            if (child.tagName && child.tagName.toLowerCase() === "li") {
-              processNode(child, currentIsBold, true, true);
-            }
-          });
-        } else if (tagName === "p") {
-          // Paragraph - check if it's empty or has only whitespace
-          const pText = node.textContent.trim();
-          if (pText) {
-            const hasListChildren = Array.from(node.childNodes).some(child =>
-              child.nodeType === 1 && (child.tagName.toLowerCase() === "ul" || child.tagName.toLowerCase() === "ol")
-            );
-            if (hasListChildren) {
-              Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false, false));
-            } else {
-              items.push({ text: pText, isListItem: false, isBold: currentIsBold });
-            }
-          }
-        } else if (tagName === "div") {
-          // Div - process children
-          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, false, false));
-        } else {
-          // Other elements - process children
-          Array.from(node.childNodes).forEach(child => processNode(child, currentIsBold, isListItem, parentIsList));
-        }
+    const markBlockSpacing = (startIdx) => {
+      if (startIdx === null || startIdx === undefined) return;
+      const endIdx = items.length - 1;
+      if (endIdx >= startIdx && items[endIdx]) {
+        items[endIdx].addSpacing = true;
       }
     };
 
-    Array.from(tmp.childNodes).forEach(node => processNode(node, false, false, false));
-    return items.length > 0 ? items : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false, isBold: false }];
+    const processNode = (node, isBold = false, isListItem = false, parentIsList = false) => {
+      if (node.nodeType === 3) {
+        const text = node.textContent.replace(/\s+\n/g, "\n");
+        if (text) {
+          items.push({ text, isListItem: isListItem || parentIsList, isBold, addSpacing: false });
+        }
+        return;
+      }
+
+      if (node.nodeType !== 1) return;
+
+      const tagName = node.tagName.toLowerCase();
+      const currentIsBold =
+        isBold ||
+        tagName === "b" ||
+        tagName === "strong" ||
+        (node.style &&
+          node.style.fontWeight &&
+          (node.style.fontWeight === "bold" || parseInt(node.style.fontWeight, 10) >= 700));
+
+      if (tagName === "br") {
+        items.push({ text: "", isListItem: isListItem || parentIsList, isBold: currentIsBold, isBreak: true, addSpacing: false });
+        return;
+      }
+
+      if (tagName === "ul" || tagName === "ol") {
+        Array.from(node.childNodes).forEach((child) => {
+          if (child.tagName && child.tagName.toLowerCase() === "li") {
+            processNode(child, currentIsBold, true, true);
+          }
+        });
+        return;
+      }
+
+      if (tagName === "li") {
+        const startIdx = items.length;
+        Array.from(node.childNodes).forEach((child) => processNode(child, currentIsBold, true, true));
+        markBlockSpacing(startIdx);
+        return;
+      }
+
+      if (tagName === "p" || tagName === "div") {
+        const startIdx = items.length;
+        Array.from(node.childNodes).forEach((child) => processNode(child, currentIsBold, isListItem, parentIsList));
+        markBlockSpacing(startIdx);
+        return;
+      }
+
+      Array.from(node.childNodes).forEach((child) => processNode(child, currentIsBold, isListItem, parentIsList));
+    };
+
+    Array.from(tmp.childNodes).forEach((node) => processNode(node, false, false, false));
+    return items.length > 0
+      ? items
+      : [{ text: tmp.textContent || tmp.innerText || "", isListItem: false, isBold: false, addSpacing: true }];
   };
 
   const splitText = (doc, text, maxWidth, x, y) => {
@@ -447,13 +490,13 @@ export default function ProposalPage() {
     const maxContentWidth = pageWidth - 2 * marginX;
 
     // Helper function to add a new page with header/footer/watermark
-    const addPage = () => {
-      doc.addPage();
-      addHeader(doc, pageWidth, headerHeight);
-      addFooter(doc, pageWidth, pageHeight, footerHeight);
-      addWatermark(doc, pageWidth, pageHeight);
-      return contentStartY;
-    };
+  const addPage = () => {
+    doc.addPage();
+    // Only footer and watermark on subsequent pages (no header)
+    addFooter(doc, pageWidth, pageHeight, footerHeight);
+    addWatermark(doc, pageWidth, pageHeight);
+    return contentStartY;
+  };
 
     // Helper function to check if we need a new page
     const checkNewPage = (currentY, requiredSpace = 10) => {
@@ -510,6 +553,8 @@ export default function ProposalPage() {
 
     // From section
     y = checkNewPage(y, 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     doc.text("From:", marginX, y);
     y += 5;
     doc.text("CodeAce IT Solutions LLP", marginX, y);
@@ -524,13 +569,14 @@ export default function ProposalPage() {
     y = checkNewPage(y, 12);
     y+=5;
     const label = "Subject:";
-    const labelWidth = 22; // fixed alignment width
+    const labelWidth = 16; // fixed alignment width
     const lineHeight = 5;
 
     doc.setFont("helvetica", "bold");
     doc.text(label, marginX, y);
 
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
 
     const subjectText = formData.mainTitle || "";
     const subjectLines = doc.splitTextToSize(
@@ -554,11 +600,15 @@ export default function ProposalPage() {
 
     // Salutation
     y = checkNewPage(y, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     doc.text("Dear Sir,", marginX, y);
     y += 8;
 
     // Body paragraphs
     y = checkNewPage(y, 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     const para1 = "We appreciate the opportunity to partner with you in digitizing and streamlining Medical Care operations.";
     const para1Lines = doc.splitTextToSize(para1, maxContentWidth);
     para1Lines.forEach((line) => {
@@ -569,7 +619,7 @@ export default function ProposalPage() {
     y += 3;
 
     y = checkNewPage(y, 15);
-    const para2 = `Based on the detailed RFP requirements, please find below our comprehensive quotation and proposal for the development and deployment of a custom solution using the ${formData.technology || "Frappe ERPNext Framework"} - the world's most agile open-source ERP platform.`;
+    const para2 = `Based on the detailed RFP requirements, we are pleased to present a comprehensive quotation and technical proposal for the development and implementation of a custom-built solution using the ${formData.technology || "Frappe ERPNext Framework"}. Leveraging its modular architecture, extensive customization capabilities, and proven reliability, our team will design a system tailored specifically to your organizational workflows. The objective is to streamline operations, enhance data visibility, support cross-department collaboration, and create a scalable digital ecosystem that can evolve with your future business needs.`;
     const para2Lines = doc.splitTextToSize(para2, maxContentWidth);
     para2Lines.forEach((line) => {
       y = checkNewPage(y, 5);
@@ -579,52 +629,220 @@ export default function ProposalPage() {
 
     // PAGE 2: Scope of Work
     y = addPage();
-    y+=5;
+    y -= 10;  // reduce top space (you can change 10)
     // Scope of Work Title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Scope Of Work", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
       x1: marginX,
       x2: pageWidth - marginX,
       y: y + 6,
-      height: 3 // 👈 increase for thicker stroke
+      height: 3 
     });
     y += 18;
 
-    // Scope Description (parse HTML and convert to text with bullet points and bold formatting)
+    // Scope Description (render as-is from editor, preserving bullets/bold/spacing)
     if (formData.scopeDescription) {
-      const scopeItems = parseHtmlToText(formData.scopeDescription);
-      // Ensure consistent font sizing/spacing with other content
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-
-      scopeItems.forEach((item) => {
-        const prefix = item.isListItem ? "• " : "";
-        const text = prefix + item.text;
-        const textLines = doc.splitTextToSize(text, maxContentWidth - (item.isListItem ? 8 : 5));
-        textLines.forEach((line, lineIdx) => {
-          y = checkNewPage(y, 5);
-          // Set font style based on bold flag
-          doc.setFont("helvetica", item.isBold ? "bold" : "normal");
-          // Adjust indentation for wrapped lines in list items
-          const indent = item.isListItem && lineIdx > 0 ? 8 : (item.isListItem ? 3 : 0);
-          doc.text(line, marginX + indent, y);
-          // Reset to normal font
+      let scopeItems = parseHtmlToText(formData.scopeDescription);
+      // Fallback if parsing yields nothing or only blanks
+      const hasContent =
+        scopeItems &&
+        scopeItems.some((i) => (i.text || "").replace(/[\s\u00A0]+/g, "").length > 0);
+      if (!hasContent) {
+        const plain = stripHtml(formData.scopeDescription).replace(/\u00A0/g, " ");
+        if (plain) {
+          scopeItems = [{ text: plain, isListItem: false, isBold: false }];
+        }
+      }
+      // Final safety: if still empty, bail
+      if (!scopeItems || scopeItems.length === 0) {
+        const fallback = stripHtml(formData.scopeDescription).replace(/\u00A0/g, " ");
+        if (fallback) {
           doc.setFont("helvetica", "normal");
-          y += 5;
+          doc.setFontSize(10);
+          const lines = doc.splitTextToSize(fallback, maxContentWidth);
+          lines.forEach((line) => {
+            y = checkNewPage(y, 6);
+            doc.text(line, marginX, y);
+            y += 6;
+          });
+        }
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        const splitWithFirstWidth = (text, firstWidth, restWidth) => {
+          const words = text.split(/\s+/).filter(Boolean);
+          const lines = [];
+          let current = "";
+          let remainingWidth = firstWidth;
+          let isFirstLine = true;
+
+          words.forEach((word) => {
+            const candidate = current ? `${current} ${word}` : word;
+            if (doc.getTextWidth(candidate) <= remainingWidth) {
+              current = candidate;
+              return;
+            }
+            if (current) {
+              lines.push({ text: current, first: isFirstLine });
+            }
+            current = word;
+            isFirstLine = false;
+            remainingWidth = restWidth;
+          });
+
+          if (current) {
+            lines.push({ text: current, first: isFirstLine });
+          }
+
+          return lines.length ? lines : [{ text: "", first: true }];
+        };
+
+        let pendingX = null;
+        let pendingY = null;
+        let pendingListItem = null;
+
+        scopeItems.forEach((item, idx) => {
+          // Skip empty items unless they're breaks or list items that need bullets
+          // Also allow items with only whitespace if they're list items
+          const hasContent = item.text && item.text.trim().length > 0;
+          if (!hasContent && !item.isBreak && !item.isListItem) {
+            return;
+          }
+
+          const next = scopeItems[idx + 1];
+          const inlineContinuation =
+            pendingX !== null &&
+            pendingY !== null &&
+            pendingListItem === item.isListItem &&
+            !item.isBold &&
+            !item.isBreak;
+
+          // Handle breaks
+          if (item.isBreak) {
+            pendingX = null;
+            pendingY = null;
+            pendingListItem = null;
+            y += 5; // Match SRS line height
+            return;
+          }
+
+          // For list items, always show bullet on first non-empty item, even if text is empty
+          const itemText = item.text || "";
+          const isListStart = item.isListItem && !inlineContinuation;
+          
+          // Skip if no text and not a list item that needs a bullet
+          if (!itemText.trim() && !item.isListItem) {
+            return;
+          }
+
+          const baseWidth = maxContentWidth - (item.isListItem ? 8 : 5);
+          const firstLineIndent = inlineContinuation ? 0 : item.isListItem ? 3 : 0;
+          const subsequentIndent = item.isListItem ? 8 : 0;
+
+          const startX = inlineContinuation ? pendingX : marginX + firstLineIndent;
+          
+          // Calculate bullet width for consistent alignment - always use normal font
+          doc.setFont("helvetica", "normal");
+          const bulletWidth = item.isListItem ? doc.getTextWidth("• ") : 0;
+          // Text always starts at the same position after bullet, regardless of font
+          const textStartX = isListStart ? marginX + firstLineIndent + bulletWidth : startX;
+          // Available width for text (accounting for bullet if present)
+          const availableWidth = inlineContinuation
+            ? marginX + maxContentWidth - textStartX
+            : (item.isListItem ? baseWidth - bulletWidth : baseWidth);
+
+          // Handle empty list items (just bullet)
+          let lines;
+          if (item.isListItem && !itemText.trim() && !inlineContinuation) {
+            // Empty list item - just bullet
+            lines = [{ text: "", first: true }];
+          } else {
+            // Split text content (without bullet prefix)
+            doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+            // Use consistent width for wrapped lines
+            const wrappedWidth = isListStart ? baseWidth - bulletWidth : baseWidth;
+            lines = splitWithFirstWidth(itemText, availableWidth, wrappedWidth);
+          }
+
+          lines.forEach((lineObj, lineIdx) => {
+            // Calculate X positions
+            const isFirstLine = lineIdx === 0;
+            const bulletX = isListStart && isFirstLine ? marginX + firstLineIndent : null;
+            
+            let textX;
+            if (inlineContinuation && isFirstLine) {
+              textX = startX;
+            } else if (isListStart && isFirstLine) {
+              textX = textStartX;
+            } else if (item.isListItem) {
+              // Wrapped lines of list item - align with text after bullet (not bullet position)
+              // Use the same calculation as first line to ensure consistent alignment
+              textX = marginX + firstLineIndent + bulletWidth; // Same as textStartX
+            } else {
+              // Regular paragraph
+              textX = marginX + (isFirstLine ? firstLineIndent : subsequentIndent);
+            }
+
+            y = pendingY !== null ? pendingY : y;
+            y = checkNewPage(y, 5); // Match SRS spacing (was 2.5)
+            
+            // Render bullet first (if this is the start of a list item)
+            if (bulletX !== null && isFirstLine) {
+              doc.setFont("helvetica", "normal");
+              doc.text("• ", bulletX, y);
+            }
+            
+            // Render text content with appropriate font
+            if (lineObj.text) {
+              doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+              doc.text(lineObj.text, textX, y);
+            }
+
+            const isLastLine = lineIdx === lines.length - 1;
+            const willInlineWithNext =
+              isLastLine &&
+              item.isBold &&
+              next &&
+              !next.isBold &&
+              !next.isBreak &&
+              next.isListItem === item.isListItem &&
+              next.text &&
+              next.text.trim();
+
+            if (willInlineWithNext) {
+              // Measure with current font (bold) to get accurate width
+              // Ensure font is set correctly before measuring
+              doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+              const measuredWidth = doc.getTextWidth(lineObj.text || "");
+              pendingX = textX + measuredWidth;
+              pendingY = y;
+              pendingListItem = item.isListItem;
+            } else {
+              pendingX = null;
+              pendingY = null;
+              pendingListItem = null;
+              y += 5; // Match SRS line height (was 2.5)
+            }
+          });
+
+          doc.setFont("helvetica", "normal");
+          if (item.addSpacing !== false && pendingX === null) {
+            y += 3; // Match SRS item spacing
+          }
         });
-        y += 2; // Add spacing between items
-      });
+      }
     }
 
     // PAGE 3: Pricing Summary
     y = addPage();
-    y+=5;
+    y -= 10;  // reduce top space (you can change 10)
+
     // Title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Pricing Summary", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
@@ -712,7 +930,7 @@ export default function ProposalPage() {
     y = checkNewPage(y, 20);
     y+=5;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Payment Terms", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
@@ -789,7 +1007,7 @@ export default function ProposalPage() {
     y = checkNewPage(y, 20);
     y+=5;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Project Timeline", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
@@ -825,17 +1043,17 @@ export default function ProposalPage() {
 
     // PAGE 4: SRS/Conclusion
     y = addPage();
-    y+=5;
+    
     // SRS Title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Software Requirements Specification (SRS)", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
       x1: marginX,
       x2: pageWidth - marginX,
       y: y + 6,
-      height: 3 // 👈 increase for thicker stroke
+      height: 3 
     });
     y += 18;
 
@@ -869,7 +1087,7 @@ export default function ProposalPage() {
     srsItems.forEach((item, idx) => {
       y = checkNewPage(y, 8);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       const itemText = `${idx + 1}. ${item}`;
       const itemLines = doc.splitTextToSize(itemText, maxContentWidth - 5);
       itemLines.forEach((line) => {
@@ -882,9 +1100,10 @@ export default function ProposalPage() {
 
     // Additional Notes Section
     y = addPage();
-    y+=5;
+    y -= 10;  // reduce top space (you can change 10)
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.text("Additional Notes", marginX, y);
     drawHorizontalGradientLine({
       docInstance: doc,
@@ -898,7 +1117,7 @@ export default function ProposalPage() {
     // Additional Notes Items
     y = checkNewPage(y, 10);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     const notesItems = [
       "The quotation is valid for 15 days from the date of issue.",
       "Annual hosting and technical support charges for Year 2 will be quoted separately.",
@@ -907,8 +1126,22 @@ export default function ProposalPage() {
 
     notesItems.forEach((note) => {
       y = checkNewPage(y, 8);
-      doc.text(`• ${note}`, marginX + 5, y);
-      y += 5; // Consistent spacing with SRS section
+      doc.setFont("helvetica", "normal");
+      const bulletWidth = doc.getTextWidth("• ");
+      const noteLines = doc.splitTextToSize(note, maxContentWidth - 5 - bulletWidth);
+      noteLines.forEach((line, lineIdx) => {
+        y = checkNewPage(y, 5);
+        const bulletX = marginX + 3;
+        const textX = marginX + 3 + bulletWidth;
+        if (lineIdx === 0) {
+          doc.text("• ", bulletX, y);
+        }
+        // Wrapped lines align with text start position
+        const lineX = lineIdx === 0 ? textX : marginX + 8;
+        doc.text(line, lineX, y);
+        y += 5;
+      });
+      y += 3; // Match SRS item spacing
     });
 
     // Conclusion paragraph
@@ -924,25 +1157,199 @@ export default function ProposalPage() {
     // Custom conclusion notes if provided
     if (formData.conclusionNotes) {
       y = checkNewPage(y, 10);
-      // Parse HTML to preserve bold formatting
-      const customNotesItems = parseHtmlToText(formData.conclusionNotes);
-      customNotesItems.forEach((item) => {
-        const textLines = doc.splitTextToSize(item.text, maxContentWidth);
-        textLines.forEach((line) => {
-          y = checkNewPage(y, 5);
-          doc.setFont("helvetica", item.isBold ? "bold" : "normal");
-          doc.text(line, marginX, y);
+      let customNotesItems = parseHtmlToText(formData.conclusionNotes);
+      const hasContent =
+        customNotesItems &&
+        customNotesItems.some((i) => (i.text || "").replace(/[\s\u00A0]+/g, "").length > 0);
+      if (!hasContent) {
+        const plain = stripHtml(formData.conclusionNotes).replace(/\u00A0/g, " ");
+        if (plain) {
+          customNotesItems = [{ text: plain, isBold: false, isListItem: false }];
+        }
+      }
+      // Final safety: if still empty, bail
+      if (!customNotesItems || customNotesItems.length === 0) {
+        const fallback = stripHtml(formData.conclusionNotes).replace(/\u00A0/g, " ");
+        if (fallback) {
           doc.setFont("helvetica", "normal");
-          y += 5;
+          doc.setFontSize(10);
+          const lines = doc.splitTextToSize(fallback, maxContentWidth);
+          lines.forEach((line) => {
+            y = checkNewPage(y, 5);
+            doc.text(line, marginX, y);
+            y += 5;
+          });
+        }
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        const splitWithFirstWidth = (text, firstWidth, restWidth) => {
+          const words = text.split(/\s+/).filter(Boolean);
+          const lines = [];
+          let current = "";
+          let remainingWidth = firstWidth;
+          let isFirstLine = true;
+
+          words.forEach((word) => {
+            const candidate = current ? `${current} ${word}` : word;
+            if (doc.getTextWidth(candidate) <= remainingWidth) {
+              current = candidate;
+              return;
+            }
+            if (current) {
+              lines.push({ text: current, first: isFirstLine });
+            }
+            current = word;
+            isFirstLine = false;
+            remainingWidth = restWidth;
+          });
+
+          if (current) {
+            lines.push({ text: current, first: isFirstLine });
+          }
+
+          return lines.length ? lines : [{ text: "", first: true }];
+        };
+
+        let pendingX = null;
+        let pendingY = null;
+        let pendingListItem = null;
+
+        customNotesItems.forEach((item, idx) => {
+          // Skip empty items unless they're breaks or list items that need bullets
+          const hasContent = item.text && item.text.trim().length > 0;
+          if (!hasContent && !item.isBreak && !item.isListItem) {
+            return;
+          }
+
+          const next = customNotesItems[idx + 1];
+          const inlineContinuation =
+            pendingX !== null &&
+            pendingY !== null &&
+            pendingListItem === item.isListItem &&
+            !item.isBold &&
+            !item.isBreak;
+
+          // Handle breaks
+          if (item.isBreak) {
+            pendingX = null;
+            pendingY = null;
+            pendingListItem = null;
+            y += 5; // Match SRS line height
+            return;
+          }
+
+          // For list items, always show bullet on first non-empty item, even if text is empty
+          const itemText = item.text || "";
+          const isListStart = item.isListItem && !inlineContinuation;
+          
+          // Skip if no text and not a list item that needs a bullet
+          if (!itemText.trim() && !item.isListItem) {
+            return;
+          }
+
+          const baseWidth = maxContentWidth - (item.isListItem ? 8 : 5);
+          const firstLineIndent = inlineContinuation ? 0 : item.isListItem ? 3 : 0;
+          const subsequentIndent = item.isListItem ? 8 : 0;
+
+          const startX = inlineContinuation ? pendingX : marginX + firstLineIndent;
+          
+          // Calculate bullet width for consistent alignment - always use normal font
+          doc.setFont("helvetica", "normal");
+          const bulletWidth = item.isListItem ? doc.getTextWidth("• ") : 0;
+          // Text always starts at the same position after bullet, regardless of font
+          const textStartX = isListStart ? marginX + firstLineIndent + bulletWidth : startX;
+          // Available width for text (accounting for bullet if present)
+          const availableWidth = inlineContinuation
+            ? marginX + maxContentWidth - textStartX
+            : (item.isListItem ? baseWidth - bulletWidth : baseWidth);
+
+          // Handle empty list items (just bullet)
+          let lines;
+          if (item.isListItem && !itemText.trim() && !inlineContinuation) {
+            // Empty list item - just bullet
+            lines = [{ text: "", first: true }];
+          } else {
+            // Split text content (without bullet prefix)
+            doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+            // Use consistent width for wrapped lines
+            const wrappedWidth = isListStart ? baseWidth - bulletWidth : baseWidth;
+            lines = splitWithFirstWidth(itemText, availableWidth, wrappedWidth);
+          }
+
+          lines.forEach((lineObj, lineIdx) => {
+            // Calculate X positions
+            const isFirstLine = lineIdx === 0;
+            const bulletX = isListStart && isFirstLine ? marginX + firstLineIndent : null;
+            
+            let textX;
+            if (inlineContinuation && isFirstLine) {
+              textX = startX;
+            } else if (isListStart && isFirstLine) {
+              textX = textStartX;
+            } else if (item.isListItem) {
+              // Wrapped lines of list item - align with text after bullet (not bullet position)
+              // Use the same calculation as first line to ensure consistent alignment
+              textX = marginX + firstLineIndent + bulletWidth; // Same as textStartX
+            } else {
+              // Regular paragraph
+              textX = marginX + (isFirstLine ? firstLineIndent : subsequentIndent);
+            }
+
+            y = pendingY !== null ? pendingY : y;
+            y = checkNewPage(y, 5); // Match SRS spacing
+            
+            // Render bullet first (if this is the start of a list item)
+            if (bulletX !== null && isFirstLine) {
+              doc.setFont("helvetica", "normal");
+              doc.text("• ", bulletX, y);
+            }
+            
+            // Render text content with appropriate font
+            if (lineObj.text) {
+              doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+              doc.text(lineObj.text, textX, y);
+            }
+
+            const isLastLine = lineIdx === lines.length - 1;
+            const willInlineWithNext =
+              isLastLine &&
+              item.isBold &&
+              next &&
+              !next.isBold &&
+              !next.isBreak &&
+              next.isListItem === item.isListItem &&
+              next.text &&
+              next.text.trim();
+
+            if (willInlineWithNext) {
+              // Measure with current font (bold) to get accurate width
+              // Ensure font is set correctly before measuring
+              doc.setFont("helvetica", item.isBold ? "bold" : "normal");
+              const measuredWidth = doc.getTextWidth(lineObj.text || "");
+              pendingX = textX + measuredWidth;
+              pendingY = y;
+              pendingListItem = item.isListItem;
+            } else {
+              pendingX = null;
+              pendingY = null;
+              pendingListItem = null;
+              y += 5; // Match SRS line height
+            }
+          });
+
+          doc.setFont("helvetica", "normal");
+          if (item.addSpacing !== false && pendingX === null) {
+            y += 3; // Match SRS item spacing
+          }
         });
-        y += 2;
-      });
+      }
     }
 
     // Closing
     y = checkNewPage(y, 20);
     doc.text("Warm Regards,", marginX, y);
-    y += 8;
+    y += 5;
     if (formData.creatorName) {
       doc.setFont("helvetica", "bold");
       doc.text(formData.creatorName, marginX, y);
@@ -961,8 +1368,30 @@ export default function ProposalPage() {
     doc.text("(Issued with approval of the Founder)", marginX, y);
     y += 5;
 
-    // Save PDF
+    // Save PDF locally and upload to Supabase if available
     const fileName = `${(formData.mainTitle || "proposal").replace(/[^a-z0-9]/gi, "_")}_${formData.proposalDate || ""}.pdf`;
+    const pdfBlob = doc.output("blob");
+
+    // Upload to Supabase bucket if keys are configured
+    if (supabase) {
+      try {
+        const path = `proposals/${fileName}`;
+        const { error } = await supabase.storage
+          .from("proposal_pdf")
+          .upload(path, pdfBlob, {
+            cacheControl: "3600",
+            contentType: "application/pdf",
+            upsert: true,
+          });
+        if (error) {
+          console.error("Supabase upload error:", error.message);
+        }
+      } catch (err) {
+        console.error("Supabase upload failed:", err);
+      }
+    }
+
+    // Trigger browser download
     doc.save(fileName);
   };
 
@@ -1052,10 +1481,11 @@ export default function ProposalPage() {
 
               {activeTab === "Scope of Work" && (
                 <div className="space-y-3 mb-6">
-                  <RichTextEditor
+                  <CustomRichTextEditor
+                    isDark={isDark}
                     value={formData.scopeDescription || ""}
                     onChange={(value) => setFormData((prev) => ({ ...prev, scopeDescription: value }))}
-                    placeholder="Enter scope of work details..."
+                    placeholder=""
                   />
                 </div>
               )}
@@ -1188,7 +1618,8 @@ export default function ProposalPage() {
                 <div className="space-y-6 mb-6">
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Additional Notes</label>
-                    <RichTextEditor
+                    <CustomRichTextEditor
+                      isDark={isDark}
                       value={formData.conclusionNotes || ""}
                       onChange={(value) => setFormData((prev) => ({ ...prev, conclusionNotes: value }))}
                       placeholder="Enter additional notes..."

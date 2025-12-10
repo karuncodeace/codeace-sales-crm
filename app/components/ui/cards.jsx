@@ -147,8 +147,7 @@ export default function Cards() {
               </p>
             </div>
             <div
-              className="p-3 bg-blue-100 text-blue-600 rounded-full  w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 
-            flex items-center justify-center"
+              className="p-3 bg-blue-100 text-blue-600 rounded-full w-10 h-10 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M16 2V6M8 2V6" />

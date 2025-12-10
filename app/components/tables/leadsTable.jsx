@@ -658,14 +658,21 @@ export default function LeadsTable() {
 
                 <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                   {filteredLeads.length === 0 ? (
-                   <tr>
-                   <td colSpan={11} className="px-6 py-10 text-center">
-                     <div className="flex items-center justify-center gap-2">
-                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce"></div>
-                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                       <div className="h-3 w-3 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                   <tr className="h-[600px]">
+                   <td colSpan={11} className="px-6 text-center">
+                     <div className="flex flex-col items-center justify-center h-full">
+                       
+                       <div className="flex items-center justify-center gap-2">
+                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce"></div>
+                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                       </div>
+             
+                       <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">
+                         Loading leads…
+                       </p>
+             
                      </div>
-                     <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">Loading leads…</p>
                    </td>
                  </tr>
                  
@@ -674,7 +681,7 @@ export default function LeadsTable() {
                   
                   ) : (
                     filteredLeads.map((lead) => (
-                      <tr key={lead.id}  className="hover:bg-gray-100 dark:hover:bg-gray-100/40">
+                      <tr key={lead.id}  className={`${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}>
                         <td className="size-px whitespace-nowrap">
                           <div className="ps-6 py-2">
                             <label
@@ -1015,29 +1022,7 @@ export default function LeadsTable() {
                           {groupedLeads[status]?.length || 0} Leads
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border focus:outline-hidden focus:ring-2 focus:ring-orange-200 ${theme === "dark"
-                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600"
-                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
-                          }`}
-                        aria-label={`Add lead to ${status}`}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          width="18"
-                          height="18"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 5v14" />
-                          <path d="M5 12h14" />
-                        </svg>
-                      </button>
+                      
                     </div>
                     <div
                       className="mt-4 space-y-3 min-h-[100px]"
