@@ -124,7 +124,7 @@ export async function POST(req) {
     if (lead_id) {
       try {
         const { data: lead, error: leadError } = await supabase
-          .from("leads")
+          .from("leads_table")
           .select("text, lead_name")
           .eq("text", lead_id)
           .single();
@@ -243,7 +243,7 @@ export async function POST(req) {
           // First try email match (exact on email)
           if (attendeeEmail) {
             const { data: leadByEmail, error: leadByEmailError } = await supabase
-              .from("leads")
+              .from("leads_table")
               .select("text, lead_name, email")
               .or(`email.eq.${attendeeEmail}`)
               .maybeSingle();
@@ -258,7 +258,7 @@ export async function POST(req) {
           // If still missing, try lead_name exact match
           if (!appointmentData.lead_id && attendeeName) {
             const { data: leadByName, error: leadByNameError } = await supabase
-              .from("leads")
+              .from("leads_table")
               .select("text, lead_name")
               .or(`lead_name.eq.${attendeeName}`)
               .maybeSingle();
@@ -401,9 +401,9 @@ export async function POST(req) {
       if (lead_id) {
         try {
           await supabase
-            .from("leads")
+            .from("leads_table")
             .update({ last_activity: new Date().toISOString() })
-            .eq("id", lead_id);
+            .eq("text", lead_id);
           console.log("✅ Updated lead last_activity for:", lead_id);
         } catch (err) {
           console.log("⚠️ Could not update lead last_activity:", err.message);
@@ -413,7 +413,7 @@ export async function POST(req) {
       // Auto-create task (if lead_id and resolvedSalespersonId exist)
       if (lead_id && resolvedSalespersonId && startTime) {
         try {
-          await supabase.from("tasks").insert({
+          await supabase.from("tasks_table").insert({
             type: "Meeting",
             lead_id: lead_id,
             sales_person_id: resolvedSalespersonId,
