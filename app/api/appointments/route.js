@@ -55,6 +55,16 @@ export async function POST(request) {
       return NextResponse.json({ error: "Missing payload" }, { status: 400 });
     }
 
+    // Normalize and require lead_id
+    const leadId = body.lead_id ?? body.leadId;
+    if (!leadId) {
+      console.error("❌ [appointments/POST] Missing lead_id in request body");
+      return NextResponse.json(
+        { error: "Missing required field: lead_id" },
+        { status: 400 }
+      );
+    }
+
     // Debug logging to trace insert issues
     console.log("📥 [appointments/POST] Incoming payload:", JSON.stringify(body, null, 2));
     console.log("🔑 [appointments/POST] Supabase env present:", {
@@ -66,6 +76,7 @@ export async function POST(request) {
     const payload = {
       status: "booked",
       ...body,
+      lead_id: leadId,
       created_at: body?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
