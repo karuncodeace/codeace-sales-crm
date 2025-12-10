@@ -240,32 +240,32 @@ export async function POST(req) {
       // If lead_id is still missing, try to resolve by attendee email/name
       if (!appointmentData.lead_id && (attendeeEmail || attendeeName)) {
         try {
-          // First try email match
+          // First try email match (exact on email)
           if (attendeeEmail) {
             const { data: leadByEmail, error: leadByEmailError } = await supabase
               .from("leads")
-              .select("id, lead_name, full_name, name, email, lead_email")
-              .or(`email.ilike.${attendeeEmail},lead_email.ilike.${attendeeEmail}`)
+              .select("id, lead_name, email")
+              .or(`email.eq.${attendeeEmail}`)
               .maybeSingle();
 
             if (!leadByEmailError && leadByEmail?.id) {
               appointmentData.lead_id = leadByEmail.id;
-              appointmentData.lead_name = leadByEmail.lead_name || leadByEmail.full_name || leadByEmail.name || appointmentData.lead_name;
+              appointmentData.lead_name = leadByEmail.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved by attendee_email:", appointmentData.lead_id);
             }
           }
 
-          // If still missing, try name match (best-effort)
+          // If still missing, try lead_name exact match
           if (!appointmentData.lead_id && attendeeName) {
             const { data: leadByName, error: leadByNameError } = await supabase
               .from("leads")
-              .select("id, lead_name, full_name, name")
-              .or(`lead_name.ilike.${attendeeName},name.ilike.${attendeeName}`)
+              .select("id, lead_name")
+              .or(`lead_name.eq.${attendeeName}`)
               .maybeSingle();
 
             if (!leadByNameError && leadByName?.id) {
               appointmentData.lead_id = leadByName.id;
-              appointmentData.lead_name = leadByName.lead_name || leadByName.full_name || leadByName.name || appointmentData.lead_name;
+              appointmentData.lead_name = leadByName.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved by attendee_name:", appointmentData.lead_id);
             }
           }
