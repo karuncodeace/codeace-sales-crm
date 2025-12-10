@@ -69,14 +69,17 @@ export async function POST(req) {
                         customInputs.name?.value ||
                         null;
 
-    // Extract lead_id (string identifier from leads.text) and salesperson_id
-    let lead_id = responses.lead_id?.value || 
+    // Extract lead_id (preferred numeric id from leads_table.id) and salesperson_id
+    let lead_id_raw = responses.lead_id?.value || 
                   responses.leadId?.value ||
                   customInputs.lead_id?.value ||
                   customInputs.leadId?.value ||
                   body?.lead_id ||
                   body?.leadId ||
                   null;
+    // Normalize to number when possible
+    const lead_id = lead_id_raw && !Number.isNaN(Number(lead_id_raw)) ? Number(lead_id_raw) : lead_id_raw || null;
+    let resolvedLeadId = lead_id;
     
     const salesperson_id = responses.salesperson_id?.value || 
                           responses.salespersonId?.value ||
@@ -125,12 +128,13 @@ export async function POST(req) {
       try {
         const { data: lead, error: leadError } = await supabase
           .from("leads_table")
-          .select("text, lead_name")
-          .eq("text", lead_id)
+          .select("id, lead_name, email")
+          .eq("id", lead_id)
           .single();
 
         if (!leadError && lead) {
           lead_name = lead.lead_name || lead_name || null;
+          resolvedLeadId = lead.id;
           console.log("  - lead_name (from DB):", lead_name);
         } else {
           console.log("  - lead_name: Not found in database");
@@ -224,7 +228,7 @@ export async function POST(req) {
         status: appointmentStatus,
         location: location,
         join_url: joinUrl,
-        lead_id: lead_id,
+        lead_id: resolvedLeadId,
         lead_name: lead_name,
         attendee_name: attendeeName,
         attendee_email: attendeeEmail,
@@ -247,12 +251,12 @@ export async function POST(req) {
           if (conditions.length > 0) {
             const { data: leadMatch, error: leadMatchError } = await supabase
               .from("leads_table")
-              .select("text, lead_name")
+              .select("id, lead_name, email")
               .or(conditions.join(","))
               .maybeSingle();
 
-            if (!leadMatchError && leadMatch?.text) {
-              appointmentData.lead_id = leadMatch.text;
+            if (!leadMatchError && leadMatch?.id) {
+              appointmentData.lead_id = leadMatch.id;
               appointmentData.lead_name = leadMatch.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved via lookup:", appointmentData.lead_id);
             }
@@ -261,13 +265,29 @@ export async function POST(req) {
           console.log("  - lead_id resolution attempt failed:", resolveErr.message);
         }
       }
+      // Fallback: if still missing, create a minimal lead entry so FK passes
+      if (!appointmentData.lead_id && (attendeeEmail || attendeeName)) {
+        try {
+          const { data: newLead, error: newLeadError } = await supabase
+            .from("leads_table")
+            .insert({
+              lead_name: attendeeName || attendeeEmail || "Unknown",
+              email: attendeeEmail || null,
+              status: "New",
+              priority: "Warm",
+            })
+            .select("id, lead_name, email")
+            .single();
 
-      // Fallback: if still missing, derive a soft lead_id from attendee email or name
-      if (!appointmentData.lead_id) {
-        if (attendeeEmail) {
-          appointmentData.lead_id = `lead:${attendeeEmail}`;
-        } else if (attendeeName) {
-          appointmentData.lead_id = `lead:${attendeeName}`.replace(/\s+/g, "-").toLowerCase();
+          if (!newLeadError && newLead?.id) {
+            appointmentData.lead_id = newLead.id;
+            appointmentData.lead_name = newLead.lead_name || appointmentData.lead_name;
+            console.log("  - lead_id created via fallback insert:", appointmentData.lead_id);
+          } else if (newLeadError) {
+            console.log("  - fallback lead creation failed:", newLeadError.message);
+          }
+        } catch (fallbackErr) {
+          console.log("  - fallback lead creation exception:", fallbackErr.message);
         }
       }
 
