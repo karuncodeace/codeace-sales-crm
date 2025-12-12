@@ -23,7 +23,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
         leadId ? `/api/tasks?lead_id=${leadId}` : null,
         fetcher
     );
-    
+
     // Fetch activities for this lead
     const { data: activitiesData } = useSWR(
         leadId ? `/api/task-activities?lead_id=${leadId}` : null,
@@ -190,7 +190,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
             return `Tomorrow, ${date.toLocaleTimeString('en-IN', timeOptions)}`;
         }
         if (dateOnly < today) return "Overdue";
-        
+
         const dateOptions = {
             timeZone: 'Asia/Calcutta',
             month: 'short',
@@ -246,25 +246,25 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
 
     return (
         <div className="">
-                <div className="space-y-6">
-                    {/* Top Row - Contact Info & Lead Info */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left Column - Contact & Lead Information */}
-                        <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
-                            <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                Contact Information
-                            </h3>
-                            <div className="space-y-4">
+            <div className="space-y-6">
+                {/* Top Row - Contact Info & Lead Info */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left Column - Contact & Lead Information */}
+                    <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
+                        <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                            Contact Information
+                        </h3>
+                        <div className="space-y-4 grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                        <User className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                    </div>
-                                    <div>
-                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Contact Name</p>
-                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.contactName || "—"}</p>
-                                    </div>
+                                <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                    <User className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
                                 </div>
-                                
+                                <div>
+                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Contact Name</p>
+                                    <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.contactName || "—"}</p>
+                                </div>
+                            </div>
+                            <div>
                                 {lead.company && (
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
@@ -276,253 +276,254 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
                                         </div>
                                     </div>
                                 )}
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                        <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                    </div>
-                                    <div>
-                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Phone</p>
-                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.phone || "—"}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-                                        <Mail className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Email</p>
-                                        {lead.email ? (
-                                            <div className="flex items-center gap-2 group">
-                                                <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                                                    {lead.email}
-                                                </span>
-                                                <button
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        try {
-                                                            await navigator.clipboard.writeText(lead.email);
-                                                            setCopiedEmail(true);
-                                                            setTimeout(() => setCopiedEmail(false), 2000);
-                                                        } catch (err) {
-                                                            console.error('Failed to copy:', err);
-                                                        }
-                                                    }}
-                                                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded  ${theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`}
-                                                    title="Copy email"
-                                                >
-                                                    {copiedEmail ? (
-                                                        <Check className="w-4 h-4 text-green-500" />
-                                                    ) : (
-                                                        <Copy className="w-4 h-4" />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>—</p>
-                                        )}
-                                    </div>
-                                </div>
-                                
                             </div>
-
-                            {/* Lead Information */}
-                            <div className="mt-8">
-                                <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                    Lead Information
-                                </h3>
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead ID</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>{lead.id}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead Source</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.source || "—"}</span>
-                                    </div>
-                                    
-                                   
-                                    {lead.assignedTo && (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Assigned To</span>
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.assignedTo}</span>
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                    <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
+                                </div>
+                                <div>
+                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Phone</p>
+                                    <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.phone || "—"}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                    <Mail className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Email</p>
+                                    {lead.email ? (
+                                        <div className="flex items-center gap-2 group">
+                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
+                                                {lead.email}
+                                            </span>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    try {
+                                                        await navigator.clipboard.writeText(lead.email);
+                                                        setCopiedEmail(true);
+                                                        setTimeout(() => setCopiedEmail(false), 2000);
+                                                    } catch (err) {
+                                                        console.error('Failed to copy:', err);
+                                                    }
+                                                }}
+                                                className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded  ${theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`}
+                                                title="Copy email"
+                                            >
+                                                {copiedEmail ? (
+                                                    <Check className="w-4 h-4 text-green-500" />
+                                                ) : (
+                                                    <Copy className="w-4 h-4" />
+                                                )}
+                                            </button>
                                         </div>
-                                    )}
-                                    {lead.campaign && (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Campaign</span>
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.campaign}</span>
-                                        </div>
-                                    )}
-                                    {lead.budget && (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Budget</span>
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.budget}</span>
-                                        </div>
-                                    )}
-                                    {lead.createdAt && (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Created Date</span>
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.createdAt}</span>
-                                        </div>
-                                    )}
-                                    {lead.lastActivityDate && (
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Last Activity</span>
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.lastActivityDate}</span>
-                                        </div>
+                                    ) : (
+                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>—</p>
                                     )}
                                 </div>
                             </div>
+
                         </div>
 
-                        {/* Right Column - Scoring & Activity */}
-                        <div className="space-y-6">
-                            {/* Lead Scoring Card */}
-                            <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
-                                <div className="flex items-center justify-between mb-5">
-                                    <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                        Lead Scoring
-                                    </h3>
-                                    {onEditScores && (
-                                        <button
-                                            onClick={onEditScores}
-                                            className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
-                                            title="Edit Scores"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                    )}
+                        {/* Lead Information */}
+                        <div className="mt-8">
+                            <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                Additional Information
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead ID</span>
+                                    <span className={`font-medium ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>{lead.id}</span>
                                 </div>
-                                
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    {/* Lead Score */}
-                                    <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Target className={`w-4 h-4 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`} />
-                                            <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                                                Lead Score
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                {Number(lead?.lead_score) || 0}
-                                            </span>
-                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                / 5
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Responsiveness Score */}
-                                    <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <MessageSquare className={`w-4 h-4 ${theme === "dark" ? "text-green-400" : "text-green-600"}`} />
-                                            <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                                                Responsiveness
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                {Number(lead?.responsiveness_score) || 0}
-                                            </span>
-                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                / 10
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Conversion Probability Score */}
-                                    <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Zap className={`w-4 h-4 ${theme === "dark" ? "text-yellow-400" : "text-yellow-600"}`} />
-                                            <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                                                Conversion Probability
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                                {Number(lead?.conversion_probability_score) || 0}
-                                            </span>
-                                            <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                                / 10
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Total Score */}
-                                    <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gradient-to-br from-orange-900/30 to-orange-800/20 border border-orange-700/50" : "bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200"}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <TrendingUp className={`w-4 h-4 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
-                                            <span className={`text-xs font-medium ${theme === "dark" ? "text-orange-300" : "text-orange-700"}`}>
-                                                Total Score
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className={`text-2xl font-bold ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>
-                                                {Number(lead?.lead_score || 0) + Number(lead?.responsiveness_score || 0) + Number(lead?.conversion_probability_score || 0)}
-                                            </span>
-                                            <span className={`text-xs ${theme === "dark" ? "text-orange-400/70" : "text-orange-600/70"}`}>
-                                                / 25
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="flex items-center justify-between">
+                                    <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead Source</span>
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.source || "—"}</span>
                                 </div>
-                            </div>
 
-                            {/* Recent Activity */}
-                            <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
-                                <div className="flex items-center justify-between mb-5">
-                                    <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                        Recent Activity
-                                    </h3>
-                                    {setTab && (
-                                        <button 
-                                            onClick={() => setTab("activity")}
-                                            className={`text-sm font-medium ${theme === "dark" ? "text-orange-400 hover:text-orange-300" : "text-orange-600 hover:text-orange-700"}`}
-                                        >
-                                            View All
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="space-y-4">
-                                    {recentActivities.length > 0 ? (
-                                        recentActivities.map((activity) => {
-                                            const iconConfig = getActivityIcon(activity.type);
-                                            const Icon = iconConfig.icon;
-                                            const activityTitle = getActivityTitle(activity);
-                                            const activityDesc = activity.comments || activity.activity || "";
 
-                                            return (
-                                                <div key={activity.id} className="flex gap-3">
-                                                    <div className={`p-2 rounded-full h-fit ${iconConfig.bg}`}>
-                                                        <Icon className={`w-3 h-3 ${iconConfig.color}`} />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                                                            <span className="font-medium">{activityTitle}</span>
-                                                            {activityDesc && ` - ${activityDesc.length > 50 ? activityDesc.substring(0, 50) + '...' : activityDesc}`}
-                                                        </p>
-                                                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                                            {formatRelativeTime(activity.created_at)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    ) : (
-                                        <p className={`text-sm text-center py-4 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                            No recent activity
-                                        </p>
-                                    )}
-                                </div>
+                                {lead.assignedTo && (
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Assigned To</span>
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.assignedTo}</span>
+                                    </div>
+                                )}
+                                {lead.campaign && (
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Campaign</span>
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.campaign}</span>
+                                    </div>
+                                )}
+                                {lead.budget && (
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Budget</span>
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.budget}</span>
+                                    </div>
+                                )}
+                                {lead.createdAt && (
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Created Date</span>
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.createdAt}</span>
+                                    </div>
+                                )}
+                                {lead.lastActivityDate && (
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Last Activity</span>
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.lastActivityDate}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                  
+                    {/* Right Column - Scoring & Activity */}
+                    <div className="space-y-6">
+                        {/* Lead Scoring Card */}
+                        <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                    Lead Scoring
+                                </h3>
+                                {onEditScores && (
+                                    <button
+                                        onClick={onEditScores}
+                                        className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
+                                        title="Edit Scores"
+                                    >
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                {/* Lead Score */}
+                                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Target className={`w-4 h-4 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`} />
+                                        <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                                            Lead Score
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                            {Number(lead?.lead_score) || 0}
+                                        </span>
+                                        <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                            / 5
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Responsiveness Score */}
+                                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className={`w-4 h-4 ${theme === "dark" ? "text-green-400" : "text-green-600"}`} />
+                                        <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                                            Responsiveness
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                            {Number(lead?.responsiveness_score) || 0}
+                                        </span>
+                                        <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                            / 10
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Conversion Probability Score */}
+                                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Zap className={`w-4 h-4 ${theme === "dark" ? "text-yellow-400" : "text-yellow-600"}`} />
+                                        <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                                            Conversion Probability
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                            {Number(lead?.conversion_probability_score) || 0}
+                                        </span>
+                                        <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                            / 10
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Total Score */}
+                                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gradient-to-br from-orange-900/30 to-orange-800/20 border border-orange-700/50" : "bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200"}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <TrendingUp className={`w-4 h-4 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
+                                        <span className={`text-xs font-medium ${theme === "dark" ? "text-orange-300" : "text-orange-700"}`}>
+                                            Total Score
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-2xl font-bold ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>
+                                            {Number(lead?.lead_score || 0) + Number(lead?.responsiveness_score || 0) + Number(lead?.conversion_probability_score || 0)}
+                                        </span>
+                                        <span className={`text-xs ${theme === "dark" ? "text-orange-400/70" : "text-orange-600/70"}`}>
+                                            / 25
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Recent Activity */}
+                        <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                    Recent Activity
+                                </h3>
+                                {setTab && (
+                                    <button
+                                        onClick={() => setTab("activity")}
+                                        className={`text-sm font-medium ${theme === "dark" ? "text-orange-400 hover:text-orange-300" : "text-orange-600 hover:text-orange-700"}`}
+                                    >
+                                        View All
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-4">
+                                {recentActivities.length > 0 ? (
+                                    recentActivities.map((activity) => {
+                                        const iconConfig = getActivityIcon(activity.type);
+                                        const Icon = iconConfig.icon;
+                                        const activityTitle = getActivityTitle(activity);
+                                        const activityDesc = activity.comments || activity.activity || "";
+
+                                        return (
+                                            <div key={activity.id} className="flex gap-3">
+                                                <div className={`p-2 rounded-full h-fit ${iconConfig.bg}`}>
+                                                    <Icon className={`w-3 h-3 ${iconConfig.color}`} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
+                                                        <span className="font-medium">{activityTitle}</span>
+                                                        {activityDesc && ` - ${activityDesc.length > 50 ? activityDesc.substring(0, 50) + '...' : activityDesc}`}
+                                                    </p>
+                                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                        {formatRelativeTime(activity.created_at)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className={`text-sm text-center py-4 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                        No recent activity
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            
-           
+
+
+            </div>
+
+
 
             {/* Email Modal */}
             <EmailModal

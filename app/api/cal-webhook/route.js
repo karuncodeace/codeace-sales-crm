@@ -69,17 +69,14 @@ export async function POST(req) {
                         customInputs.name?.value ||
                         null;
 
-    // Extract lead_id (preferred numeric id from leads_table.id) and salesperson_id
-    let lead_id_raw = responses.lead_id?.value || 
+    // Extract lead_id (string identifier from leads.text) and salesperson_id
+    let lead_id = responses.lead_id?.value || 
                   responses.leadId?.value ||
                   customInputs.lead_id?.value ||
                   customInputs.leadId?.value ||
                   body?.lead_id ||
                   body?.leadId ||
                   null;
-    // Normalize to number when possible
-    const lead_id = lead_id_raw && !Number.isNaN(Number(lead_id_raw)) ? Number(lead_id_raw) : lead_id_raw || null;
-    let resolvedLeadId = lead_id;
     
     const salesperson_id = responses.salesperson_id?.value || 
                           responses.salespersonId?.value ||
@@ -128,13 +125,12 @@ export async function POST(req) {
       try {
         const { data: lead, error: leadError } = await supabase
           .from("leads_table")
-          .select("id, lead_name, email")
-          .eq("id", lead_id)
+          .select("text, lead_name")
+          .eq("text", lead_id)
           .single();
 
         if (!leadError && lead) {
           lead_name = lead.lead_name || lead_name || null;
-          resolvedLeadId = lead.id;
           console.log("  - lead_name (from DB):", lead_name);
         } else {
           console.log("  - lead_name: Not found in database");
@@ -196,7 +192,7 @@ export async function POST(req) {
       if (lead_id) {
         try {
           const { data: pendingAppointments, error: searchError } = await supabase
-            .from("appointments")
+            .from("appoiintments")
             .select("*")
             .eq("lead_id", lead_id)
             .eq("status", "pending")
@@ -228,7 +224,7 @@ export async function POST(req) {
         status: appointmentStatus,
         location: location,
         join_url: joinUrl,
-        lead_id: resolvedLeadId,
+        lead_id: lead_id,
         lead_name: lead_name,
         attendee_name: attendeeName,
         attendee_email: attendeeEmail,
@@ -251,43 +247,18 @@ export async function POST(req) {
           if (conditions.length > 0) {
             const { data: leadMatch, error: leadMatchError } = await supabase
               .from("leads_table")
-              .select("id, lead_name, email")
+              .select("text, lead_name")
               .or(conditions.join(","))
               .maybeSingle();
 
-            if (!leadMatchError && leadMatch?.id) {
-              appointmentData.lead_id = leadMatch.id;
+            if (!leadMatchError && leadMatch?.text) {
+              appointmentData.lead_id = leadMatch.text;
               appointmentData.lead_name = leadMatch.lead_name || appointmentData.lead_name;
               console.log("  - lead_id resolved via lookup:", appointmentData.lead_id);
             }
           }
         } catch (resolveErr) {
           console.log("  - lead_id resolution attempt failed:", resolveErr.message);
-        }
-      }
-      // Fallback: if still missing, create a minimal lead entry so FK passes
-      if (!appointmentData.lead_id && (attendeeEmail || attendeeName)) {
-        try {
-          const { data: newLead, error: newLeadError } = await supabase
-            .from("leads_table")
-            .insert({
-              lead_name: attendeeName || attendeeEmail || "Unknown",
-              email: attendeeEmail || null,
-              status: "New",
-              priority: "Warm",
-            })
-            .select("id, lead_name, email")
-            .single();
-
-          if (!newLeadError && newLead?.id) {
-            appointmentData.lead_id = newLead.id;
-            appointmentData.lead_name = newLead.lead_name || appointmentData.lead_name;
-            console.log("  - lead_id created via fallback insert:", appointmentData.lead_id);
-          } else if (newLeadError) {
-            console.log("  - fallback lead creation failed:", newLeadError.message);
-          }
-        } catch (fallbackErr) {
-          console.log("  - fallback lead creation exception:", fallbackErr.message);
         }
       }
 
@@ -307,7 +278,7 @@ export async function POST(req) {
         console.log("📝 Updating existing pending appointment:", existingPendingAppointment.id);
         
         const { data: updatedData, error: updateError } = await supabase
-          .from("appointments")
+          .from("appoiintments")
           .update(appointmentData)
           .eq("id", existingPendingAppointment.id)
           .select()
@@ -328,6 +299,14 @@ export async function POST(req) {
         console.log("   Appointment data:", JSON.stringify(appointmentData, null, 2));
         
         // Validate required fields before insert
+        if (!appointmentData.lead_id) {
+          console.error("❌ Missing required field: lead_id");
+          return NextResponse.json(
+            { error: "Missing required field: lead_id" },
+            { status: 400 }
+          );
+        }
+
         if (!appointmentData.start_time) {
           console.error("❌ Missing required field: start_time");
           return NextResponse.json(
@@ -347,12 +326,12 @@ export async function POST(req) {
         
         // Log what we're about to insert
         console.log("📤 Attempting Supabase insert...");
-        console.log("   - Table: appointments");
+        console.log("   - Table: appoiintments");
         console.log("   - Data keys:", Object.keys(appointmentData));
         
         try {
           const { data: insertedData, error: insertError } = await supabase
-            .from("appointments")
+            .from("appoiintments")
             .insert(appointmentData)
             .select()
             .single();

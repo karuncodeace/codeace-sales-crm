@@ -1,30 +1,5 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 
-// Task title mapping based on lead status
-const taskTitles = {
-  "New":        (name) => `Contact ${name} for the first time`,
-  "Contacted":  (name) => `Qualify the needs of ${name}`,
-  "Demo":       (name) => `Follow up with ${name} after the demo`,
-  "Proposal":   (name) => `Discuss proposal details with ${name}`,
-  "Follow-Up":  (name) => `Follow up with ${name} for decision update`,
-  "Won":        (name) => `Begin onboarding process for ${name}`,
-};
-
-// Helper function to normalize status to match taskTitles keys
-function normalizeStatus(status) {
-  if (!status) return null;
-  const s = String(status).toLowerCase().trim();
-  
-  if (s === "new") return "New";
-  if (s === "contacted") return "Contacted";
-  if (s === "demo") return "Demo";
-  if (s === "proposal") return "Proposal";
-  if (s === "follow-up" || s === "follow_up" || s === "follow up") return "Follow-Up";
-  if (s === "won") return "Won";
-  
-  return null;
-}
-
 export async function GET() {
   const supabase = await supabaseServer();
   
@@ -39,25 +14,35 @@ export async function GET() {
   }
 
   // Map the data to the format expected by the frontend
-  const leads = data.map((lead) => ({
-    id: lead.id,
-    name: lead.lead_name,
-    phone: lead.phone || "",
-    email: lead.email || "",
-    contactName: lead.contact_name || "",
-    source: lead.lead_source,
-    status: lead.status,
-    priority: lead.priority,
-    assignedTo: lead.assigned_to,
-    createdAt: lead.created_at
-      ? new Date(lead.created_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "",
-    lastActivity: formatLastActivity(lead.last_activity),
-  }));
+  const leads = data.map((lead) => {
+    const totalScore = lead.total_score !== null && lead.total_score !== undefined 
+      ? Number(lead.total_score) 
+      : 0;
+    
+    return {
+      id: lead.id,
+      name: lead.lead_name,
+      phone: lead.phone || "",
+      email: lead.email || "",
+      contactName: lead.contact_name || "",
+      source: lead.lead_source,
+      status: lead.status,
+      priority: lead.priority,
+      assignedTo: lead.assigned_to,
+      companySize: lead.company_size || "",
+      turnover: lead.turnover || "",
+      industryType: lead.industry_type || "",
+      createdAt: lead.created_at
+        ? new Date(lead.created_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "",
+      lastActivity: formatLastActivity(lead.last_activity),
+      totalScore: totalScore,
+    };
+  });
 
   return Response.json(leads);
 }
@@ -89,7 +74,7 @@ export async function POST(request) {
   const supabase = await supabaseServer();
   
   const body = await request.json();
-  const { name, phone, email, contactName, source, status, priority } = body;
+  const { name, phone, email, contactName, source, status, priority, companySize, turnover, industryType } = body;
 
   // Validate required fields
   if (!name || !phone || !email || !contactName || !source) {
@@ -106,6 +91,9 @@ export async function POST(request) {
       lead_source: source,
       status: status || "New",
       priority: priority || "Warm",
+      company_size: companySize || "",
+      turnover: turnover || "",
+      industry_type: industryType || "",
       // created_at and last_activity will use Supabase defaults (now())
     })
     .select()
@@ -126,6 +114,9 @@ export async function POST(request) {
     status: data.status,
     priority: data.priority,
     assignedTo: data.assigned_to,
+    companySize: data.company_size || "",
+    turnover: data.turnover || "",
+    industryType: data.industry_type || "",
     createdAt: data.created_at
       ? new Date(data.created_at).toLocaleDateString("en-US", {
           month: "short",
@@ -136,27 +127,15 @@ export async function POST(request) {
     lastActivity: formatLastActivity(data.last_activity),
   };
 
-  // Generate task title based on status using the new mapping
-  const normalizedStatus = normalizeStatus(newLead.status || "New");
-  const initialTaskTitle = normalizedStatus && taskTitles[normalizedStatus]
-    ? taskTitles[normalizedStatus](newLead.name)
-    : `Contact ${newLead.name} for the first time`; // Default to "New" mapping
-  
-  const taskInsertData = {
-    lead_id: newLead.id,
-    title: initialTaskTitle,
-    type: "Call",
-    status: "Pending",
-  };
-  
-  // Set sales_person_id from lead's assigned_to if available
-  if (data.assigned_to) {
-    taskInsertData.sales_person_id = data.assigned_to;
-  }
-  
+  const initialTaskTitle = `Call to ${newLead.name}`;
   await supabase
     .from("tasks_table")
-    .insert(taskInsertData);
+    .insert({
+      lead_id: newLead.id,
+      title: initialTaskTitle,
+      type: "Call",
+      status: "Pending",
+    });
 
   return Response.json({ success: true, lead: newLead });
 }
@@ -165,7 +144,7 @@ export async function PATCH(request) {
   const supabase = await supabaseServer();
   
   const body = await request.json();
-  const { id, status, priority } = body;
+  const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType } = body;
 
   if (!id) {
     return Response.json({ error: "Lead ID is required" }, { status: 400 });
@@ -177,17 +156,34 @@ export async function PATCH(request) {
     .eq("id", id)
     .single();
 
+  if (!existingLead) {
+    return Response.json({ error: "Lead not found" }, { status: 404 });
+  }
+
   const previousStatus = existingLead?.status;
   const leadName = existingLead?.lead_name || "";
 
   const updateData = {};
+  if (name !== undefined) updateData.lead_name = name;
+  if (phone !== undefined) updateData.phone = phone;
+  if (email !== undefined) updateData.email = email;
+  if (contactName !== undefined) updateData.contact_name = contactName;
+  if (source !== undefined) updateData.lead_source = source;
   if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
+  if (companySize !== undefined) updateData.company_size = companySize;
+  if (turnover !== undefined) updateData.turnover = turnover;
+  if (industryType !== undefined) {
+    updateData.industry_type = industryType;
+    console.log("📝 Updating industry_type:", industryType);
+  }
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ error: "No fields to update" }, { status: 400 });
   }
 
+  console.log("🔄 Updating lead with data:", JSON.stringify(updateData, null, 2));
+  
   const { data, error } = await supabase
     .from("leads_table")
     .update(updateData)
@@ -195,9 +191,11 @@ export async function PATCH(request) {
     .select();
 
   if (error) {
-    console.error("Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
+    console.error("❌ Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
     return Response.json({ error: error.message }, { status: 500 });
   }
+  
+  console.log("✅ Lead updated successfully:", data?.[0]?.industry_type);
 
   if (!data || data.length === 0) {
     console.error("Leads PATCH Error: No lead found with ID:", id);
@@ -207,20 +205,30 @@ export async function PATCH(request) {
   const updatedLead = data[0];
 
   if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
-    // Generate task title based on status using the new mapping
-    const normalizedStatus = normalizeStatus(status);
+    const s = String(status).toLowerCase();
     let title = `Task for ${leadName}`;
     let type = "Follow-Up";
-    
-    if (normalizedStatus && taskTitles[normalizedStatus]) {
-      title = taskTitles[normalizedStatus](leadName);
-      // Set type based on status
-      if (normalizedStatus === "New") type = "Call";
-      else if (normalizedStatus === "Contacted") type = "Follow-Up";
-      else if (normalizedStatus === "Demo") type = "Follow-Up";
-      else if (normalizedStatus === "Proposal") type = "Proposal";
-      else if (normalizedStatus === "Follow-Up") type = "Follow-Up";
-      else if (normalizedStatus === "Won") type = "Meeting";
+    if (s === "new") {
+      title = `Call to ${leadName}`;
+      type = "Call";
+    } else if (s === "contacted") {
+      title = `Follow-up to ${leadName}`;
+      type = "Follow-Up";
+    } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
+      title = `Follow-up to ${leadName}`;
+      type = "Follow-Up";
+    } else if (s === "qualified") {
+      title = `Qualification call with ${leadName}`;
+      type = "Call";
+    } else if (s === "proposal") {
+      title = `Prepare proposal for ${leadName}`;
+      type = "Proposal";
+    } else if (s === "won") {
+      title = `Closure with ${leadName}`;
+      type = "Meeting";
+    } else if (s === "no response" || s === "no_response") {
+      title = `Re-attempt contact: ${leadName}`;
+      type = "Call";
     }
 
     await supabase
@@ -233,5 +241,30 @@ export async function PATCH(request) {
       });
   }
 
-  return Response.json({ success: true, data: updatedLead });
+  // Map the updated lead to frontend format
+  const formattedLead = {
+    id: updatedLead.id,
+    name: updatedLead.lead_name,
+    phone: updatedLead.phone || "",
+    email: updatedLead.email || "",
+    contactName: updatedLead.contact_name || "",
+    source: updatedLead.lead_source,
+    status: updatedLead.status,
+    priority: updatedLead.priority,
+    assignedTo: updatedLead.assigned_to,
+    companySize: updatedLead.company_size || "",
+    turnover: updatedLead.turnover || "",
+    industryType: updatedLead.industry_type || "",
+    createdAt: updatedLead.created_at
+      ? new Date(updatedLead.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "",
+    lastActivity: formatLastActivity(updatedLead.last_activity),
+    totalScore: updatedLead.total_score !== null && updatedLead.total_score !== undefined ? Number(updatedLead.total_score) : 0,
+  };
+
+  return Response.json({ success: true, data: formattedLead });
 }

@@ -11,6 +11,7 @@ import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
 import AddLeadModal from "../buttons/addLeadModal";
+import EditLeadModal from "../buttons/editLeadModal";
 import EmailModal from "../ui/email-modal";
 
 // Fetcher function for SWR - calls the API route
@@ -110,6 +111,10 @@ export default function LeadsTable() {
   const [filter, setFilter] = useState("all");
   const [openFilter, setOpenFilter] = useState(false);
   const [openAddLead, setOpenAddLead] = useState(false);
+  const [editLeadModal, setEditLeadModal] = useState({
+    isOpen: false,
+    lead: null,
+  });
   const [emailModal, setEmailModal] = useState({
     isOpen: false,
     recipientEmail: "",
@@ -146,6 +151,14 @@ export default function LeadsTable() {
   const handleAddLead = (newLead) => {
     // Add new lead and revalidate from server
     mutate([newLead, ...leadData], true);
+  };
+
+  const handleUpdateLead = (updatedLead) => {
+    // Update the lead in the list and revalidate
+    mutate(
+      leadData.map((lead) => (lead.id === updatedLead.id ? updatedLead : lead)),
+      true
+    );
   };
 
   const handleLeadClick = (leadId) => {
@@ -676,14 +689,14 @@ export default function LeadsTable() {
 
                     {[
                       "Contact Name",
-                      "Lead Name"
-,                     "Phone",
-                      "Email",
+                      "Lead Name",
+                      "Contact Info",
                       
                       "Status",
                       "Assigned To",
-                      "Created At",
+                     
                       "Priority",
+                      "Score",
                       "Actions",
                     ].map((column) => (
                       <th
@@ -703,26 +716,26 @@ export default function LeadsTable() {
 
                 <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                   {leadData.length === 0 ? (
-                   <tr className="h-[600px]">
-                   <td colSpan={11} className="px-6 text-center">
-                     <div className="flex flex-col items-center justify-center h-full">
-                       
-                       <div className="flex items-center justify-center gap-2">
-                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce"></div>
-                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                         <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
-                       </div>
-             
-                       <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">
-                         Loading leads…
-                       </p>
-             
-                     </div>
-                   </td>
-                 </tr>
+                    <tr className="h-[600px]">
+                      <td colSpan={9} className="px-6 text-center">
+                        <div className="flex flex-col items-center justify-center h-full">
+                          
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce"></div>
+                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                          </div>
+            
+                          <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">
+                            Loading leads…
+                          </p>
+            
+                        </div>
+                      </td>
+                    </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr className="h-[600px]">
-                      <td colSpan={11} className="px-6 text-center">
+                      <td colSpan={9} className="px-6 text-center">
                         <div className="flex flex-col items-center justify-center h-full">
                           <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                             No leads found
@@ -752,9 +765,20 @@ export default function LeadsTable() {
                         </td>
                         <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(lead.id)}>
                           <div className="px-6 py-2">
-                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                              {lead.contactName || "—"}
-                            </span>
+                            <div className="flex items-center gap-x-3">
+
+                              <div 
+                                className="flex flex-col cursor-pointer"
+                                
+                              >
+                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                  {lead.contactName || "—"}
+                                </span>
+                                <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                  {lead.createdAt || "—"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(lead.id)}>
@@ -766,63 +790,63 @@ export default function LeadsTable() {
                                 
                               >
                                 <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                  {lead.name}
+                                  {lead.name || "—"}
                                 </span>
                                 <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                  {lead.id}
+                                  {lead.id || "—"}
                                 </span>
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
+                        <td className="size-px whitespace-nowrap cursor-pointer">
                           <div className="px-6 py-2">
-                            <a
-                              href={`tel:${lead.phone.replace(
-                                /[^0-9+]/g,
-                                ""
-                              )}`}
-                              className={`text-sm font-medium  
-                            ${theme === "dark" ? " text-gray-300 hover:text-orange-400" : " text-gray-900 hover:text-orange-800"}
-                            `}
-                            >
-                              {lead.phone}
-                            </a>
-                          </div>
-                        </td>
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            {lead.email ? (
-                              <div className="flex items-center gap-2 group">
-                                <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                  {lead.email}
-                                </span>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    try {
-                                      await navigator.clipboard.writeText(lead.email);
-                                      setCopiedEmailId(lead.id);
-                                      setTimeout(() => setCopiedEmailId(null), 2000);
-                                    } catch (err) {
-                                      console.error('Failed to copy:', err);
-                                    }
-                                  }}
-                                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded  ${
-                                    theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                                  }`}
-                                  title="Copy email"
+                            <div className="flex flex-col ">
+                              {lead.phone ? (
+                                <a
+                                  href={`tel:${lead.phone.replace(
+                                    /[^0-9+]/g,
+                                    ""
+                                  )}`}
+                                  className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}
                                 >
-                                  {copiedEmailId === lead.id ? (
-                                    <Check className="w-4 h-4 text-green-500" />
-                                  ) : (
-                                    <Copy className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-                            ) : (
-                              <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>—</span>
-                            )}
+                                  {lead.phone}
+                                </a>
+                              ) : (
+                                <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>—</span>
+                              )}
+                              {lead.email ? (
+                                <div className="flex items-center gap-2 group">
+                                  <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                    {lead.email}
+                                  </span>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        await navigator.clipboard.writeText(lead.email);
+                                        setCopiedEmailId(lead.id);
+                                        setTimeout(() => setCopiedEmailId(null), 2000);
+                                      } catch (err) {
+                                        console.error('Failed to copy:', err);
+                                      }
+                                    }}
+                                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+                                      theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                                    }`}
+                                    title="Copy email"
+                                  >
+                                    {copiedEmailId === lead.id ? (
+                                      <Check className="w-4 h-4 text-green-500" />
+                                    ) : (
+                                      <Copy className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>—</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                        {/*
@@ -851,13 +875,7 @@ export default function LeadsTable() {
                           </div>
                         </td>
                         
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {lead.createdAt}
-                            </span>
-                          </div>
-                        </td>
+                     
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <PriorityDropdown
@@ -865,6 +883,13 @@ export default function LeadsTable() {
                               theme={theme}
                               onChange={(newPriority) => handlePriorityUpdate(lead.id, newPriority)}
                             />
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap">
+                          <div className="px-6 py-2">
+                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                              {lead.totalScore || 0}
+                            </span>
                           </div>
                         </td>
                         <td className="size-px whitespace-nowrap">
@@ -957,6 +982,13 @@ export default function LeadsTable() {
                                   </button>
                                   <button
                                     type="button"
+                                    onClick={() => {
+                                      setEditLeadModal({
+                                        isOpen: true,
+                                        lead: lead,
+                                      });
+                                      setOpenActions(null);
+                                    }}
                                     className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
                                     ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
                                   `}
@@ -1465,6 +1497,14 @@ export default function LeadsTable() {
           </div>
         </div>
       )}
+
+      {/* Edit Lead Modal */}
+      <EditLeadModal
+        open={editLeadModal.isOpen}
+        onClose={() => setEditLeadModal({ isOpen: false, lead: null })}
+        lead={editLeadModal.lead}
+        onUpdate={handleUpdateLead}
+      />
 
       {/* Email Modal */}
       <EmailModal

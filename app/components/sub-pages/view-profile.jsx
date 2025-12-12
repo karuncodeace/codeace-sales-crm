@@ -138,11 +138,11 @@ export default function ViewProfile() {
   }
 
   return (
-    <div className={`w-full min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
+    <div className={`w-full min-h-screen `}>
       {/* Hero Banner Section */}
-      <div className={`relative overflow-hidden ${isDark ? "bg-gradient-to-br from-[#262626] via-[#1f1f1f] to-[#262626]" : "bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700"}`}>
+      <div className={`relative overflow-hidden rounded-3xl border  shadow-lg mt-5 ${isDark ? "bg-gradient-to-br from-[#262626] via-[#1f1f1f] to-[#262626] border-gray-700 " : "bg-white text-black border-gray-200 "}`}>
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>
-        <div className="relative max-w-7xl mx-auto px-6 py-12">
+        <div className="relative  mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row items-center gap-8">
             {/* Avatar Section */}
             <div className="relative">
@@ -166,15 +166,15 @@ export default function ViewProfile() {
             </div>
 
             {/* Profile Info */}
-            <div className="flex-1 text-center md:text-left">
-              <h1 className={`text-4xl md:text-5xl font-bold mb-2 ${isDark ? "text-white" : "text-white"}`}>
+            <div className="flex-1 text-center md:text-left text-black">
+              <h1 className={`text-4xl md:text-5xl font-bold mb-2 ${isDark ? "text-white" : "text-black"}`}>
                 {userData.name}
               </h1>
-              <p className={`text-xl mb-4 ${isDark ? "text-gray-300" : "text-white/90"}`}>
+              <p className={`text-xl mb-4 ${isDark ? "text-gray-300" : "text-black/50"}`}>
                 {userData.role}
               </p>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isDark ? "bg-gray-800/50 text-gray-300" : "bg-white/20 text-white"} backdrop-blur-sm`}>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isDark ? "bg-gray-800/50 text-gray-300" : "bg-white/20 text-black"} backdrop-blur-sm`}>
                   <Mail className="h-4 w-4" />
                   <span className="text-sm">{userData.email}</span>
                   <button
@@ -202,7 +202,7 @@ export default function ViewProfile() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 -mt-8">
+      <div className=" mx-auto  py-8 ">
         {/* Performance Overview Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Tasks Card */}

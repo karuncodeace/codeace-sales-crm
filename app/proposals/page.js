@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useTheme } from "../context/themeContext";
-import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, X, ChevronRight, ChevronLeft, FileText, Check } from "lucide-react";
+import { Download, Plus, Trash2, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, X, ChevronRight, ChevronLeft, FileText, Check, MoreVertical, Eye } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import jsPDF from "jspdf";
 import { generatePDF as generatePDFService, generatePreviewPDF as generatePreviewPDFService } from "./pdfService";
@@ -207,6 +207,7 @@ export default function ProposalPage() {
   const [loadingPdfs, setLoadingPdfs] = useState(true);
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
   const [pdfUrls, setPdfUrls] = useState({});
+  const [openActionMenu, setOpenActionMenu] = useState(null);
   const defaultMilestones = useMemo(
     () => [
       { title: "Advance Payment on Contract Signing", amount: "" },
@@ -234,16 +235,32 @@ export default function ProposalPage() {
         return;
       }
       try {
-        const { data, error } = await supabase.storage
-          .from("proposal_pdf")
-          .list("proposals", {
-            limit: 100,
-            offset: 0,
-            sortBy: { column: "created_at", order: "desc" },
-          });
+        // Try different possible bucket names
+        const bucketNames = ["proposal_pdf", "proposals", "pdfs"];
+        let data = null;
+        let error = null;
+        let usedBucket = null;
 
-        if (error) {
-          console.error("Error fetching PDFs:", error);
+        for (const bucketName of bucketNames) {
+          const result = await supabase.storage
+            .from(bucketName)
+            .list("proposals", {
+              limit: 100,
+              offset: 0,
+              sortBy: { column: "created_at", order: "desc" },
+            });
+          
+          if (!result.error) {
+            data = result.data;
+            usedBucket = bucketName;
+            break;
+          }
+          error = result.error;
+        }
+
+        if (error && !data) {
+          console.error("Error fetching PDFs - Bucket not found. Tried:", bucketNames);
+          console.error("Error details:", error);
           setPdfList([]);
         } else {
           const pdfs = (data || [])
@@ -254,6 +271,9 @@ export default function ProposalPage() {
               id: file.id,
             }));
           setPdfList(pdfs);
+          if (usedBucket) {
+            console.log("Using bucket:", usedBucket);
+          }
         }
       } catch (err) {
         console.error("Error fetching PDFs:", err);
@@ -266,23 +286,50 @@ export default function ProposalPage() {
     fetchPdfs();
   }, [supabase]);
 
-  // Resolve public/signed URLs for PDFs so view/download/share work reliably
+  // Resolve public/signed URLs for PDFs so view/download work reliably
   useEffect(() => {
     const resolveUrls = async () => {
       if (!supabase || !pdfList?.length) {
         setPdfUrls({});
         return;
       }
+      
       const entries = await Promise.all(
         pdfList.map(async (file) => {
           const path = `proposals/${file.name}`;
-          // Try public URL first
-          const { data } = supabase.storage.from("proposal_pdf").getPublicUrl(path);
-          if (data?.publicUrl) return [file.name, data.publicUrl];
+          
+          try {
+            // Try public URL first (if bucket is public)
+            const { data: publicData } = supabase.storage.from("proposal_pdf").getPublicUrl(path);
+            if (publicData?.publicUrl) {
+              // Test if public URL is accessible
+              try {
+                const testResponse = await fetch(publicData.publicUrl, { method: 'HEAD' });
+                if (testResponse.ok) {
+                  return [file.name, publicData.publicUrl];
+                }
+              } catch (e) {
+                // Public URL not accessible, fall through to signed URL
+              }
+            }
 
-          // Fallback to signed URL
-          const { data: signed } = await supabase.storage.from("proposal_pdf").createSignedUrl(path, 3600);
-          if (signed?.signedUrl) return [file.name, signed.signedUrl];
+            // Use signed URL (works for both public and private buckets)
+            const { data: signed, error } = await supabase.storage
+              .from("proposal_pdf")
+              .createSignedUrl(path, 3600);
+            
+            if (error) {
+              console.error(`Error creating signed URL for ${file.name}:`, error);
+              return [file.name, null];
+            }
+            
+            if (signed?.signedUrl) {
+              return [file.name, signed.signedUrl];
+            }
+          } catch (err) {
+            console.error(`Error resolving URL for ${file.name}:`, err);
+          }
+          
           return [file.name, null];
         })
       );
@@ -298,12 +345,47 @@ export default function ProposalPage() {
     }
   }, [currentStep, formData.milestones, defaultMilestones]);
 
-  const getPdfUrl = (fileName) => {
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('[data-actions-menu="true"]')) {
+        setOpenActionMenu(null);
+      }
+    };
+
+    if (openActionMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openActionMenu]);
+
+  const getPdfUrl = async (fileName) => {
     if (!supabase) return null;
-    const { data } = supabase.storage
-      .from("proposal_pdf")
-      .getPublicUrl(`proposals/${fileName}`);
-    return data?.publicUrl || null;
+    try {
+      const path = `proposals/${fileName}`;
+      
+      // Try to get signed URL (more reliable)
+      const { data: signed, error } = await supabase.storage
+        .from("proposal_pdf")
+        .createSignedUrl(path, 3600);
+      
+      if (!error && signed?.signedUrl) {
+        return signed.signedUrl;
+      }
+      
+      // Fallback to public URL
+      const { data: publicData } = supabase.storage
+        .from("proposal_pdf")
+        .getPublicUrl(path);
+      
+      return publicData?.publicUrl || null;
+    } catch (err) {
+      console.error('Error getting PDF URL:', err);
+      return null;
+    }
   };
 
   const handleInputChange = (e) => {
@@ -2046,12 +2128,12 @@ export default function ProposalPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#1a1a1a]" : "bg-gray-50"}`}>
-      <div className="w-full mt-10 ">
+      <div className="w-full mt-8 ">
         <div className="mx-auto ">
           {/* Header */}
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className={`text-3xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+              <h1 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                 Proposals
               </h1>
               <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
@@ -2090,78 +2172,124 @@ export default function ProposalPage() {
                   No PDFs found. Create your first proposal!
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4  ">
                   {pdfList.map((pdf) => {
-                    const pdfUrl = pdfUrls[pdf.name] || getPdfUrl(pdf.name);
-                    const handleShare = async () => {
-                      if (!pdfUrl) return;
-                      try {
-                        await navigator.clipboard.writeText(pdfUrl);
-                        alert("Share link copied to clipboard");
-                      } catch (err) {
-                        alert("Unable to copy link");
-                      }
-                    };
+                    const pdfUrl = pdfUrls[pdf.name];
                     return (
                       <div
-                        key={pdf.id}
-                        className={`p-4 rounded-lg border ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"} hover:shadow-lg transition-shadow`}
+                        key={pdf.id || pdf.name}
+                        className={`flex   p-4 rounded-lg border ${
+                          isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
+                        }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <FileText className={`w-8 h-8 ${isDark ? "text-orange-500" : "text-orange-600"} flex-shrink-0 mt-1`} />
+                        <div className="flex items-center gap-3 flex-1">
+                          <FileText className={`w-5 h-5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-medium truncate ${isDark ? "text-white" : "text-gray-900"}`}>
-                              {pdf.name.replace(/_/g, " ").replace(/\.pdf$/i, "")}
+                              {pdf.name}
                             </p>
-                            <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                              {pdf.created_at ? new Date(pdf.created_at).toLocaleDateString() : "Unknown date"}
-                            </p>
+                            {pdf.created_at && (
+                              <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                                {new Date(pdf.created_at).toLocaleDateString()}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <div className="mt-3 flex gap-2">
+                        <div className="relative" data-actions-menu="true">
                           <button
-                            onClick={() => pdfUrl && window.open(pdfUrl, "_blank", "noopener,noreferrer")}
-                            disabled={!pdfUrl}
-                            className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors ${
-                              pdfUrl
-                                ? isDark
-                                  ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                  : "bg-gray-200 hover:bg-gray-300 text-gray-900"
-                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            type="button"
+                            onClick={() => setOpenActionMenu(openActionMenu === pdf.name ? null : pdf.name)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDark
+                                ? "hover:bg-gray-700 text-gray-400"
+                                : "hover:bg-gray-200 text-gray-600"
                             }`}
+                            aria-label="Actions"
                           >
-                            View
+                            <MoreVertical className="w-5 h-5" />
                           </button>
-                          <a
-                            href={pdfUrl || "#"}
-                            download
-                            onClick={(e) => {
-                              if (!pdfUrl) e.preventDefault();
-                            }}
-                            className={`flex-1 text-center px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                              pdfUrl
-                                ? isDark
-                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
-                                  : "bg-orange-500 hover:bg-orange-600 text-white"
-                                : "bg-orange-200 text-orange-900 cursor-not-allowed"
-                            }`}
-                          >
-                            <Download className="w-4 h-4" />
-                            Download
-                          </a>
-                          <button
-                            onClick={handleShare}
-                            disabled={!pdfUrl}
-                            className={`px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center ${
-                              pdfUrl
-                                ? isDark
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                  : "bg-blue-500 hover:bg-blue-600 text-white"
-                                : "bg-blue-200 text-blue-900 cursor-not-allowed"
-                            }`}
-                          >
-                            Share
-                          </button>
+                          {openActionMenu === pdf.name && (
+                            <div
+                              className={`absolute right-0 top-full mt-2 z-10 w-40 rounded-lg border shadow-xl ${
+                                isDark
+                                  ? "bg-gray-800 border-gray-700"
+                                  : "bg-white border-gray-200"
+                              }`}
+                            >
+                              {pdfUrl ? (
+                                <>
+                                  <a
+                                    href={pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setOpenActionMenu(null);
+                                      window.open(pdfUrl, '_blank');
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
+                                      isDark
+                                        ? "hover:bg-gray-700 text-gray-200"
+                                        : "hover:bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                    View
+                                  </a>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      setOpenActionMenu(null);
+                                      try {
+                                        let urlToUse = pdfUrl;
+                                        
+                                        // If no URL available, get a fresh signed URL
+                                        if (!urlToUse) {
+                                          const path = `proposals/${pdf.name}`;
+                                          const { data: signed, error } = await supabase.storage
+                                            .from("proposal_pdf")
+                                            .createSignedUrl(path, 3600);
+                                          
+                                          if (error) {
+                                            throw new Error(error.message || 'Failed to generate download URL');
+                                          }
+                                          
+                                          if (signed?.signedUrl) {
+                                            urlToUse = signed.signedUrl;
+                                          } else {
+                                            throw new Error('Unable to generate download URL');
+                                          }
+                                        }
+                                        
+                                        // Create download link
+                                        const link = document.createElement('a');
+                                        link.href = urlToUse;
+                                        link.download = pdf.name;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      } catch (error) {
+                                        console.error('Error downloading PDF:', error);
+                                        alert(`Failed to download PDF: ${error.message || 'Unknown error'}`);
+                                      }
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-t w-full text-left ${
+                                      isDark
+                                        ? "hover:bg-gray-700 text-gray-200 border-gray-700"
+                                        : "hover:bg-gray-100 text-gray-700 border-gray-200"
+                                    }`}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Download
+                                  </button>
+                                </>
+                              ) : (
+                                <div className={`px-4 py-2 text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                                  Loading URL...
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

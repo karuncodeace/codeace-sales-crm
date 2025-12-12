@@ -6,43 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Fetch appointments (supports optional status and lead_id filters)
-export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const leadId = searchParams.get("lead_id");
-
-    let query = supabase
-      .from("appointments")
-      .select("*")
-      .order("start_time", { ascending: false });
-
-    if (status && status !== "all") {
-      query = query.eq("status", status);
-    }
-    if (leadId) {
-      query = query.eq("lead_id", leadId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Appointments GET error:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to fetch appointments" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(data || []);
-  } catch (err) {
-    console.error("Appointments GET exception:", err);
-    return NextResponse.json(
-      { error: err.message || "Internal server error" },
-      { status: 500 }
-    );
-  }
+// Basic health/check endpoint (keep disabled for reads until needed)
+export async function GET() {
+  return NextResponse.json({ message: "Appointments POST available" });
 }
 
 // Insert a new appointment row into the appointments table.
