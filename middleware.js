@@ -47,6 +47,22 @@ export async function middleware(request) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // If user is authenticated, check if they're authorized in sales_persons table
+  if (user && !isPublicRoute) {
+    const { data: salesPerson } = await supabase
+      .from("sales_persons")
+      .select("id")
+      .eq("email", user.email)
+      .single();
+
+    // If user is not found in sales_persons table, block access
+    if (!salesPerson) {
+      const unauthorizedUrl = new URL("/login", request.url);
+      unauthorizedUrl.searchParams.set("error", "not_authorized");
+      return NextResponse.redirect(unauthorizedUrl);
+    }
+  }
+
   // If user is authenticated and trying to access login page, redirect to dashboard
   if (user && pathname === "/login") {
     const dashboardUrl = new URL("/dashboard", request.url);

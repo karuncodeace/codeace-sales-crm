@@ -1,14 +1,21 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
 /* ---------------- GET ---------------- */
 export async function GET(request) {
   const supabase = await supabaseServer();
   
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("lead_id");
 
-  // Fetch tasks from tasks_table
-  let query = supabase.from("tasks_table").select("*");
+  // Get filtered query based on role
+  let query = getFilteredQuery(supabase, "tasks_table", crmUser);
 
   // Filter by lead_id if provided
   if (leadId) {
@@ -29,23 +36,37 @@ export async function GET(request) {
 /* ---------------- POST (Manual task create) ---------------- */
 export async function POST(request) {
   const supabase = await supabaseServer();
+  
+  // Get CRM user for role-based assignment
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const body = await request.json();
 
   const { lead_id, sales_person_id, priority, comments, type, title, due_date } = body;
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
 
-  // If sales_person_id is not provided, get it from the lead's assigned_to
+  // Determine sales_person_id based on role
   let finalSalesPersonId = sales_person_id;
-  if (!finalSalesPersonId) {
-    const { data: lead, error: leadError } = await supabase
-      .from("leads_table")
-      .select("assigned_to")
-      .eq("id", lead_id)
-      .single();
+  
+  if (crmUser.role === "salesperson") {
+    // Salesperson: always assign to themselves
+    finalSalesPersonId = crmUser.id;
+  } else if (crmUser.role === "admin") {
+    // Admin: can assign to anyone, but if not provided, try to get from lead
+    if (!finalSalesPersonId) {
+      const { data: lead, error: leadError } = await supabase
+        .from("leads_table")
+        .select("assigned_to")
+        .eq("id", lead_id)
+        .single();
 
-    if (!leadError && lead?.assigned_to) {
-      finalSalesPersonId = lead.assigned_to;
+      if (!leadError && lead?.assigned_to) {
+        finalSalesPersonId = lead.assigned_to;
+      }
     }
   }
 
@@ -75,12 +96,32 @@ export async function POST(request) {
 /* ---------------- PATCH ---------------- */
 export async function PATCH(request) {
   const supabase = await supabaseServer();
+  
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const body = await request.json();
 
   const { id, lead_id, title, type, status, priority, comments, due_date } = body;
 
   // Either id or lead_id must be provided
   if (!id && !lead_id) return Response.json({ error: "Task ID or Lead ID is required" }, { status: 400 });
+
+  // Check if user has access to this task
+  let accessQuery = getFilteredQuery(supabase, "tasks_table", crmUser);
+  if (id) {
+    accessQuery = accessQuery.eq("id", id);
+  } else {
+    accessQuery = accessQuery.eq("lead_id", lead_id);
+  }
+  
+  const { data: existingTask } = await accessQuery.select().single();
+  if (!existingTask) {
+    return Response.json({ error: "Task not found or access denied" }, { status: 404 });
+  }
 
   const updateData = {};
 
@@ -110,10 +151,25 @@ export async function PATCH(request) {
 /* ---------------- DELETE ---------------- */
 export async function DELETE(request) {
   const supabase = await supabaseServer();
+  
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const { searchParams } = new URL(request.url);
 
   const id = searchParams.get("id");
   if (!id) return Response.json({ error: "Task ID is required" }, { status: 400 });
+
+  // Check if user has access to this task
+  let accessQuery = getFilteredQuery(supabase, "tasks_table", crmUser);
+  const { data: existingTask } = await accessQuery.eq("id", id).select().single();
+  
+  if (!existingTask) {
+    return Response.json({ error: "Task not found or access denied" }, { status: 404 });
+  }
 
   const { error } = await supabase
     .from("tasks_table")

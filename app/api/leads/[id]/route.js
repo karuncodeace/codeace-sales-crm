@@ -1,4 +1,5 @@
 import { supabaseServer } from "../../../../lib/supabase/serverClient";
+import { getCrmUser, getFilteredQuery } from "../../../../lib/crm/auth";
 
 // Helper function to format timestamp to relative time
 function formatLastActivity(timestamp) {
@@ -25,11 +26,18 @@ function formatLastActivity(timestamp) {
 
 export async function GET(request, { params }) {
   const supabase = await supabaseServer();
+  
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const { id } = await params;
 
-  const { data: lead, error } = await supabase
-    .from("leads_table")
-    .select("*")
+  // Check if user has access to this lead
+  let query = getFilteredQuery(supabase, "leads_table", crmUser);
+  const { data: lead, error } = await query
     .eq("id", id)
     .single();
 
@@ -83,7 +91,26 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const supabase = await supabaseServer();
+    
+    // Get CRM user for role-based filtering
+    const crmUser = await getCrmUser();
+    if (!crmUser) {
+      return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+    }
+    
     const { id } = await params;
+    
+    // Check if user has access to this lead
+    let accessQuery = getFilteredQuery(supabase, "leads_table", crmUser);
+    const { data: existingLead } = await accessQuery
+      .eq("id", id)
+      .select("id")
+      .single();
+    
+    if (!existingLead) {
+      return Response.json({ error: "Lead not found or access denied" }, { status: 404 });
+    }
+    
     const body = await request.json();
 
     // Extract score fields

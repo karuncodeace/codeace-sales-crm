@@ -1,13 +1,20 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
 export async function GET() {
   const supabase = await supabaseServer();
   
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+
+  // Get filtered query based on role
+  let query = getFilteredQuery(supabase, "leads_table", crmUser);
+  
   // Order by id (descending to show newest leads first)
-  const { data, error } = await supabase
-    .from("leads_table")
-    .select("*")
-    .order("id", { ascending: true });
+  const { data, error } = await query.order("id", { ascending: true });
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -73,12 +80,28 @@ function formatLastActivity(timestamp) {
 export async function POST(request) {
   const supabase = await supabaseServer();
   
+  // Get CRM user for role-based assignment
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const body = await request.json();
-  const { name, phone, email, contactName, source, status, priority, companySize, turnover, industryType } = body;
+  const { name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo } = body;
 
   // Validate required fields
   if (!name || !phone || !email || !contactName || !source) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  // Determine assigned_to based on role
+  let finalAssignedTo = assignedTo;
+  if (crmUser.role === "salesperson") {
+    // Salesperson: always assign to themselves
+    finalAssignedTo = crmUser.id;
+  } else if (crmUser.role === "admin") {
+    // Admin: can assign to anyone (use provided assignedTo or leave null)
+    finalAssignedTo = assignedTo || null;
   }
 
   const { data, error } = await supabase
@@ -94,6 +117,7 @@ export async function POST(request) {
       company_size: companySize || "",
       turnover: turnover || "",
       industry_type: industryType || "",
+      assigned_to: finalAssignedTo,
       // created_at and last_activity will use Supabase defaults (now())
     })
     .select()
@@ -135,6 +159,7 @@ export async function POST(request) {
       title: initialTaskTitle,
       type: "Call",
       status: "Pending",
+      sales_person_id: crmUser.id, // Auto-assign task to creator
     });
 
   return Response.json({ success: true, lead: newLead });
@@ -143,6 +168,12 @@ export async function POST(request) {
 export async function PATCH(request) {
   const supabase = await supabaseServer();
   
+  // Get CRM user for role-based filtering
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
   const body = await request.json();
   const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType } = body;
 
@@ -150,8 +181,9 @@ export async function PATCH(request) {
     return Response.json({ error: "Lead ID is required" }, { status: 400 });
   }
 
-  const { data: existingLead } = await supabase
-    .from("leads_table")
+  // Check if user has access to this lead
+  let query = getFilteredQuery(supabase, "leads_table", crmUser);
+  const { data: existingLead } = await query
     .select("id, lead_name, status")
     .eq("id", id)
     .single();
@@ -238,6 +270,7 @@ export async function PATCH(request) {
         title,
         type,
         status: "Pending",
+        sales_person_id: crmUser.id, // Auto-assign task to current user
       });
   }
 

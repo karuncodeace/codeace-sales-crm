@@ -1,19 +1,49 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-// Basic health/check endpoint (keep disabled for reads until needed)
+// Get appointments with role-based filtering
 export async function GET() {
-  return NextResponse.json({ message: "Appointments POST available" });
+  try {
+    const supabase = await supabaseServer();
+    
+    // Get CRM user for role-based filtering
+    const crmUser = await getCrmUser();
+    if (!crmUser) {
+      return NextResponse.json({ error: "Not authorized for CRM" }, { status: 403 });
+    }
+    
+    // Get filtered query based on role
+    let query = getFilteredQuery(supabase, "appointments", crmUser);
+    
+    const { data, error } = await query.order("start_time", { ascending: true });
+    
+    if (error) {
+      console.error("Appointments GET error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    
+    return NextResponse.json(data || []);
+  } catch (err) {
+    console.error("Appointments GET exception:", err);
+    return NextResponse.json(
+      { error: err.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
 }
 
 // Insert a new appointment row into the appointments table.
 export async function POST(request) {
   try {
+    const supabase = await supabaseServer();
+    
+    // Get CRM user for role-based assignment
+    const crmUser = await getCrmUser();
+    if (!crmUser) {
+      return NextResponse.json({ error: "Not authorized for CRM" }, { status: 403 });
+    }
+    
     const body = await request.json();
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
@@ -28,6 +58,16 @@ export async function POST(request) {
       );
     }
 
+    // Determine salesperson_id based on role
+    let finalSalespersonId = body.salesperson_id;
+    if (crmUser.role === "salesperson") {
+      // Salesperson: always assign to themselves
+      finalSalespersonId = crmUser.id;
+    } else if (crmUser.role === "admin") {
+      // Admin: can assign to anyone (use provided salesperson_id or leave null)
+      finalSalespersonId = body.salesperson_id || null;
+    }
+
     // Normalize payload to match table columns
     const payload = {
       cal_event_id: body.cal_event_id ?? null,
@@ -39,7 +79,7 @@ export async function POST(request) {
       status: body.status ?? "booked",
       lead_id: body.lead_id,
       lead_name: body.lead_name ?? null,
-      salesperson_id: body.salesperson_id ?? null,
+      salesperson_id: finalSalespersonId,
       attendee_name: body.attendee_name ?? null,
       attendee_email: body.attendee_email ?? null,
       raw_payload: body.raw_payload ?? body, // keep original payload for audit

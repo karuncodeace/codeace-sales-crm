@@ -1,15 +1,31 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { supabaseServer } from "../../../../lib/supabase/serverClient";
+import { getCrmUser, getFilteredQuery } from "../../../../lib/crm/auth";
 
 // PATCH - Update appointment (for reschedule/cancel)
 export async function PATCH(request, { params }) {
   try {
+    const supabase = await supabaseServer();
+    
+    // Get CRM user for role-based filtering
+    const crmUser = await getCrmUser();
+    if (!crmUser) {
+      return NextResponse.json({ error: "Not authorized for CRM" }, { status: 403 });
+    }
+    
     const { id } = await params;
+    
+    // Check if user has access to this appointment
+    let accessQuery = getFilteredQuery(supabase, "appointments", crmUser);
+    const { data: existingAppointment } = await accessQuery
+      .eq("id", id)
+      .select("id")
+      .single();
+    
+    if (!existingAppointment) {
+      return NextResponse.json({ error: "Appointment not found or access denied" }, { status: 404 });
+    }
+    
     const body = await request.json();
     const { status, start_time, end_time, action } = body;
 

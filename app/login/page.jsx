@@ -45,6 +45,7 @@ function LoginContent() {
         no_tokens: "Authentication incomplete. Please try again.",
         callback_error: "Something went wrong during sign in. Please try again.",
         auth_callback_error: "Authentication was interrupted. Please try again.",
+        not_authorized: "Not authorized for CRM. Please contact your administrator.",
       };
       setError(errorMessages[errorParam] || "An error occurred. Please try again.");
 
