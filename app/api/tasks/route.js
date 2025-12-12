@@ -7,8 +7,11 @@ export async function GET(request) {
   
   // Get CRM user for role-based filtering
   const crmUser = await getCrmUser();
+  
+  // If no CRM user found, return empty array instead of 403 to prevent loading loops
   if (!crmUser) {
-    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+    console.warn("No CRM user found - returning empty tasks array");
+    return Response.json([]);
   }
   
   const { searchParams } = new URL(request.url);
@@ -27,6 +30,12 @@ export async function GET(request) {
 
   if (error) {
     console.error("Tasks API Error:", error.message);
+    return Response.json([]);
+  }
+
+  // Handle null or undefined data
+  if (!data || !Array.isArray(data)) {
+    console.warn("Tasks API: No data returned or data is not an array");
     return Response.json([]);
   }
 

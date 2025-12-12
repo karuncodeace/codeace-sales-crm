@@ -97,10 +97,17 @@ export default function LeadsTable() {
   const router = useRouter();
   
   // SWR for cached data fetching - data persists across navigations
-  const { data: leadData = [], mutate } = useSWR("leads", fetchLeads, {
+  const { data: leadData = [], error: leadsError, isLoading: leadsLoading, mutate } = useSWR("leads", fetchLeads, {
     revalidateOnFocus: false,      // Don't refetch when window regains focus
     revalidateOnReconnect: false,  // Don't refetch on reconnect
     dedupingInterval: 60000,       // Dedupe requests within 60 seconds
+    onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+      // Don't retry on 403/404 errors
+      if (error.status === 403 || error.status === 404) return;
+      // Retry up to 3 times for other errors
+      if (retryCount >= 3) return;
+      setTimeout(() => revalidate({ retryCount }), 5000);
+    },
   });
   const [openActions, setOpenActions] = useState(null);
   const [viewMode, setViewMode] = useState("table");
@@ -715,7 +722,7 @@ export default function LeadsTable() {
                 </thead>
 
                 <tbody className={`divide-y  overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
-                  {leadData.length === 0 ? (
+                  {leadsLoading ? (
                     <tr className="h-[600px]">
                       <td colSpan={9} className="px-6 text-center">
                         <div className="flex flex-col items-center justify-center h-full">
@@ -730,6 +737,16 @@ export default function LeadsTable() {
                             Loading leads…
                           </p>
             
+                        </div>
+                      </td>
+                    </tr>
+                  ) : leadsError ? (
+                    <tr className="h-[600px]">
+                      <td colSpan={9} className="px-6 text-center">
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <p className={`text-sm ${theme === "dark" ? "text-red-400" : "text-red-600"}`}>
+                            Error loading leads. Please refresh the page.
+                          </p>
                         </div>
                       </td>
                     </tr>

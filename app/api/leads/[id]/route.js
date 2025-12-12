@@ -29,8 +29,11 @@ export async function GET(request, { params }) {
   
   // Get CRM user for role-based filtering
   const crmUser = await getCrmUser();
+  
+  // If no CRM user found, return 404 instead of 403 to prevent loading loops
   if (!crmUser) {
-    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+    console.warn("No CRM user found - returning 404 for lead detail");
+    return Response.json({ error: "Lead not found" }, { status: 404 });
   }
   
   const { id } = await params;

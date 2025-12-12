@@ -9,8 +9,11 @@ export async function GET() {
     
     // Get CRM user for role-based filtering
     const crmUser = await getCrmUser();
+    
+    // If no CRM user found, return empty array instead of 403 to prevent loading loops
     if (!crmUser) {
-      return NextResponse.json({ error: "Not authorized for CRM" }, { status: 403 });
+      console.warn("No CRM user found - returning empty appointments array");
+      return NextResponse.json([]);
     }
     
     // Get filtered query based on role

@@ -6,18 +6,33 @@ export async function GET() {
   
   // Get CRM user for role-based filtering
   const crmUser = await getCrmUser();
+  
+  // If no CRM user found, return empty array instead of 403 to prevent loading loops
   if (!crmUser) {
-    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+    console.warn("No CRM user found - returning empty leads array");
+    return Response.json([]);
   }
 
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
+  console.log("Leads API: Fetching leads for user", { id: crmUser.id, role: crmUser.role });
+  
   // Order by id (descending to show newest leads first)
   const { data, error } = await query.order("id", { ascending: true });
+  
+  console.log("Leads API: Query result", { dataCount: data?.length || 0, error: error?.message });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("Leads API Error:", error);
+    // Return empty array instead of error to prevent loading loops
+    return Response.json([]);
+  }
+
+  // Handle null or undefined data
+  if (!data || !Array.isArray(data)) {
+    console.warn("Leads API: No data returned or data is not an array");
+    return Response.json([]);
   }
 
   // Map the data to the format expected by the frontend
