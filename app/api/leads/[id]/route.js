@@ -52,6 +52,9 @@ export async function GET(request, { params }) {
     company: lead.company || lead.lead_name,
     campaign: lead.campaign || "",
     budget: lead.budget || "",
+    company_size: lead.company_size || "",
+    turnover: lead.turnover || "",
+    industry_type: lead.industry_type || "",
     createdAt: lead.created_at
       ? new Date(lead.created_at).toLocaleDateString("en-US", {
           month: "short",

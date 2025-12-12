@@ -10,7 +10,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-  const { lead_id, activity, type, comments, connect_through, due_date } = body;
+  const { lead_id, activity, type, comments, connect_through, due_date, notes_type } = body;
 
   if (!lead_id) {
     return Response.json({ error: "lead_id is required" }, { status: 400 });
@@ -28,6 +28,7 @@ export async function POST(request) {
   // Add optional fields if provided
   if (connect_through) insertData.connect_through = connect_through;
   if (due_date) insertData.due_date = due_date;
+  if (notes_type) insertData.notes_type = notes_type;
 
     const { error } = await supabase
       .from("task_activities")
@@ -71,7 +72,7 @@ export async function GET(request) {
 
     let query = supabase
       .from("task_activities")
-      .select("id, lead_id, activity, type, comments, connect_through, due_date, source, created_at")
+      .select("id, lead_id, activity, type, comments, connect_through, due_date, source, notes_type, created_at")
       .eq("source", "user"); // Only fetch user activities
 
     if (leadId) {
@@ -100,5 +101,28 @@ export async function GET(request) {
   } catch (err) {
     console.error("Task Activities API Exception:", err);
     return Response.json([]); // Return empty array on exception
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("task_activities").delete().eq("id", id);
+
+    if (error) {
+      console.error("Task Activities DELETE Error:", error);
+      return Response.json({ error: error.message || "Failed to delete task activity" }, { status: 500 });
+    }
+
+    return Response.json({ success: true });
+  } catch (err) {
+    console.error("Task Activities DELETE Exception:", err);
+    return Response.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }

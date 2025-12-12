@@ -82,6 +82,17 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
         return task.due_date || task.due_datetime;
     };
 
+    // Format turnover in INR (₹ with lakh/crore separators if numeric)
+    const formatTurnover = (turnoverValue) => {
+        if (!turnoverValue && turnoverValue !== 0) return "—";
+        const asString = String(turnoverValue).trim();
+        // If already starts with ₹, return as-is
+        if (asString.startsWith("₹")) return asString;
+        const numeric = Number(asString.replace(/[^0-9.-]/g, ""));
+        if (Number.isNaN(numeric)) return `₹ ${asString}`;
+        return numeric.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+    };
+
     // Process tasks data
     const tasksList = Array.isArray(tasksData) ? tasksData : [];
     const upcomingTasks = tasksList
@@ -331,47 +342,40 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
                             <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
                                 Additional Information
                             </h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead ID</span>
-                                    <span className={`font-medium ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`}>{lead.id}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Lead Source</span>
-                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.source || "—"}</span>
-                                </div>
-
-
-                                {lead.assignedTo && (
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Assigned To</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.assignedTo}</span>
-                                    </div>
-                                )}
-                                {lead.campaign && (
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Campaign</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.campaign}</span>
-                                    </div>
-                                )}
-                                {lead.budget && (
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Budget</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.budget}</span>
-                                    </div>
-                                )}
-                                {lead.createdAt && (
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Created Date</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.createdAt}</span>
-                                    </div>
-                                )}
-                                {lead.lastActivityDate && (
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Last Activity</span>
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.lastActivityDate}</span>
-                                    </div>
-                                )}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { label: "Lead ID", value: lead.id || "—", icon: FileText },
+                                    { label: "Assigned To", value: lead.assignedTo || "—", icon: User, hide: !lead.assignedTo },
+                                    { label: "Company Size", value: lead.company_size || lead.companySize || "—", icon: Building2 },
+                                    { label: "Industry", value: lead.industry_type || lead.industryType || "—", icon: FileText, pill: true },
+                                    { label: "Turnover", value: formatTurnover(lead.turnover), icon: TrendingUp },
+                                    { label: "Created Date", value: lead.createdAt || "—", icon: Calendar },
+                                ]
+                                    .filter((item) => !item.hide)
+                                    .map(({ label, value, icon: Icon, pill }) => (
+                                        <div
+                                            key={label}
+                                            className={`flex items-center justify-between p-3   pl-0  rounded-lg`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700 text-gray-200 border border-gray-600" : "bg-white text-gray-700 border border-gray-200"}`}>
+                                                    <Icon className="w-4 h-4" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{label}</span>
+                                                    {pill ? (
+                                                        <span className={`mt-1 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === "dark" ? "bg-orange-500/10 text-orange-300 border border-orange-500/30" : "bg-orange-50 text-orange-700 border border-orange-100"}`}>
+                                                            {value}
+                                                        </span>
+                                                    ) : (
+                                                        <span className={`text-sm font-medium pt-1 ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
+                                                            {value}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                             </div>
                         </div>
                     </div>
