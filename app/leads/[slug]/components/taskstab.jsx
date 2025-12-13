@@ -113,20 +113,88 @@ function TaskItem({ task, theme, onToggle }) {
   );
 }
 
+// Helper function to get next stage
+function getNextStage(currentStage) {
+  const stageMap = {
+    "New": "Contacted",
+    "Contacted": "Demo",
+    "Demo": "Proposal",
+    "Proposal": "Follow-Up",
+    "Follow-Up": "Won",
+    "Won": null, // No next stage after Won
+  };
+  return stageMap[currentStage] || null;
+}
+
+// Helper function to get task details for next stage
+function getTaskDetailsForNextStage(nextStage, leadName) {
+  const taskTitles = {
+    "Contacted": `Schedule Demo for ${leadName}`,
+    "Demo": `Prepare Proposal for ${leadName}`,
+    "Proposal": `Follow up on Proposal with ${leadName}`,
+    "Follow-Up": `Finalize deal with ${leadName}`,
+  };
+  
+  const taskTypes = {
+    "Contacted": "Meeting",
+    "Demo": "Follow-Up",
+    "Proposal": "Follow-Up",
+    "Follow-Up": "Meeting",
+  };
+  
+  if (!nextStage || !taskTitles[nextStage]) return null;
+  
+  return {
+    title: taskTitles[nextStage],
+    type: taskTypes[nextStage] || "Follow-Up",
+  };
+}
+
 export default function TasksTab({ leadId, leadName }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { data: tasksData, mutate } = useSWR(leadId ? `/api/tasks?lead_id=${leadId}` : null, fetcher);
+  const { data: leadData } = useSWR(leadId ? `/api/leads/${leadId}` : null, fetcher);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState("Call");
   const [newDueDate, setNewDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Task completion modal state
+  const [taskCompletionModal, setTaskCompletionModal] = useState({
+    isOpen: false,
+    task: null,
+    comment: "",
+    nextStageComments: "",
+    connectThrough: "",
+    dueDate: "",
+    outcome: "Success",
+    isSubmitting: false,
+    showCalendar: false,
+  });
 
   const toggleStatus = async (task) => {
     const currentStatus = String(task.status || "").toLowerCase();
-    const nextStatus = currentStatus === "completed" ? "Pending" : "Completed";
-    // optimistic update
+    
+    // If marking as completed, show modal first
+    if (currentStatus !== "completed") {
+      setTaskCompletionModal({
+        isOpen: true,
+        task: task,
+        comment: "",
+        nextStageComments: "",
+        connectThrough: "",
+        dueDate: "",
+        outcome: "Success",
+        isSubmitting: false,
+        showCalendar: false,
+      });
+      return;
+    }
+    
+    // If unmarking as completed, just update directly
+    const nextStatus = "Pending";
     mutate(
       (tasks) =>
         Array.isArray(tasks)
@@ -146,6 +214,140 @@ export default function TasksTab({ leadId, leadName }) {
       console.error("Error updating task status:", err);
       await mutate(); // revert
     }
+  };
+  
+  // Confirm task completion with stage progression
+  const handleConfirmTaskCompletion = async () => {
+    const { task, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
+    
+    if (!comment.trim()) {
+      alert("Please add a comment before completing the task");
+      return;
+    }
+    
+    setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: true }));
+    
+    try {
+      const currentLeadStatus = leadData?.status || "New";
+      const nextStage = getNextStage(currentLeadStatus);
+      
+      // Save to stage_notes table
+      const stageNotesRes = await fetch("/api/stage-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          current_stage_notes: comment,
+          next_stage_notes: nextStageComments || null,
+          outcome: outcome || "Success",
+        }),
+      });
+      
+      if (!stageNotesRes.ok) {
+        const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
+        const errorMessage = errorData.error || errorData.details || "Failed to save stage notes";
+        console.error("Stage notes error:", errorData);
+        throw new Error(errorMessage);
+      }
+      
+      // Update lead status and stage notes
+      if (nextStage) {
+        const leadUpdateRes = await fetch("/api/leads", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: leadId,
+            status: nextStage,
+            current_stage: nextStage,
+            next_stage_notes: nextStageComments || null,
+          }),
+        });
+        
+        if (!leadUpdateRes.ok) {
+          throw new Error("Failed to update lead status");
+        }
+        
+        // Create task for next stage
+        const taskDetails = getTaskDetailsForNextStage(nextStage, leadName);
+        if (taskDetails) {
+          await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lead_id: leadId,
+              title: taskDetails.title,
+              type: taskDetails.type,
+            }),
+          });
+        }
+      }
+      
+      // Mark task as completed
+      const taskRes = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: task.id,
+          status: "Completed",
+        }),
+      });
+      
+      if (!taskRes.ok) {
+        throw new Error("Failed to complete task");
+      }
+      
+      // Save activity
+      await fetch("/api/task-activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          activity: `Task completed: ${task.title}`,
+          type: "task",
+          comments: comment,
+          connect_through: connectThrough,
+          due_date: dueDate || null,
+        }),
+      });
+      
+      // Close modal and refresh
+      setTaskCompletionModal({
+        isOpen: false,
+        task: null,
+        comment: "",
+        nextStageComments: "",
+        connectThrough: "",
+        dueDate: "",
+        outcome: "Success",
+        isSubmitting: false,
+        showCalendar: false,
+      });
+      
+      await mutate();
+      // Refresh lead data if available
+      if (window.location) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error completing task:", error);
+      alert(error.message);
+      setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
+  
+  // Cancel task completion
+  const handleCancelTaskCompletion = () => {
+    setTaskCompletionModal({
+      isOpen: false,
+      task: null,
+      comment: "",
+      nextStageComments: "",
+      connectThrough: "",
+      dueDate: "",
+      outcome: "Success",
+      isSubmitting: false,
+      showCalendar: false,
+    });
   };
 
   const tasks = Array.isArray(tasksData) ? tasksData : [];
@@ -358,6 +560,193 @@ export default function TasksTab({ leadId, leadName }) {
           )}
         </div>
       </div>
+
+      {/* Task Completion Modal */}
+      {taskCompletionModal.isOpen && taskCompletionModal.task && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+              isDark ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
+            }`}
+          >
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <CheckCircle2 className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Complete Task</h2>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {leadData?.status && getNextStage(leadData.status) && (
+                      <>Moving to: <span className="font-medium text-orange-500">{getNextStage(leadData.status)}</span></>
+                    )}
+                    {(!leadData?.status || !getNextStage(leadData.status)) && (
+                      <span className="font-medium text-orange-500">Completing task</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCancelTaskCompletion}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Connect Through */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Connect Through
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: "call", label: "Call", icon: "📞" },
+                    { id: "email", label: "Email", icon: "✉️" },
+                    { id: "meeting", label: "Meeting", icon: "🤝" },
+                    { id: "whatsapp", label: "WhatsApp", icon: "💬" },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setTaskCompletionModal((prev) => ({ ...prev, connectThrough: option.id }))}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 ${
+                        taskCompletionModal.connectThrough === option.id
+                          ? "border-orange-500 bg-orange-500/10 text-orange-500"
+                          : isDark
+                            ? "border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300"
+                            : "border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      <span className="text-lg">{option.icon}</span>
+                      <span className="text-xs font-medium">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Current Stage Comment */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Current Stage Comment <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  placeholder="Add a comment about completing this task..."
+                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                    isDark
+                      ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                      : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                  }`}
+                  rows={3}
+                  value={taskCompletionModal.comment}
+                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, comment: e.target.value }))}
+                  autoFocus
+                />
+                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  This will be saved to the activity log.
+                </p>
+              </div>
+
+              {/* Next Stage Comments */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Next Stage Comments
+                </label>
+                <textarea
+                  placeholder="Add comments about the next stage..."
+                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                    isDark
+                      ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                      : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                  }`}
+                  rows={3}
+                  value={taskCompletionModal.nextStageComments}
+                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, nextStageComments: e.target.value }))}
+                />
+                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Optional comments about the next stage.
+                </p>
+              </div>
+
+              {/* Outcome */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Outcome
+                </label>
+                <select
+                  value={taskCompletionModal.outcome}
+                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, outcome: e.target.value }))}
+                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
+                    isDark
+                      ? "bg-[#262626] border-gray-700 text-gray-200"
+                      : "bg-white border-gray-200 text-gray-900"
+                  }`}
+                >
+                  <option value="Success">Success</option>
+                  <option value="Reschedule">Reschedule</option>
+                  <option value="No response">No response</option>
+                </select>
+                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Select the outcome of this stage.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`flex justify-end gap-3 px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+              <button
+                onClick={handleCancelTaskCompletion}
+                disabled={taskCompletionModal.isSubmitting}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isDark
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                } disabled:opacity-50`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmTaskCompletion}
+                disabled={taskCompletionModal.isSubmitting || !taskCompletionModal.comment.trim()}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {taskCompletionModal.isSubmitting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Completing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Complete Task
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

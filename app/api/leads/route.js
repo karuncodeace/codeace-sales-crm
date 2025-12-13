@@ -288,7 +288,7 @@ export async function PATCH(request) {
     }
     
     const body = await request.json();
-    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo } = body;
+    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes } = body;
 
     if (!id) {
       return Response.json({ error: "Lead ID is required" }, { status: 400 });
@@ -324,6 +324,8 @@ export async function PATCH(request) {
       updateData.industry_type = industryType;
       console.log("📝 Updating industry_type:", industryType);
     }
+    if (current_stage !== undefined) updateData.current_stage = current_stage;
+    if (next_stage_notes !== undefined) updateData.next_stage_notes = next_stage_notes;
     
     // Handle assigned_to update
     let finalAssignedTo = assignedTo;

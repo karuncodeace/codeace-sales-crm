@@ -144,8 +144,10 @@ export default function LeadsTable() {
     leadId: null,
     newStatus: null,
     comment: "",
+    nextStageComments: "",
     connectThrough: "",
     dueDate: "",
+    outcome: "Success",
     isSubmitting: false,
     showCalendar: false,
   });
@@ -333,8 +335,10 @@ export default function LeadsTable() {
       leadId,
       newStatus,
       comment: "",
+      nextStageComments: "",
       connectThrough: "",
       dueDate: "",
+      outcome: "Success",
       isSubmitting: false,
       showCalendar: false,
     });
@@ -364,7 +368,7 @@ export default function LeadsTable() {
 
   // Confirm status change with comment
   const handleConfirmStatusChange = async () => {
-    const { leadId, newStatus, comment, connectThrough, dueDate } = statusChangeModal;
+    const { leadId, newStatus, comment, nextStageComments, connectThrough, dueDate, outcome } = statusChangeModal;
     
     if (!comment.trim()) {
       alert("Please add a comment before changing status");
@@ -383,6 +387,7 @@ export default function LeadsTable() {
           activity: `Status changed to ${newStatus}`,
           type: "status",
           comments: comment,
+          next_stage_comments: nextStageComments || null,
           connect_through: connectThrough,
           due_date: dueDate || null,
         }),
@@ -392,11 +397,32 @@ export default function LeadsTable() {
         throw new Error("Failed to save activity comment");
       }
 
-      // Then update the lead status
+      // Save to stage_notes table
+      const stageNotesRes = await fetch("/api/stage-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          current_stage_notes: comment,
+          next_stage_notes: nextStageComments || null,
+          outcome: outcome,
+        }),
+      });
+
+      if (!stageNotesRes.ok) {
+        throw new Error("Failed to save stage notes");
+      }
+
+      // Update the lead: set status, current_stage, and next_stage_notes
       const res = await fetch("/api/leads", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: leadId, status: newStatus }),
+        body: JSON.stringify({ 
+          id: leadId, 
+          status: newStatus,
+          current_stage: newStatus,
+          next_stage_notes: nextStageComments || null,
+        }),
       });
 
       if (!res.ok) {
@@ -433,8 +459,10 @@ export default function LeadsTable() {
         leadId: null,
         newStatus: null,
         comment: "",
+        nextStageComments: "",
         connectThrough: "",
         dueDate: "",
+        outcome: "Success",
         isSubmitting: false,
         showCalendar: false,
       });
@@ -452,8 +480,10 @@ export default function LeadsTable() {
       leadId: null,
       newStatus: null,
       comment: "",
+      nextStageComments: "",
       connectThrough: "",
       dueDate: "",
+      outcome: "Success",
       isSubmitting: false,
       showCalendar: false,
     });
@@ -1445,7 +1475,7 @@ export default function LeadsTable() {
               {/* Comment */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                  Comment <span className="text-red-500">*</span>
+                  Current Stage Comment <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   placeholder="Add a comment explaining this status change..."
@@ -1461,6 +1491,50 @@ export default function LeadsTable() {
                 />
                 <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
                   This will be saved to the activity log.
+                </p>
+              </div>
+
+              {/* Next Stage Comments */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                  Next Stage Comments
+                </label>
+                <textarea
+                  placeholder="Add comments about the next stage..."
+                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                    theme === "dark"
+                      ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                      : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                  }`}
+                  rows={3}
+                  value={statusChangeModal.nextStageComments}
+                  onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, nextStageComments: e.target.value }))}
+                />
+                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                  Optional comments about the next stage.
+                </p>
+              </div>
+
+              {/* Outcome */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                  Outcome
+                </label>
+                <select
+                  value={statusChangeModal.outcome}
+                  onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, outcome: e.target.value }))}
+                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
+                    theme === "dark"
+                      ? "bg-[#262626] border-gray-700 text-gray-200"
+                      : "bg-white border-gray-200 text-gray-900"
+                  }`}
+                >
+                  <option value="Success">Success</option>
+                  <option value="Reschedule">Reschedule</option>
+                  <option value="No response">No response</option>
+                </select>
+                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                  Select the outcome of this stage.
                 </p>
               </div>
             </div>
