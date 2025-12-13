@@ -268,15 +268,12 @@ function LoginContent() {
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  className="peer appearance-none h-4 w-4 border border-gray-300 rounded bg-white 
-               checked:bg-orange-500 checked:border-orange-500 
-               transition-all duration-200"
+                  className="peer appearance-none h-4 w-4 border border-gray-300 rounded bg-white checked:bg-orange-500 checked:border-orange-500 transition-all duration-200"
                 />
 
                 {/* Custom Tick Icon */}
                 <svg
-                  className="absolute w-3 h-3 ml-0.5 pointer-events-none 
-               hidden peer-checked:block text-white"
+                  className="absolute w-3 h-3 ml-0.5 pointer-events-none hidden peer-checked:block text-white"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="3"

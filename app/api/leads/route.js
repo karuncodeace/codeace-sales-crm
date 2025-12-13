@@ -1,6 +1,82 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
+/**
+ * Helper function to create a first call task for a lead
+ * Ensures no duplicate first call tasks are created
+ * @param {object} supabase - Supabase client instance
+ * @param {string} leadId - Lead ID
+ * @param {string} leadName - Lead name
+ * @param {string} salespersonId - Salesperson ID to assign the task to
+ * @returns {Promise<object|null>} - Created task or null if already exists or error
+ */
+async function createFirstCallTask(supabase, leadId, leadName, salespersonId) {
+  if (!leadId || !leadName || !salespersonId) {
+    console.warn("createFirstCallTask: Missing required parameters", { leadId, leadName, salespersonId });
+    return null;
+  }
+
+  const taskTitle = `Initiate first call with ${leadName}`;
+
+  // Check if a first call task already exists for this lead
+  const { data: existingTasks, error: checkError } = await supabase
+    .from("tasks_table")
+    .select("id, title")
+    .eq("lead_id", leadId)
+    .ilike("title", `Initiate first call with%`); // Case-insensitive match
+
+  if (checkError) {
+    console.error("Error checking for existing first call task:", checkError);
+    return null;
+  }
+
+  if (existingTasks && existingTasks.length > 0) {
+    console.log("First call task already exists for lead:", leadId, existingTasks);
+    return null; // Task already exists, don't create duplicate
+  }
+
+  // Create the first call task
+  const { data: newTask, error: taskError } = await supabase
+    .from("tasks_table")
+    .insert({
+      lead_id: leadId,
+      title: taskTitle,
+      type: "Call",
+      status: "Pending",
+      sales_person_id: salespersonId,
+    })
+    .select()
+    .single();
+
+  if (taskError) {
+    console.error("Error creating first call task:", taskError);
+    return null;
+  }
+
+  // Create corresponding task_activity record
+  if (newTask && salespersonId) {
+    try {
+      await supabase
+        .from("task_activities")
+        .insert({
+          lead_id: leadId,
+          activity: `Task Created: ${taskTitle}`,
+          type: "task",
+          comments: `First call task "${taskTitle}" has been automatically created`,
+          source: "system",
+          created_at: new Date().toISOString(),
+          salesperson_id: salespersonId,
+        });
+    } catch (activityError) {
+      console.error("Error creating task activity for first call task:", activityError);
+      // Don't fail if activity creation fails - it's optional
+    }
+  }
+
+  console.log("✅ Created first call task:", { leadId, leadName, taskId: newTask?.id });
+  return newTask;
+}
+
 export async function GET() {
   const supabase = await supabaseServer();
   
@@ -16,12 +92,36 @@ export async function GET() {
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
-  console.log("Leads API: Fetching leads for user", { id: crmUser.id, role: crmUser.role });
+  console.log("🔍 Leads API: Fetching leads for user", { 
+    userId: crmUser.id, 
+    role: crmUser.role,
+    email: crmUser.email 
+  });
+  
+  // For debugging: Check what assigned_to values exist in the database
+  if (crmUser.role === "salesperson") {
+    const { data: allLeads, error: debugError } = await supabase
+      .from("leads_table")
+      .select("id, lead_name, assigned_to");
+    
+    console.log("🔍 DEBUG: All leads in database:", {
+      totalLeads: allLeads?.length || 0,
+      leadsWithAssignedTo: allLeads?.filter(l => l.assigned_to).length || 0,
+      uniqueAssignedTo: [...new Set(allLeads?.map(l => l.assigned_to).filter(Boolean))],
+      lookingFor: crmUser.id,
+      matchingLeads: allLeads?.filter(l => l.assigned_to === crmUser.id).length || 0,
+      sampleLeads: allLeads?.slice(0, 5).map(l => ({ id: l.id, name: l.lead_name, assigned_to: l.assigned_to }))
+    });
+  }
   
   // Order by id (descending to show newest leads first)
   const { data, error } = await query.order("id", { ascending: true });
   
-  console.log("Leads API: Query result", { dataCount: data?.length || 0, error: error?.message });
+  console.log("✅ Leads API: Query result", { 
+    dataCount: data?.length || 0, 
+    error: error?.message,
+    returnedLeadIds: data?.map(l => ({ id: l.id, name: l.lead_name, assigned_to: l.assigned_to })) || []
+  });
 
   if (error) {
     console.error("Leads API Error:", error);
@@ -166,92 +266,122 @@ export async function POST(request) {
     lastActivity: formatLastActivity(data.last_activity),
   };
 
-  const initialTaskTitle = `Call to ${newLead.name}`;
-  await supabase
-    .from("tasks_table")
-    .insert({
-      lead_id: newLead.id,
-      title: initialTaskTitle,
-      type: "Call",
-      status: "Pending",
-      sales_person_id: crmUser.id, // Auto-assign task to creator
-    });
+  // Create first call task if lead status is "New" (explicitly or default) and has assigned_to
+  const leadStatus = data.status || "New"; // Default to "New" if not set
+  if (leadStatus.toLowerCase() === "new" && finalAssignedTo) {
+    // Use the assigned_to value (which could be crmUser.id for salesperson or provided assignedTo for admin)
+    const salespersonIdForTask = finalAssignedTo;
+    await createFirstCallTask(supabase, newLead.id, newLead.name, salespersonIdForTask);
+  }
 
   return Response.json({ success: true, lead: newLead });
 }
 
 export async function PATCH(request) {
-  const supabase = await supabaseServer();
-  
-  // Get CRM user for role-based filtering
-  const crmUser = await getCrmUser();
-  if (!crmUser) {
-    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
-  }
-  
-  const body = await request.json();
-  const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType } = body;
+  try {
+    const supabase = await supabaseServer();
+    
+    // Get CRM user for role-based filtering
+    const crmUser = await getCrmUser();
+    if (!crmUser) {
+      return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+    }
+    
+    const body = await request.json();
+    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo } = body;
 
-  if (!id) {
-    return Response.json({ error: "Lead ID is required" }, { status: 400 });
-  }
+    if (!id) {
+      return Response.json({ error: "Lead ID is required" }, { status: 400 });
+    }
 
-  // Check if user has access to this lead
-  let query = getFilteredQuery(supabase, "leads_table", crmUser);
-  const { data: existingLead } = await query
-    .select("id, lead_name, status")
-    .eq("id", id)
-    .single();
+    // Check if user has access to this lead
+    let query = getFilteredQuery(supabase, "leads_table", crmUser);
+    const { data: existingLead, error: accessError } = await query
+      .select("id, lead_name, status, assigned_to")
+      .eq("id", id)
+      .single();
 
-  if (!existingLead) {
-    return Response.json({ error: "Lead not found" }, { status: 404 });
-  }
+    if (accessError || !existingLead) {
+      console.error("Lead access check failed:", { id, error: accessError, hasLead: !!existingLead });
+      return Response.json({ error: "Lead not found or access denied" }, { status: 404 });
+    }
 
-  const previousStatus = existingLead?.status;
-  const leadName = existingLead?.lead_name || "";
+    const previousStatus = existingLead?.status;
+    const previousAssignedTo = existingLead?.assigned_to;
+    const leadName = existingLead?.lead_name || "";
 
-  const updateData = {};
-  if (name !== undefined) updateData.lead_name = name;
-  if (phone !== undefined) updateData.phone = phone;
-  if (email !== undefined) updateData.email = email;
-  if (contactName !== undefined) updateData.contact_name = contactName;
-  if (source !== undefined) updateData.lead_source = source;
-  if (status !== undefined) updateData.status = status;
-  if (priority !== undefined) updateData.priority = priority;
-  if (companySize !== undefined) updateData.company_size = companySize;
-  if (turnover !== undefined) updateData.turnover = turnover;
-  if (industryType !== undefined) {
-    updateData.industry_type = industryType;
-    console.log("📝 Updating industry_type:", industryType);
-  }
+    const updateData = {};
+    if (name !== undefined) updateData.lead_name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (contactName !== undefined) updateData.contact_name = contactName;
+    if (source !== undefined) updateData.lead_source = source;
+    if (status !== undefined) updateData.status = status;
+    if (priority !== undefined) updateData.priority = priority;
+    if (companySize !== undefined) updateData.company_size = companySize;
+    if (turnover !== undefined) updateData.turnover = turnover;
+    if (industryType !== undefined) {
+      updateData.industry_type = industryType;
+      console.log("📝 Updating industry_type:", industryType);
+    }
+    
+    // Handle assigned_to update
+    let finalAssignedTo = assignedTo;
+    if (assignedTo !== undefined) {
+      if (crmUser.role === "salesperson") {
+        // Salesperson can only assign to themselves
+        finalAssignedTo = crmUser.id;
+      } else if (crmUser.role === "admin") {
+        // Admin can assign to anyone
+        finalAssignedTo = assignedTo || null;
+      }
+      updateData.assigned_to = finalAssignedTo;
+    }
 
-  if (Object.keys(updateData).length === 0) {
-    return Response.json({ error: "No fields to update" }, { status: 400 });
-  }
+    if (Object.keys(updateData).length === 0) {
+      return Response.json({ error: "No fields to update" }, { status: 400 });
+    }
 
-  console.log("🔄 Updating lead with data:", JSON.stringify(updateData, null, 2));
-  
-  const { data, error } = await supabase
-    .from("leads_table")
-    .update(updateData)
-    .eq("id", id)
-    .select();
+    console.log("🔄 Updating lead with data:", JSON.stringify(updateData, null, 2));
+    
+    const { data, error } = await supabase
+      .from("leads_table")
+      .update(updateData)
+      .eq("id", id)
+      .select();
 
-  if (error) {
-    console.error("❌ Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-  
-  console.log("✅ Lead updated successfully:", data?.[0]?.industry_type);
+    if (error) {
+      console.error("❌ Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+    
+    console.log("✅ Lead updated successfully:", data?.[0]?.industry_type);
 
-  if (!data || data.length === 0) {
-    console.error("Leads PATCH Error: No lead found with ID:", id);
-    return Response.json({ error: "Lead not found" }, { status: 404 });
-  }
+    if (!data || data.length === 0) {
+      console.error("Leads PATCH Error: No lead found with ID:", id);
+      return Response.json({ error: "Lead not found" }, { status: 404 });
+    }
 
-  const updatedLead = data[0];
+    const updatedLead = data[0];
 
-  if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
+    // Create first call task if:
+    // 1. Lead status is being set/changed to "New" and has assigned_to
+    // 2. Lead is being assigned to a salesperson (assigned_to changed from null/other to a value)
+    const currentAssignedTo = updatedLead.assigned_to || finalAssignedTo;
+    const statusChangedToNew = status !== undefined && 
+      String(status).toLowerCase() === "new" && 
+      (previousStatus === undefined || String(previousStatus).toLowerCase() !== "new");
+    
+    const assignedToChanged = assignedTo !== undefined && 
+      currentAssignedTo !== null && 
+      currentAssignedTo !== previousAssignedTo;
+
+    if ((statusChangedToNew || assignedToChanged) && currentAssignedTo) {
+      // Create first call task for the assigned salesperson
+      await createFirstCallTask(supabase, id, updatedLead.lead_name || leadName, currentAssignedTo);
+    }
+
+    if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
     const s = String(status).toLowerCase();
     let title = `Task for ${leadName}`;
     let type = "Follow-Up";
@@ -278,41 +408,75 @@ export async function PATCH(request) {
       type = "Call";
     }
 
-    await supabase
-      .from("tasks_table")
-      .insert({
-        lead_id: id,
-        title,
-        type,
-        status: "Pending",
-        sales_person_id: crmUser.id, // Auto-assign task to current user
-      });
-  }
-
-  // Map the updated lead to frontend format
-  const formattedLead = {
-    id: updatedLead.id,
-    name: updatedLead.lead_name,
-    phone: updatedLead.phone || "",
-    email: updatedLead.email || "",
-    contactName: updatedLead.contact_name || "",
-    source: updatedLead.lead_source,
-    status: updatedLead.status,
-    priority: updatedLead.priority,
-    assignedTo: updatedLead.assigned_to,
-    companySize: updatedLead.company_size || "",
-    turnover: updatedLead.turnover || "",
-    industryType: updatedLead.industry_type || "",
-    createdAt: updatedLead.created_at
-      ? new Date(updatedLead.created_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
+    try {
+      const { data: statusTask, error: taskError } = await supabase
+        .from("tasks_table")
+        .insert({
+          lead_id: id,
+          title,
+          type,
+          status: "Pending",
+          sales_person_id: crmUser.id, // Auto-assign task to current user
         })
-      : "",
-    lastActivity: formatLastActivity(updatedLead.last_activity),
-    totalScore: updatedLead.total_score !== null && updatedLead.total_score !== undefined ? Number(updatedLead.total_score) : 0,
-  };
+        .select()
+        .single();
 
-  return Response.json({ success: true, data: formattedLead });
+      if (taskError) {
+        console.error("Error creating task for status change:", taskError);
+        // Don't fail the lead update if task creation fails
+      } else if (statusTask && crmUser.id) {
+        // Create corresponding task_activity record with assigned salesperson_id
+        const { error: activityError } = await supabase
+          .from("task_activities")
+          .insert({
+            lead_id: id,
+            activity: `Task Created: ${title}`,
+            type: "task",
+            comments: `Task "${title}" has been created due to status change`,
+            source: "user",
+            created_at: new Date().toISOString(),
+            salesperson_id: crmUser.id, // Store assigned sales person
+          });
+
+        if (activityError) {
+          console.error("Error creating task activity for status change:", activityError);
+          // Don't fail if activity creation fails - it's optional
+        }
+      }
+    } catch (err) {
+      console.error("Exception creating task/activity for status change:", err);
+      // Don't fail the lead update if task/activity creation fails
+    }
+    }
+
+    // Map the updated lead to frontend format
+    const formattedLead = {
+      id: updatedLead.id,
+      name: updatedLead.lead_name,
+      phone: updatedLead.phone || "",
+      email: updatedLead.email || "",
+      contactName: updatedLead.contact_name || "",
+      source: updatedLead.lead_source,
+      status: updatedLead.status,
+      priority: updatedLead.priority,
+      assignedTo: updatedLead.assigned_to,
+      companySize: updatedLead.company_size || "",
+      turnover: updatedLead.turnover || "",
+      industryType: updatedLead.industry_type || "",
+      createdAt: updatedLead.created_at
+        ? new Date(updatedLead.created_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "",
+      lastActivity: formatLastActivity(updatedLead.last_activity),
+      totalScore: updatedLead.total_score !== null && updatedLead.total_score !== undefined ? Number(updatedLead.total_score) : 0,
+    };
+
+    return Response.json({ success: true, data: formattedLead });
+  } catch (error) {
+    console.error("Leads PATCH Exception:", error);
+    return Response.json({ error: error.message || "Internal server error" }, { status: 500 });
+  }
 }

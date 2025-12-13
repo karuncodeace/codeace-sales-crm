@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
-// Get appointments with role-based filtering
+// Get all appointments from the table (no role-based filtering)
 export async function GET() {
   try {
     const supabase = await supabaseServer();
     
-    // Get CRM user for role-based filtering
+    // Get CRM user for authentication check only
     const crmUser = await getCrmUser();
     
     // If no CRM user found, return empty array instead of 403 to prevent loading loops
@@ -16,15 +16,27 @@ export async function GET() {
       return NextResponse.json([]);
     }
     
-    // Get filtered query based on role
-    let query = getFilteredQuery(supabase, "appointments", crmUser);
+    // Fetch ALL appointments from the table (no filtering)
+    console.log("🔍 Appointments API: Fetching ALL appointments", { 
+      userId: crmUser.id, 
+      role: crmUser.role,
+      email: crmUser.email 
+    });
     
-    const { data, error } = await query.order("start_time", { ascending: true });
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("*")
+      .order("start_time", { ascending: true });
     
     if (error) {
       console.error("Appointments GET error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    
+    console.log("✅ Appointments API: Query result", { 
+      dataCount: data?.length || 0,
+      returnedAppointmentIds: data?.map(a => ({ id: a.id, title: a.title, salesperson_id: a.salesperson_id })) || []
+    });
     
     return NextResponse.json(data || []);
   } catch (err) {

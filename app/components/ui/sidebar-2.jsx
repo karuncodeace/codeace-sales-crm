@@ -296,7 +296,7 @@ export default function Sidebar2() {
                                         <div>
                                             <div onClick={() => handleMenuClick(item.path)}
                                                 className={`w-full h-12  rounded-lg p-1   gap-3 transition-colors flex items-center justify-center ${active
-                                                    ? "bg-orange-500 text-white"
+                                                    ? "bg-orange-600 text-white"
                                                     : theme === "dark"
                                                         ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -308,7 +308,7 @@ export default function Sidebar2() {
                                 ) : (
                                     <div onClick={() => handleMenuClick(item.path)}
                                         className={`w-full p-3 rounded-lg  gap-3 flex items-center transition-colors ${active
-                                            ? "bg-[#FF7A00] text-white"
+                                            ? "bg-orange-500 text-white"
                                             : theme === "dark"
                                                 ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"

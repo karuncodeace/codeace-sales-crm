@@ -249,15 +249,15 @@ export default function TasksPage() {
 
         const mappedTasks = tasksData.map((task) => {
             const lead = leadsMap[task.lead_id];
-            // Use task's sales_person_id, or fallback to lead's assigned_to
-            const salesPersonId = task.sales_person_id || lead?.assignedTo;
+            // Use task's salesperson_id, or fallback to lead's assigned_to
+            const salesPersonId = task.salesperson_id || task.sales_person_id || lead?.assignedTo;
 
             // Get due date from activities or default to 1 day
             const calculatedDueDate = getTaskDueDate(task);
             const hasActivityDueDate = !!activitiesDueDateMap[task.lead_id]?.due_date;
             const dueStatus = getDueStatus(calculatedDueDate.toISOString(), task.status);
 
-            // Display sales_person_id directly (or lead's assigned_to as fallback)
+            // Display salesperson_id directly (or lead's assigned_to as fallback)
             const assignedToId = salesPersonId || "—";
 
             return {
@@ -265,7 +265,7 @@ export default function TasksPage() {
                 title: task.title || "—",
                 type: task.type || "Call",
                 lead_id: task.lead_id,
-                sales_person_id: task.sales_person_id,
+                salesperson_id: task.salesperson_id || task.sales_person_id,
                 leadName: lead?.name || task.lead_id || "—",
                 phone: lead?.phone || "—",
                 due_datetime: calculatedDueDate.toISOString(),

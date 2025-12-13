@@ -401,14 +401,28 @@ export async function POST(req) {
       // Auto-create task (if lead_id and resolvedSalespersonId exist)
       if (lead_id && resolvedSalespersonId && startTime) {
         try {
-          await supabase.from("tasks_table").insert({
+          const { data: autoTask } = await supabase.from("tasks_table").insert({
             type: "Meeting",
             lead_id: lead_id,
-            sales_person_id: resolvedSalespersonId,
+            salesperson_id: resolvedSalespersonId,
             due_datetime: startTime,
             priority: "Hot",
             comments: "Meeting booked automatically via Cal.com"
-          });
+          }).select().single();
+          
+          // Create corresponding task_activity record with assigned salesperson_id
+          if (autoTask && resolvedSalespersonId) {
+            await supabase.from("task_activities").insert({
+              lead_id: lead_id,
+              activity: "Task Created: Meeting",
+              type: "task",
+              comments: "Meeting task created automatically via Cal.com",
+              source: "system",
+              created_at: new Date().toISOString(),
+              salesperson_id: resolvedSalespersonId, // Store assigned sales person
+            });
+          }
+          
           console.log("✅ Auto-created task for meeting");
         } catch (err) {
           console.log("⚠️ Could not auto-create task:", err.message);

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
-import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarX, CalendarClock, MoreVertical } from "lucide-react";
+import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -16,24 +16,6 @@ export default function AppointmentsPage() {
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [openActionsMenu, setOpenActionsMenu] = useState(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('[data-actions-menu="true"]')) {
-        setOpenActionsMenu(null);
-      }
-    };
-
-    if (openActionsMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [openActionsMenu]);
 
   // Fetch all appointments (no status filter on server)
   const { data: appointments, error, isLoading, mutate } = useSWR(
@@ -130,10 +112,14 @@ export default function AppointmentsPage() {
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`/api/appointments/${appointment.id}`, {
-        method: "PATCH",
+      // Call Cal.com cancel API first, then update database
+      const response = await fetch(`/api/cal-appointments/cancel`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
+        body: JSON.stringify({ 
+          appointment_id: appointment.id,
+          cal_event_id: appointment.cal_event_id 
+        }),
       });
 
       const result = await response.json();
@@ -162,11 +148,13 @@ export default function AppointmentsPage() {
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`/api/appointments/${appointment.id}`, {
-        method: "PATCH",
+      // Call Cal.com reschedule API first, then update database
+      const response = await fetch(`/api/cal-appointments/reschedule`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "reschedule",
+          appointment_id: appointment.id,
+          cal_event_id: appointment.cal_event_id,
           start_time: newStartTime,
           end_time: newEndTime,
         }),
@@ -220,7 +208,7 @@ export default function AppointmentsPage() {
                       ? "bg-orange-600 text-white"
                       : "bg-orange-500 text-white"
                     : isDark
-                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    ? "bg-gray-700/50 text-gray-300 hover:bg-gray-600"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
@@ -372,78 +360,41 @@ export default function AppointmentsPage() {
                           )}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Right Section - Actions */}
-                      <div className="ml-4 relative">
-                        {appointment.status === "booked" && (
-                          <div className="relative" data-actions-menu="true">
+                      {/* Action Buttons */}
+                      {appointment.status !== "cancelled" && (
+                        <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                          <div className="flex  gap-2">
                             <button
                               type="button"
-                              aria-label="Open actions menu"
-                              onClick={() => setOpenActionsMenu(openActionsMenu === appointment.id ? null : appointment.id)}
-                              className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-none transition-colors ${
+                              onClick={() => setRescheduleModal({ isOpen: true, appointment })}
+                              disabled={isProcessing}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                 isDark
-                                  ? "border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600"
-                                  : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                  : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                               }`}
                             >
-                              <MoreVertical className="w-5 h-5" />
+                              <CalendarClock className="w-3.5 h-3.5" />
+                              Reschedule
                             </button>
-
-                            {openActionsMenu === appointment.id && (
-                              <div
-                                className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl ${
-                                  isDark
-                                    ? "bg-gray-800 text-gray-200 border-gray-700"
-                                    : "bg-white text-gray-700 border-gray-200"
-                                }`}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setRescheduleModal({ isOpen: true, appointment });
-                                    setOpenActionsMenu(null);
-                                  }}
-                                  disabled={isProcessing}
-                                  className={`flex w-full items-center gap-2 px-4 py-2 transition-colors ${
-                                    isProcessing
-                                      ? isDark
-                                        ? "text-gray-600 cursor-not-allowed opacity-50"
-                                        : "text-gray-400 cursor-not-allowed opacity-50"
-                                      : isDark
-                                      ? "hover:bg-gray-700"
-                                      : "hover:bg-gray-100"
-                                  }`}
-                                >
-                                  <CalendarClock className="w-4 h-4" />
-                                  Reschedule
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleCancel(appointment);
-                                    setOpenActionsMenu(null);
-                                  }}
-                                  disabled={isProcessing}
-                                  className={`flex w-full items-center gap-2 px-4 py-2 transition-colors ${
-                                    isProcessing
-                                      ? isDark
-                                        ? "text-gray-600 cursor-not-allowed opacity-50"
-                                        : "text-gray-400 cursor-not-allowed opacity-50"
-                                      : isDark
-                                      ? "hover:bg-gray-700 text-red-400"
-                                      : "hover:bg-gray-100 text-red-600"
-                                  }`}
-                                >
-                                  <CalendarX className="w-4 h-4" />
-                                  Cancel
-                                </button>
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleCancel(appointment)}
+                              disabled={isProcessing}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                isDark
+                                  ? "bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                  : "bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              }`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Cancel
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      )}
 
                       {/* Footer - Metadata */}
                       <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
