@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Phone, Mail, MessageSquare, MoreHorizontal, ArrowLeft, MapPin, User, Target, IndianRupee, Flame, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Loader2, Copy, Check, Plus, Edit2, Trash2, StickyNote } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
@@ -23,6 +23,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 export default function LeadDetailPage() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const leadId = params.slug;
     
     const { data: lead, error, isLoading, mutate } = useSWR(
@@ -44,6 +45,29 @@ export default function LeadDetailPage() {
     
     const { theme } = useTheme();
     const [tab, setTab] = useState("overview");
+    
+    // Handle scroll to demo section
+    useEffect(() => {
+        if (!searchParams) return;
+        const scrollToDemo = searchParams.get("scrollToDemo");
+        if (scrollToDemo === "true") {
+            // Switch to tasks tab and scroll to demo booking section
+            setTab("tasks");
+            // Remove the query parameter
+            router.replace(`/leads/${leadId}`, { scroll: false });
+            // Scroll after a short delay to ensure tab is rendered
+            setTimeout(() => {
+                // Try to find the BookMeetingButton or scroll to top of tasks section
+                const tasksSection = document.querySelector('[data-tasks-section]');
+                if (tasksSection) {
+                    tasksSection.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                    // Fallback: scroll to top of page
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+            }, 300);
+        }
+    }, [searchParams, leadId, router]);
     const [emailModal, setEmailModal] = useState({
         isOpen: false,
         recipientEmail: "",
@@ -257,7 +281,9 @@ export default function LeadDetailPage() {
             )}
              {/* TASKS TAB */}
             {tab === "tasks" && (
-                <TasksTab theme={theme} leadId={leadId} leadName={lead.name} />
+                <div data-tasks-section>
+                    <TasksTab theme={theme} leadId={leadId} leadName={lead.name} />
+                </div>
             )}
 
         

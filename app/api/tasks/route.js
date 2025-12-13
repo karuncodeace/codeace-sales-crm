@@ -165,9 +165,30 @@ export async function POST(request) {
   
   const body = await request.json();
 
-  const { lead_id, salesperson_id, sales_person_id, priority, comments, type, title, due_date } = body;
+  const { lead_id, salesperson_id, sales_person_id, priority, comments, type, title, due_date, stage } = body;
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
+
+  // Get lead to determine stage if not provided
+  const { data: lead, error: leadError } = await supabase
+    .from("leads_table")
+    .select("status, current_stage, assigned_to")
+    .eq("id", lead_id)
+    .single();
+
+  if (leadError || !lead) {
+    return Response.json({ error: "Lead not found" }, { status: 404 });
+  }
+
+  // Determine stage - use provided stage, or fallback to lead's current stage
+  let taskStage = stage || lead.current_stage || lead.status;
+  
+  // Validate stage is not null/undefined
+  if (!taskStage || taskStage === "null" || taskStage === "undefined") {
+    return Response.json({ 
+      error: `Invalid stage: ${taskStage}. Stage is required and must be a valid pipeline stage.` 
+    }, { status: 400 });
+  }
 
   // Determine sales_person_id based on role (support both field names for backward compatibility)
   let finalSalesPersonId = sales_person_id || salesperson_id;
@@ -177,21 +198,14 @@ export async function POST(request) {
     finalSalesPersonId = crmUser.id;
   } else if (crmUser.role === "admin") {
     // Admin: can assign to anyone, but if not provided, try to get from lead
-    if (!finalSalesPersonId) {
-      const { data: lead, error: leadError } = await supabase
-        .from("leads_table")
-        .select("assigned_to")
-        .eq("id", lead_id)
-        .single();
-
-      if (!leadError && lead?.assigned_to) {
-        finalSalesPersonId = lead.assigned_to;
-      }
+    if (!finalSalesPersonId && lead?.assigned_to) {
+      finalSalesPersonId = lead.assigned_to;
     }
   }
 
   const insertData = {
     lead_id,
+    stage: taskStage, // CRITICAL: Always include stage
     type: type || "Call",
     priority: priority || "Medium",
     comments: comments || null,
@@ -277,7 +291,8 @@ export async function PATCH(request) {
   if (type !== undefined) updateData.type = type;
   if (status !== undefined) updateData.status = status;
   if (priority !== undefined) updateData.priority = priority;
-  if (comments !== undefined) updateData.comments = comments;
+  // Note: comments column doesn't exist in tasks_table, so we don't update it
+  // Comments are stored in task_activities table instead
   if (due_date !== undefined) updateData.due_date = due_date;
 
   let query = supabase.from("tasks_table").update(updateData);

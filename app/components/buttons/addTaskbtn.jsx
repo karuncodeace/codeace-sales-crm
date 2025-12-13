@@ -120,11 +120,16 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
       return;
     }
 
+    // Get current stage from selected lead
+    const selectedLead = leads.find(l => l.id === formData.lead_id);
+    const currentStage = selectedLead?.status || selectedLead?.current_stage || "New";
+    
     // Call the onAdd function with the form data
     await onAdd({
       title: finalTitle,
       type: formData.type,
       lead_id: formData.lead_id,
+      stage: currentStage, // CRITICAL: Always include stage
       sales_person_id: formData.sales_person_id,
       due_datetime: new Date(formData.due_datetime).toISOString(),
       priority: formData.priority,

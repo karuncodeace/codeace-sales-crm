@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
 import AddTaskModal from "../buttons/addTaskbtn";
 import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../lib/utils/taskTitleGenerator";
+import { CheckCircle2, Calendar } from "lucide-react";
 
 // Custom Icon Components
 const PhoneIcon = ({ className }) => (
@@ -116,31 +118,61 @@ function formatDueDateTime(dueDatetime) {
     });
 }
 
+// Single source of truth for stage progression
+const NEXT_STAGE_MAP = {
+  "New": "Contacted",
+  "Contacted": "Demo",
+  "Demo": "Proposal",
+  "Proposal": "Follow-Up",
+  "Follow-Up": "Won",
+  "Won": null, // No next stage after Won
+};
+
+// Helper function to check if task is a demo scheduling task
+function isDemoSchedulingTask(task, leadStatus) {
+  if (!task || !task.title) return false;
+  if (leadStatus !== "Contacted") return false;
+  
+  const title = task.title.toLowerCase();
+  // Match "Schedule Demo" or "Schedule Product Demo" patterns
+  return title.includes("schedule") && title.includes("demo");
+}
+
 // Helper function to get next stage
 function getNextStage(currentStage) {
-  const stageMap = {
-    "New": "Contacted",
-    "Contacted": "Demo",
-    "Demo": "Proposal",
-    "Proposal": "Follow-Up",
-    "Follow-Up": "Won",
-    "Won": null, // No next stage after Won
-  };
-  return stageMap[currentStage] || null;
+  if (!currentStage || currentStage === "null" || currentStage === "undefined") {
+    console.warn("getNextStage called with invalid stage:", currentStage);
+    return null;
+  }
+  
+  const next = NEXT_STAGE_MAP[currentStage];
+  return next !== undefined ? next : null;
 }
 
 // Helper function to get task details for next stage
 function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
-  if (!nextStage || !canCreateTaskForStage(nextStage)) return null;
+  // Validate inputs
+  if (!nextStage || typeof nextStage !== "string" || nextStage === "null" || nextStage === "undefined") {
+    console.warn("getTaskDetailsForNextStage: Invalid nextStage:", nextStage);
+    return null;
+  }
+  
+  if (!canCreateTaskForStage(nextStage)) {
+    console.warn("getTaskDetailsForNextStage: Cannot create task for stage:", nextStage);
+    return null;
+  }
   
   try {
+    // Ensure leadName is valid
+    const validLeadName = leadName || "Client";
+    
     // For Demo stage, determine if it's first or second demo
     const options = {};
     if (nextStage === "Demo") {
       options.demoCount = getDemoCount(existingTasks);
     }
     
-    const title = generateTaskTitle(nextStage, leadName, options);
+    const title = generateTaskTitle(nextStage, validLeadName, options);
     
     // Determine task type based on stage
     const taskTypes = {
@@ -161,6 +193,7 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
 }
 
 export default function TasksPage() {
+    const router = useRouter();
     const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState("all");
@@ -192,6 +225,16 @@ export default function TasksPage() {
         outcome: "Success",
         isSubmitting: false,
         showCalendar: false,
+    });
+
+    // Demo outcome confirmation modal state
+    const [demoOutcomeModal, setDemoOutcomeModal] = useState({
+        isOpen: false,
+        task: null,
+        leadId: null,
+        leadName: "",
+        requiresSecondDemo: null, // null = not selected, true = yes, false = no
+        isSubmitting: false,
     });
 
     // Fetch tasks from API
@@ -443,10 +486,31 @@ export default function TasksPage() {
 
         // Get lead data to determine current status
         const lead = leadsMap[task.lead_id];
-        const currentStatus = lead?.status || "New";
+        let currentStatus = lead?.status || lead?.current_stage || "New";
+        
+        // Ensure currentStatus is never null/undefined
+        if (!currentStatus || currentStatus === "null" || currentStatus === "undefined" || currentStatus === null) {
+            console.warn("Invalid lead status, defaulting to 'New':", currentStatus, "for lead:", lead);
+            currentStatus = "New";
+        }
+        
         const leadName = lead?.name || task.leadName || "Lead";
 
-        // Show modal before completing
+        // Check if this is the special demo scenario
+        if (isDemoSchedulingTask(task, currentStatus)) {
+            setDemoOutcomeModal({
+                isOpen: true,
+                task: task,
+                leadId: task.lead_id,
+                leadName: leadName,
+                requiresSecondDemo: null,
+                isSubmitting: false,
+            });
+            setOpenActions(null);
+            return;
+        }
+
+        // Otherwise, show normal completion modal
         setTaskCompletionModal({
             isOpen: true,
             task: task,
@@ -473,10 +537,25 @@ export default function TasksPage() {
             return;
         }
         
+        // Validate currentStatus
+        const validStatus = currentStatus || "New";
+        if (!validStatus || validStatus === "null" || validStatus === "undefined") {
+            alert("Cannot complete task: Lead status is invalid. Please refresh the page.");
+            return;
+        }
+        
         setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: true }));
         
         try {
-            const nextStage = getNextStage(currentStatus);
+            const nextStage = getNextStage(validStatus);
+            
+            console.log("Task completion - validStatus:", validStatus, "nextStage:", nextStage);
+            
+            // Validate nextStage before proceeding
+            if (!nextStage) {
+                console.warn("No next stage available for status:", validStatus);
+                // Still mark task as completed even if no next stage
+            }
             
             // Save to stage_notes table
             const stageNotesRes = await fetch("/api/stage-notes", {
@@ -497,8 +576,8 @@ export default function TasksPage() {
                 throw new Error(errorMessage);
             }
             
-            // Update lead status and stage notes
-            if (nextStage && canCreateTaskForStage(nextStage)) {
+            // Update lead status and stage notes - only if nextStage is valid
+            if (nextStage && nextStage !== "null" && nextStage !== "undefined" && canCreateTaskForStage(nextStage)) {
                 const leadUpdateRes = await fetch("/api/leads", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -517,24 +596,56 @@ export default function TasksPage() {
                 // Get existing tasks for this lead to check for duplicates and demo count
                 const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
                 const existingTasks = await existingTasksRes.json().catch(() => []);
+                // Exclude the current task being completed from active tasks check
                 const activeTasks = Array.isArray(existingTasks) 
-                    ? existingTasks.filter(t => String(t.status || "").toLowerCase() !== "completed")
+                    ? existingTasks.filter(t => 
+                        String(t.status || "").toLowerCase() !== "completed" && t.id !== task.id
+                      )
                     : [];
                 
-                // Create task for next stage (only if no active tasks exist)
-                if (activeTasks.length === 0) {
-                    const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, existingTasks);
-                    if (taskDetails) {
-                        await fetch("/api/tasks", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                lead_id: leadId,
-                                title: taskDetails.title,
-                                type: taskDetails.type,
-                            }),
-                        });
+                // Create task for next stage (only if no active tasks exist, excluding current task)
+                if (activeTasks.length === 0 && nextStage && nextStage !== "null" && nextStage !== "undefined") {
+                    try {
+                        // Ensure leadName is valid
+                        const validLeadName = leadName || "Client";
+                        console.log("Creating task for next stage:", { nextStage, leadName: validLeadName, existingTasksCount: existingTasks.length });
+                        
+                        const taskDetails = getTaskDetailsForNextStage(nextStage, validLeadName, existingTasks);
+                        if (taskDetails) {
+                            console.log("Task details generated:", taskDetails);
+                            
+                            // Validate nextStage before creating task
+                            if (!nextStage || typeof nextStage !== "string") {
+                                throw new Error(`Cannot create task: Invalid next stage: ${nextStage}`);
+                            }
+                            
+                            const createRes = await fetch("/api/tasks", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    lead_id: leadId,
+                                    stage: nextStage, // CRITICAL: Always include stage
+                                    title: taskDetails.title,
+                                    type: taskDetails.type,
+                                }),
+                            });
+
+                            if (!createRes.ok) {
+                                const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
+                                console.error("Failed to create task:", errorData);
+                                throw new Error(errorData.error || "Failed to create next task");
+                            }
+                            console.log("Task created successfully");
+                        } else {
+                            console.warn("No task details generated for stage:", nextStage, "leadName:", validLeadName);
+                        }
+                    } catch (error) {
+                        console.error("Error creating task for next stage:", error);
+                        // Don't throw - still complete the current task even if next task creation fails
+                        alert(`Task completed, but failed to create next task: ${error.message}`);
                     }
+                } else {
+                    console.log("Skipping task creation:", { activeTasksCount: activeTasks.length, nextStage, hasNextStage: !!nextStage });
                 }
             }
             
@@ -606,6 +717,185 @@ export default function TasksPage() {
             outcome: "Success",
             isSubmitting: false,
             showCalendar: false,
+        });
+    };
+
+    // Handle demo outcome confirmation
+    const handleDemoOutcomeConfirm = async () => {
+        const { task, leadId, leadName, requiresSecondDemo } = demoOutcomeModal;
+        
+        if (requiresSecondDemo === null) {
+            alert("Please select an option");
+            return;
+        }
+
+        setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: true }));
+
+        try {
+            if (requiresSecondDemo) {
+                // YES: Stay in Contacted stage, redirect to leads page, scroll to demo section
+                // Mark task as completed
+                const taskRes = await fetch("/api/tasks", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: task.id,
+                        status: "Completed",
+                    }),
+                });
+
+                if (!taskRes.ok) {
+                    throw new Error("Failed to complete task");
+                }
+
+                mutate("/api/tasks");
+                mutate("/api/leads");
+                
+                // Close modal
+                setDemoOutcomeModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    requiresSecondDemo: null,
+                    isSubmitting: false,
+                });
+
+                // Redirect to leads page with scroll to demo section
+                router.push(`/leads/${leadId}?scrollToDemo=true`);
+            } else {
+                // NO: Proceed with normal flow - update to Demo stage and create next task
+                // Get lead data to determine current status
+                const lead = leadsMap[task.lead_id];
+                const currentLeadStatus = lead?.status || "New";
+                const nextStage = getNextStage(currentLeadStatus); // This should be "Demo" when current is "Contacted"
+                
+                // Save to stage_notes table
+                const stageNotesRes = await fetch("/api/stage-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        current_stage_notes: "Demo completed - proceeding to next stage",
+                        next_stage_notes: null,
+                        outcome: "Success",
+                    }),
+                });
+
+                if (!stageNotesRes.ok) {
+                    const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
+                    throw new Error(errorData.error || errorData.details || "Failed to save stage notes");
+                }
+
+                // Update lead status and stage notes
+                if (nextStage && canCreateTaskForStage(nextStage)) {
+                    const leadUpdateRes = await fetch("/api/leads", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            id: leadId,
+                            status: nextStage,
+                            current_stage: nextStage,
+                        }),
+                    });
+
+                    if (!leadUpdateRes.ok) {
+                        throw new Error("Failed to update lead status");
+                    }
+
+                    // Get existing tasks for this lead to check for duplicates and demo count
+                    // Use the tasks from state (same as normal flow) - exclude the current task being completed
+                    const activeTasks = Array.isArray(tasksData) 
+                        ? tasksData.filter(t => 
+                            t.lead_id === leadId && 
+                            String(t.status || "").toLowerCase() !== "completed" &&
+                            t.id !== task.id // Exclude the current task
+                          )
+                        : [];
+                    
+                    // Create task for next stage (only if no active tasks exist)
+                    if (activeTasks.length === 0) {
+                        // Validate nextStage before creating task
+                        if (!nextStage || typeof nextStage !== "string") {
+                            throw new Error(`Cannot create task: Invalid next stage: ${nextStage}`);
+                        }
+                        
+                        const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasksData || []);
+                        if (taskDetails) {
+                            const createRes = await fetch("/api/tasks", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    lead_id: leadId,
+                                    stage: nextStage, // CRITICAL: Always include stage
+                                    title: taskDetails.title,
+                                    type: taskDetails.type,
+                                }),
+                            });
+
+                            if (!createRes.ok) {
+                                const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
+                                throw new Error(errorData.error || "Failed to create next task");
+                            }
+                        }
+                    }
+                }
+
+                // Mark task as completed (after creating new task, same as normal flow)
+                const taskRes = await fetch("/api/tasks", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: task.id,
+                        status: "Completed",
+                    }),
+                });
+
+                if (!taskRes.ok) {
+                    throw new Error("Failed to complete task");
+                }
+
+                // Save activity
+                await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: `Task completed: ${task.title}`,
+                        type: "task",
+                        comments: "Demo completed - proceeding to next stage",
+                    }),
+                });
+
+                // Close modal and refresh
+                setDemoOutcomeModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    requiresSecondDemo: null,
+                    isSubmitting: false,
+                });
+
+                mutate("/api/tasks");
+                mutate("/api/leads");
+            }
+        } catch (error) {
+            console.error("Error handling demo outcome:", error);
+            alert(error.message);
+            setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
+        }
+    };
+
+    // Cancel demo outcome modal
+    const handleCancelDemoOutcome = () => {
+        setDemoOutcomeModal({
+            isOpen: false,
+            task: null,
+            leadId: null,
+            leadName: "",
+            requiresSecondDemo: null,
+            isSubmitting: false,
         });
     };
 
@@ -1297,6 +1587,121 @@ export default function TasksPage() {
                                             <polyline points="20 6 9 17 4 12" />
                                         </svg>
                                         Complete Task
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Demo Outcome Confirmation Modal */}
+            {demoOutcomeModal.isOpen && demoOutcomeModal.task && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div
+                        className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+                            theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-orange-500/10">
+                                    <Calendar className="w-5 h-5 text-orange-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-semibold">Demo Outcome Confirmation</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-6 py-5 space-y-5">
+                            <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                                Does the client require a second demo?
+                            </p>
+
+                            {/* Radio Options */}
+                            <div className="space-y-3">
+                                <label
+                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        demoOutcomeModal.requiresSecondDemo === true
+                                            ? theme === "dark"
+                                                ? "border-orange-500 bg-orange-500/10"
+                                                : "border-orange-500 bg-orange-50"
+                                            : theme === "dark"
+                                                ? "border-gray-700 hover:border-gray-600"
+                                                : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="demoOutcome"
+                                        checked={demoOutcomeModal.requiresSecondDemo === true}
+                                        onChange={() => setDemoOutcomeModal((prev) => ({ ...prev, requiresSecondDemo: true }))}
+                                        className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                                    />
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        YES, client requires another demo
+                                    </span>
+                                </label>
+
+                                <label
+                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        demoOutcomeModal.requiresSecondDemo === false
+                                            ? theme === "dark"
+                                                ? "border-orange-500 bg-orange-500/10"
+                                                : "border-orange-500 bg-orange-50"
+                                            : theme === "dark"
+                                                ? "border-gray-700 hover:border-gray-600"
+                                                : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="demoOutcome"
+                                        checked={demoOutcomeModal.requiresSecondDemo === false}
+                                        onChange={() => setDemoOutcomeModal((prev) => ({ ...prev, requiresSecondDemo: false }))}
+                                        className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                                    />
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        NO, proceed with next stage
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                            <button
+                                onClick={handleCancelDemoOutcome}
+                                disabled={demoOutcomeModal.isSubmitting}
+                                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                                    theme === "dark"
+                                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                } disabled:opacity-50`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDemoOutcomeConfirm}
+                                disabled={demoOutcomeModal.isSubmitting || demoOutcomeModal.requiresSecondDemo === null}
+                                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {demoOutcomeModal.isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Confirm
                                     </>
                                 )}
                             </button>
