@@ -1,7 +1,8 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../lib/utils/taskTitleGenerator";
 
 export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPersons = [], isSubmitting = false }) {
   const { theme } = useTheme();
@@ -19,6 +20,52 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
   });
 
   const [errors, setErrors] = useState({});
+  const [existingTasks, setExistingTasks] = useState([]);
+  
+  // Fetch existing tasks for selected lead
+  useEffect(() => {
+    if (formData.lead_id) {
+      fetch(`/api/tasks?lead_id=${formData.lead_id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setExistingTasks(Array.isArray(data) ? data : []);
+        })
+        .catch((err) => {
+          console.error("Error fetching tasks:", err);
+          setExistingTasks([]);
+        });
+    } else {
+      setExistingTasks([]);
+    }
+  }, [formData.lead_id]);
+  
+  // Get selected lead data
+  const selectedLead = useMemo(() => {
+    return leads.find((lead) => lead.id === formData.lead_id) || null;
+  }, [leads, formData.lead_id]);
+  
+  // Generate task title based on selected lead's stage
+  const generatedTitle = useMemo(() => {
+    if (!selectedLead || !formData.lead_id) return "";
+    
+    const currentStage = selectedLead.status || "New";
+    
+    if (!canCreateTaskForStage(currentStage)) {
+      return "";
+    }
+    
+    try {
+      const options = {};
+      if (currentStage === "Demo") {
+        options.demoCount = getDemoCount(existingTasks);
+      }
+      const leadName = selectedLead.name || selectedLead.lead_name || "";
+      return generateTaskTitle(currentStage, leadName, options);
+    } catch (error) {
+      console.error("Error generating task title:", error);
+      return "";
+    }
+  }, [selectedLead, existingTasks]);
 
   const updateField = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -29,11 +76,34 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.title.trim()) newErrors.title = "Task title is required";
-    if (!formData.lead_id) newErrors.lead_id = "Lead is required";
+    
+    if (!formData.lead_id) {
+      newErrors.lead_id = "Lead is required";
+    } else if (selectedLead) {
+      const currentStage = selectedLead.status || "New";
+      if (!canCreateTaskForStage(currentStage)) {
+        newErrors.lead_id = "Cannot create tasks for leads in 'Won' stage";
+      }
+    }
+    
+    if (!generatedTitle) {
+      newErrors.title = "Task title could not be generated. Please check lead selection.";
+    }
+    
     if (!formData.sales_person_id) newErrors.sales_person_id = "Sales person is required";
     if (!formData.due_datetime) newErrors.due_datetime = "Due date and time is required";
     if (!formData.priority) newErrors.priority = "Priority is required";
+    
+    // Check for existing active tasks
+    const activeTasks = existingTasks.filter(
+      (t) => String(t.status || "").toLowerCase() !== "completed"
+    );
+    if (activeTasks.length > 0) {
+      const confirmMessage = `This lead already has ${activeTasks.length} active task(s). Do you want to create another task?`;
+      if (!confirm(confirmMessage)) {
+        return false;
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -42,9 +112,17 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    // Use generated title instead of formData.title
+    const finalTitle = generatedTitle || formData.title;
+    
+    if (!finalTitle) {
+      alert("Task title could not be generated. Please check lead selection.");
+      return;
+    }
+
     // Call the onAdd function with the form data
     await onAdd({
-      title: formData.title,
+      title: finalTitle,
       type: formData.type,
       lead_id: formData.lead_id,
       sales_person_id: formData.sales_person_id,
@@ -66,6 +144,7 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
       comments: "",
     });
     setErrors({});
+    setExistingTasks([]);
   };
 
   const handleClose = () => {
@@ -80,7 +159,21 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
       status: "Pending",
       comments: "",
     });
+    setExistingTasks([]);
     onClose();
+  };
+  
+  // Handle lead selection change
+  const handleLeadChange = (leadId) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (lead) {
+      const currentStage = lead.status || "New";
+      if (!canCreateTaskForStage(currentStage)) {
+        alert("Cannot create tasks for leads in 'Won' stage");
+        return;
+      }
+    }
+    updateField("lead_id", leadId);
   };
 
   const inputClass = (field) =>
@@ -161,19 +254,26 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
         {/* Form Body */}
         <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Task Title */}
+            {/* Task Title - Auto-generated */}
             <div className="md:col-span-2">
               <label className={labelClass}>
                 Task Title <span className="text-red-500">*</span>
+                <span className="text-xs text-gray-500 ml-2">(Auto-generated based on stage)</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g. Call John Doe"
-                className={inputClass("title")}
-                value={formData.title}
-                onChange={(e) => updateField("title", e.target.value)}
+                placeholder="Select a lead to generate title..."
+                className={`${inputClass("title")} ${!generatedTitle ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                value={generatedTitle}
+                disabled
+                readOnly
               />
               {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
+              {generatedTitle && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Task title is automatically generated based on the lead's current stage.
+                </p>
+              )}
             </div>
 
             {/* Task Type */}
@@ -200,16 +300,29 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
               <select
                 className={selectClass("lead_id")}
                 value={formData.lead_id}
-                onChange={(e) => updateField("lead_id", e.target.value)}
+                onChange={(e) => handleLeadChange(e.target.value)}
               >
                 <option value="">Select a lead</option>
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.name} ({lead.id})
-                  </option>
-                ))}
+                {leads.map((lead) => {
+                  const leadStage = lead.status || "New";
+                  const canCreate = canCreateTaskForStage(leadStage);
+                  return (
+                    <option 
+                      key={lead.id} 
+                      value={lead.id}
+                      disabled={!canCreate}
+                    >
+                      {lead.name || lead.lead_name} {!canCreate ? "(Won - cannot create tasks)" : ""}
+                    </option>
+                  );
+                })}
               </select>
               {errors.lead_id && <p className="mt-1 text-xs text-red-500">{errors.lead_id}</p>}
+              {selectedLead && existingTasks.length > 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  This lead has {existingTasks.filter(t => String(t.status || "").toLowerCase() !== "completed").length} active task(s).
+                </p>
+              )}
             </div>
 
             {/* Sales Person */}

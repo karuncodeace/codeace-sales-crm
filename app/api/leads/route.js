@@ -1,82 +1,6 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
-/**
- * Helper function to create a first call task for a lead
- * Ensures no duplicate first call tasks are created
- * @param {object} supabase - Supabase client instance
- * @param {string} leadId - Lead ID
- * @param {string} leadName - Lead name
- * @param {string} salespersonId - Salesperson ID to assign the task to
- * @returns {Promise<object|null>} - Created task or null if already exists or error
- */
-async function createFirstCallTask(supabase, leadId, leadName, salespersonId) {
-  if (!leadId || !leadName || !salespersonId) {
-    console.warn("createFirstCallTask: Missing required parameters", { leadId, leadName, salespersonId });
-    return null;
-  }
-
-  const taskTitle = `Initiate first call with ${leadName}`;
-
-  // Check if a first call task already exists for this lead
-  const { data: existingTasks, error: checkError } = await supabase
-    .from("tasks_table")
-    .select("id, title")
-    .eq("lead_id", leadId)
-    .ilike("title", `Initiate first call with%`); // Case-insensitive match
-
-  if (checkError) {
-    console.error("Error checking for existing first call task:", checkError);
-    return null;
-  }
-
-  if (existingTasks && existingTasks.length > 0) {
-    console.log("First call task already exists for lead:", leadId, existingTasks);
-    return null; // Task already exists, don't create duplicate
-  }
-
-  // Create the first call task
-  const { data: newTask, error: taskError } = await supabase
-    .from("tasks_table")
-    .insert({
-      lead_id: leadId,
-      title: taskTitle,
-      type: "Call",
-      status: "Pending",
-      sales_person_id: salespersonId,
-    })
-    .select()
-    .single();
-
-  if (taskError) {
-    console.error("Error creating first call task:", taskError);
-    return null;
-  }
-
-  // Create corresponding task_activity record
-  if (newTask && salespersonId) {
-    try {
-      await supabase
-        .from("task_activities")
-        .insert({
-          lead_id: leadId,
-          activity: `Task Created: ${taskTitle}`,
-          type: "task",
-          comments: `First call task "${taskTitle}" has been automatically created`,
-          source: "system",
-          created_at: new Date().toISOString(),
-          salesperson_id: salespersonId,
-        });
-    } catch (activityError) {
-      console.error("Error creating task activity for first call task:", activityError);
-      // Don't fail if activity creation fails - it's optional
-    }
-  }
-
-  console.log("✅ Created first call task:", { leadId, leadName, taskId: newTask?.id });
-  return newTask;
-}
-
 export async function GET() {
   const supabase = await supabaseServer();
   
@@ -266,13 +190,8 @@ export async function POST(request) {
     lastActivity: formatLastActivity(data.last_activity),
   };
 
-  // Create first call task if lead status is "New" (explicitly or default) and has assigned_to
-  const leadStatus = data.status || "New"; // Default to "New" if not set
-  if (leadStatus.toLowerCase() === "new" && finalAssignedTo) {
-    // Use the assigned_to value (which could be crmUser.id for salesperson or provided assignedTo for admin)
-    const salespersonIdForTask = finalAssignedTo;
-    await createFirstCallTask(supabase, newLead.id, newLead.name, salespersonIdForTask);
-  }
+  // Note: Task creation for "New" stage is handled by database trigger
+  // Frontend should NOT create tasks here
 
   return Response.json({ success: true, lead: newLead });
 }
@@ -366,89 +285,79 @@ export async function PATCH(request) {
 
     const updatedLead = data[0];
 
-    // Create first call task if:
-    // 1. Lead status is being set/changed to "New" and has assigned_to
-    // 2. Lead is being assigned to a salesperson (assigned_to changed from null/other to a value)
-    const currentAssignedTo = updatedLead.assigned_to || finalAssignedTo;
-    const statusChangedToNew = status !== undefined && 
-      String(status).toLowerCase() === "new" && 
-      (previousStatus === undefined || String(previousStatus).toLowerCase() !== "new");
+    // Note: Task creation for "New" stage is handled by database trigger
+    // Frontend should NOT create tasks when status changes to "New"
     
-    const assignedToChanged = assignedTo !== undefined && 
-      currentAssignedTo !== null && 
-      currentAssignedTo !== previousAssignedTo;
-
-    if ((statusChangedToNew || assignedToChanged) && currentAssignedTo) {
-      // Create first call task for the assigned salesperson
-      await createFirstCallTask(supabase, id, updatedLead.lead_name || leadName, currentAssignedTo);
-    }
-
+    // Only create tasks for status changes to non-"New" stages (if needed)
+    // But skip "New" stage as it's handled by trigger
     if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
-    const s = String(status).toLowerCase();
-    let title = `Task for ${leadName}`;
-    let type = "Follow-Up";
-    if (s === "new") {
-      title = `Call to ${leadName}`;
-      type = "Call";
-    } else if (s === "contacted") {
-      title = `Follow-up to ${leadName}`;
-      type = "Follow-Up";
-    } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
-      title = `Follow-up to ${leadName}`;
-      type = "Follow-Up";
-    } else if (s === "qualified") {
-      title = `Qualification call with ${leadName}`;
-      type = "Call";
-    } else if (s === "proposal") {
-      title = `Prepare proposal for ${leadName}`;
-      type = "Proposal";
-    } else if (s === "won") {
-      title = `Closure with ${leadName}`;
-      type = "Meeting";
-    } else if (s === "no response" || s === "no_response") {
-      title = `Re-attempt contact: ${leadName}`;
-      type = "Call";
-    }
+      const s = String(status).toLowerCase();
+      
+      // Skip task creation for "New" stage - handled by database trigger
+      if (s !== "new") {
+        let title = `Task for ${leadName}`;
+        let type = "Follow-Up";
+        
+        if (s === "contacted") {
+          title = `Follow-up to ${leadName}`;
+          type = "Follow-Up";
+        } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
+          title = `Follow-up to ${leadName}`;
+          type = "Follow-Up";
+        } else if (s === "qualified") {
+          title = `Qualification call with ${leadName}`;
+          type = "Call";
+        } else if (s === "proposal") {
+          title = `Prepare proposal for ${leadName}`;
+          type = "Proposal";
+        } else if (s === "won") {
+          title = `Closure with ${leadName}`;
+          type = "Meeting";
+        } else if (s === "no response" || s === "no_response") {
+          title = `Re-attempt contact: ${leadName}`;
+          type = "Call";
+        }
 
-    try {
-      const { data: statusTask, error: taskError } = await supabase
-        .from("tasks_table")
-        .insert({
-          lead_id: id,
-          title,
-          type,
-          status: "Pending",
-          sales_person_id: crmUser.id, // Auto-assign task to current user
-        })
-        .select()
-        .single();
+        try {
+          const { data: statusTask, error: taskError } = await supabase
+            .from("tasks_table")
+            .insert({
+              lead_id: id,
+              title,
+              type,
+              status: "Pending",
+              sales_person_id: crmUser.id, // Auto-assign task to current user
+            })
+            .select()
+            .single();
 
-      if (taskError) {
-        console.error("Error creating task for status change:", taskError);
-        // Don't fail the lead update if task creation fails
-      } else if (statusTask && crmUser.id) {
-        // Create corresponding task_activity record with assigned salesperson_id
-        const { error: activityError } = await supabase
-          .from("task_activities")
-          .insert({
-            lead_id: id,
-            activity: `Task Created: ${title}`,
-            type: "task",
-            comments: `Task "${title}" has been created due to status change`,
-            source: "user",
-            created_at: new Date().toISOString(),
-            salesperson_id: crmUser.id, // Store assigned sales person
-          });
+          if (taskError) {
+            console.error("Error creating task for status change:", taskError);
+            // Don't fail the lead update if task creation fails
+          } else if (statusTask && crmUser.id) {
+            // Create corresponding task_activity record with assigned salesperson_id
+            const { error: activityError } = await supabase
+              .from("task_activities")
+              .insert({
+                lead_id: id,
+                activity: `Task Created: ${title}`,
+                type: "task",
+                comments: `Task "${title}" has been created due to status change`,
+                source: "user",
+                created_at: new Date().toISOString(),
+                salesperson_id: crmUser.id, // Store assigned sales person
+              });
 
-        if (activityError) {
-          console.error("Error creating task activity for status change:", activityError);
-          // Don't fail if activity creation fails - it's optional
+            if (activityError) {
+              console.error("Error creating task activity for status change:", activityError);
+              // Don't fail if activity creation fails - it's optional
+            }
+          }
+        } catch (err) {
+          console.error("Exception creating task/activity for status change:", err);
+          // Don't fail the lead update if task/activity creation fails
         }
       }
-    } catch (err) {
-      console.error("Exception creating task/activity for status change:", err);
-      // Don't fail the lead update if task/activity creation fails
-    }
     }
 
     // Map the updated lead to frontend format

@@ -6,6 +6,7 @@ import { useTheme } from "../../context/themeContext";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
 import AddTaskModal from "../buttons/addTaskbtn";
+import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../lib/utils/taskTitleGenerator";
 
 // Custom Icon Components
 const PhoneIcon = ({ className }) => (
@@ -129,27 +130,34 @@ function getNextStage(currentStage) {
 }
 
 // Helper function to get task details for next stage
-function getTaskDetailsForNextStage(nextStage, leadName) {
-  const taskTitles = {
-    "Contacted": `Schedule Demo for ${leadName}`,
-    "Demo": `Prepare Proposal for ${leadName}`,
-    "Proposal": `Follow up on Proposal with ${leadName}`,
-    "Follow-Up": `Finalize deal with ${leadName}`,
-  };
+function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
+  if (!nextStage || !canCreateTaskForStage(nextStage)) return null;
   
-  const taskTypes = {
-    "Contacted": "Meeting",
-    "Demo": "Follow-Up",
-    "Proposal": "Follow-Up",
-    "Follow-Up": "Meeting",
-  };
-  
-  if (!nextStage || !taskTitles[nextStage]) return null;
-  
-  return {
-    title: taskTitles[nextStage],
-    type: taskTypes[nextStage] || "Follow-Up",
-  };
+  try {
+    // For Demo stage, determine if it's first or second demo
+    const options = {};
+    if (nextStage === "Demo") {
+      options.demoCount = getDemoCount(existingTasks);
+    }
+    
+    const title = generateTaskTitle(nextStage, leadName, options);
+    
+    // Determine task type based on stage
+    const taskTypes = {
+      "Contacted": "Meeting",
+      "Demo": "Meeting",
+      "Proposal": "Follow-Up",
+      "Follow Up": "Call",
+    };
+    
+    return {
+      title,
+      type: taskTypes[nextStage] || "Call",
+    };
+  } catch (error) {
+    console.error("Error generating task title:", error);
+    return null;
+  }
 }
 
 export default function TasksPage() {
@@ -490,7 +498,7 @@ export default function TasksPage() {
             }
             
             // Update lead status and stage notes
-            if (nextStage) {
+            if (nextStage && canCreateTaskForStage(nextStage)) {
                 const leadUpdateRes = await fetch("/api/leads", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -506,18 +514,27 @@ export default function TasksPage() {
                     throw new Error("Failed to update lead status");
                 }
                 
-                // Create task for next stage
-                const taskDetails = getTaskDetailsForNextStage(nextStage, leadName);
-                if (taskDetails) {
-                    await fetch("/api/tasks", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            lead_id: leadId,
-                            title: taskDetails.title,
-                            type: taskDetails.type,
-                        }),
-                    });
+                // Get existing tasks for this lead to check for duplicates and demo count
+                const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
+                const existingTasks = await existingTasksRes.json().catch(() => []);
+                const activeTasks = Array.isArray(existingTasks) 
+                    ? existingTasks.filter(t => String(t.status || "").toLowerCase() !== "completed")
+                    : [];
+                
+                // Create task for next stage (only if no active tasks exist)
+                if (activeTasks.length === 0) {
+                    const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, existingTasks);
+                    if (taskDetails) {
+                        await fetch("/api/tasks", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                lead_id: leadId,
+                                title: taskDetails.title,
+                                type: taskDetails.type,
+                            }),
+                        });
+                    }
                 }
             }
             

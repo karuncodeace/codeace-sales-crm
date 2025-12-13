@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { Copy, Check, Mail } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
+import { generateTaskTitle, canCreateTaskForStage } from "../../../lib/utils/taskTitleGenerator";
 
 import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
@@ -344,26 +345,32 @@ export default function LeadsTable() {
     });
   };
 
-  // Get task title and type based on status
+  // Get task title and type based on status (for updating existing tasks)
   const getTaskDetailsForStatus = (status, leadName) => {
     const normalizedStatus = normalizeStatus(status);
     
-    if (!normalizedStatus || !taskTitles[normalizedStatus]) {
-      return null; // No task update for unmapped statuses
+    // Block task updates for Won stage
+    if (!normalizedStatus || !canCreateTaskForStage(normalizedStatus)) {
+      return null;
     }
     
-    const title = taskTitles[normalizedStatus](leadName);
-    
-    // Set type based on status
-    let type = "Follow-Up";
-    if (normalizedStatus === "New") type = "Call";
-    else if (normalizedStatus === "Contacted") type = "Follow-Up";
-    else if (normalizedStatus === "Demo") type = "Follow-Up";
-    else if (normalizedStatus === "Proposal") type = "Proposal";
-    else if (normalizedStatus === "Follow-Up") type = "Follow-Up";
-    else if (normalizedStatus === "Won") type = "Meeting";
-    
-    return { title, type };
+    try {
+      // Use utility function to generate title
+      const title = generateTaskTitle(normalizedStatus, leadName || "Client");
+      
+      // Set type based on status
+      let type = "Call";
+      if (normalizedStatus === "New") type = "Call";
+      else if (normalizedStatus === "Contacted") type = "Meeting";
+      else if (normalizedStatus === "Demo") type = "Meeting";
+      else if (normalizedStatus === "Proposal") type = "Follow-Up";
+      else if (normalizedStatus === "Follow-Up") type = "Call";
+      
+      return { title, type };
+    } catch (error) {
+      console.error("Error generating task title:", error);
+      return null;
+    }
   };
 
   // Confirm status change with comment

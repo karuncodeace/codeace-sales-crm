@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { useTheme } from "../../../context/themeContext";
 import { Phone, Clock, CheckCircle2, Calendar, Circle, Plus } from "lucide-react";
+import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../../lib/utils/taskTitleGenerator";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
@@ -127,27 +128,34 @@ function getNextStage(currentStage) {
 }
 
 // Helper function to get task details for next stage
-function getTaskDetailsForNextStage(nextStage, leadName) {
-  const taskTitles = {
-    "Contacted": `Schedule Demo for ${leadName}`,
-    "Demo": `Prepare Proposal for ${leadName}`,
-    "Proposal": `Follow up on Proposal with ${leadName}`,
-    "Follow-Up": `Finalize deal with ${leadName}`,
-  };
+function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
+  if (!nextStage || !canCreateTaskForStage(nextStage)) return null;
   
-  const taskTypes = {
-    "Contacted": "Meeting",
-    "Demo": "Follow-Up",
-    "Proposal": "Follow-Up",
-    "Follow-Up": "Meeting",
-  };
-  
-  if (!nextStage || !taskTitles[nextStage]) return null;
-  
-  return {
-    title: taskTitles[nextStage],
-    type: taskTypes[nextStage] || "Follow-Up",
-  };
+  try {
+    // For Demo stage, determine if it's first or second demo
+    const options = {};
+    if (nextStage === "Demo") {
+      options.demoCount = getDemoCount(existingTasks);
+    }
+    
+    const title = generateTaskTitle(nextStage, leadName, options);
+    
+    // Determine task type based on stage
+    const taskTypes = {
+      "Contacted": "Meeting",
+      "Demo": "Meeting",
+      "Proposal": "Follow-Up",
+      "Follow Up": "Call",
+    };
+    
+    return {
+      title,
+      type: taskTypes[nextStage] || "Call",
+    };
+  } catch (error) {
+    console.error("Error generating task title:", error);
+    return null;
+  }
 }
 
 export default function TasksTab({ leadId, leadName }) {
@@ -267,18 +275,28 @@ export default function TasksTab({ leadId, leadName }) {
           throw new Error("Failed to update lead status");
         }
         
-        // Create task for next stage
-        const taskDetails = getTaskDetailsForNextStage(nextStage, leadName);
-        if (taskDetails) {
-          await fetch("/api/tasks", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lead_id: leadId,
-              title: taskDetails.title,
-              type: taskDetails.type,
-            }),
-          });
+        // Create task for next stage (only if not Won)
+        if (nextStage && canCreateTaskForStage(nextStage)) {
+          const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasks);
+          if (taskDetails) {
+            // Check for existing active tasks before creating
+            const activeTasks = tasks.filter(
+              (t) => String(t.status || "").toLowerCase() !== "completed"
+            );
+            
+            // Only create if no active tasks exist
+            if (activeTasks.length === 0) {
+              await fetch("/api/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  lead_id: leadId,
+                  title: taskDetails.title,
+                  type: taskDetails.type,
+                }),
+              });
+            }
+          }
         }
       }
       
@@ -372,7 +390,42 @@ export default function TasksTab({ leadId, leadName }) {
   }, [tasks]);
 
   const handleAddTask = async () => {
-    if (!newTitle.trim()) return;
+    if (!leadId || !leadData) return;
+    
+    const currentStage = leadData.status || "New";
+    
+    // Block task creation for Won stage
+    if (!canCreateTaskForStage(currentStage)) {
+      alert("Cannot create tasks for leads in 'Won' stage");
+      return;
+    }
+    
+    // Check for existing active tasks
+    const activeTasks = tasks.filter(
+      (t) => String(t.status || "").toLowerCase() !== "completed"
+    );
+    
+    if (activeTasks.length > 0) {
+      const confirmMessage = `This lead already has ${activeTasks.length} active task(s). Do you want to create another task?`;
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+    }
+    
+    // Generate task title based on current stage
+    let taskTitle;
+    try {
+      const options = {};
+      if (currentStage === "Demo") {
+        options.demoCount = getDemoCount(tasks);
+      }
+      taskTitle = generateTaskTitle(currentStage, leadName || leadData.lead_name || leadData.name, options);
+    } catch (error) {
+      console.error("Error generating task title:", error);
+      alert(error.message || "Failed to generate task title");
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/tasks", {
@@ -380,12 +433,15 @@ export default function TasksTab({ leadId, leadName }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lead_id: leadId,
-          title: newTitle.trim(),
+          title: taskTitle,
           type: newType,
           due_date: newDueDate || null,
         }),
       });
-      if (!res.ok) throw new Error("Failed to create task");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to create task");
+      }
       setNewTitle("");
       setNewType("Call");
       setNewDueDate("");
@@ -393,6 +449,7 @@ export default function TasksTab({ leadId, leadName }) {
       await mutate();
     } catch (err) {
       console.error("Error creating task:", err);
+      alert(err.message || "Failed to create task");
     } finally {
       setIsSubmitting(false);
     }
@@ -412,7 +469,14 @@ export default function TasksTab({ leadId, leadName }) {
         </div>
 
         <button
-          onClick={() => setShowAddTask(true)}
+          onClick={() => {
+            const currentStage = leadData?.status || "New";
+            if (!canCreateTaskForStage(currentStage)) {
+              alert("Cannot create tasks for leads in 'Won' stage");
+              return;
+            }
+            setShowAddTask(true);
+          }}
           className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-medium text-sm"
         >
           <Plus className="w-4 h-4" />
@@ -455,15 +519,31 @@ export default function TasksTab({ leadId, leadName }) {
 
             <div className="space-y-4">
               <div>
-                <label className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>Title</label>
+                <label className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                  Title <span className="text-xs text-gray-500">(Auto-generated based on stage)</span>
+                </label>
                 <input
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Call the prospect"
-                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 ${
-                    isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"
+                  value={(() => {
+                    if (!leadData) return "";
+                    const currentStage = leadData.status || "New";
+                    try {
+                      const options = {};
+                      if (currentStage === "Demo") {
+                        options.demoCount = getDemoCount(tasks);
+                      }
+                      return generateTaskTitle(currentStage, leadName || leadData.lead_name || leadData.name || "", options);
+                    } catch (error) {
+                      return "";
+                    }
+                  })()}
+                  disabled
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm bg-gray-100 cursor-not-allowed ${
+                    isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-600"
                   }`}
                 />
+                <p className={`mt-1 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Task title is automatically generated based on the lead's current stage.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -513,7 +593,7 @@ export default function TasksTab({ leadId, leadName }) {
               </button>
               <button
                 onClick={handleAddTask}
-                disabled={isSubmitting || !newTitle.trim()}
+                disabled={isSubmitting || !leadData}
                 className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all shadow-lg hover:shadow-xl"
               >
                 {isSubmitting && <CheckCircle2 className="w-4 h-4 animate-spin" />}
