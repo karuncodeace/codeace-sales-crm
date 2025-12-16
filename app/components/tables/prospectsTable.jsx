@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
 import StatusDropdown from "../buttons/statusTooglebtn";
@@ -17,6 +18,7 @@ const LoaderIcon = ({ className }) => (
 );
 
 export default function ProspectsTable() {
+    const router = useRouter();
     const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const { theme } = useTheme();
@@ -31,6 +33,9 @@ export default function ProspectsTable() {
         priority: "",
         type: "",
     });
+    const handleLeadClick = (prospectId) => {
+        router.push(`/prospects/${prospectId}`);
+    };
 
     // Fetch prospects from API (leads with conversion_chance >= 60)
     const { data: prospectsData, error: prospectsError, isLoading } = useSWR("/api/prospects", fetcher);
@@ -41,7 +46,7 @@ export default function ProspectsTable() {
 
     const filteredProspects = useMemo(() => {
         if (!prospectsData || !Array.isArray(prospectsData)) return [];
-        
+
         let result = prospectsData;
 
         // Apply advanced filters
@@ -99,11 +104,11 @@ export default function ProspectsTable() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: prospectId, status: newStatus }),
             });
-            
+
             if (!response.ok) {
                 throw new Error("Failed to update status");
             }
-            
+
             mutate("/api/prospects");
         } catch (error) {
             console.error("Error updating status:", error);
@@ -117,11 +122,11 @@ export default function ProspectsTable() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: prospectId, priority: newPriority }),
             });
-            
+
             if (!response.ok) {
                 throw new Error("Failed to update priority");
             }
-            
+
             mutate("/api/prospects");
         } catch (error) {
             console.error("Error updating priority:", error);
@@ -145,7 +150,7 @@ export default function ProspectsTable() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [openActions]);
 
-   
+
 
     if (prospectsError) {
         return (
@@ -160,7 +165,7 @@ export default function ProspectsTable() {
 
     return (
         <div className="">
-           
+
 
             <div className={`h-[calc(100vh-180px)] mt-4 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
                 <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
@@ -205,17 +210,15 @@ export default function ProspectsTable() {
                                     </label>
                                 </th>
 
-                                {[
-                                    "Prospect Name",
-                                    "Phone",
-                                    "Email",
-                                    "Lead Source",
+                                {["Contact Name",
+                                    "Lead Name",
+                                    "Contact Info",
+
                                     "Status",
                                     "Assigned To",
-                                    "Last Activity",
-                                    "Created At",
+
                                     "Priority",
-                                    "Conversion Chance",
+                                    "Rate Of Conversion",
                                     "Actions",
 
                                 ].map((column) => (
@@ -241,7 +244,7 @@ export default function ProspectsTable() {
                                         colSpan={12}
                                         className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                                     >
-                                        {searchTerm.trim() 
+                                        {searchTerm.trim()
                                             ? `No prospects match "${searchTerm.trim()}". Try a different search.`
                                             : "No prospects found with 60%+ conversion chance."
                                         }
@@ -267,47 +270,72 @@ export default function ProspectsTable() {
                                                 </label>
                                             </div>
                                         </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <div className="flex items-center gap-x-3">
-                                                    <div className="flex flex-col">
-                                                        <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                            {prospect.name || "—"}
-                                                        </span>
-                                                        <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                                            {prospect.id}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <a
-                                                    href={`tel:${prospect.phone?.replace(/[^0-9+]/g, "")}`}
-                                                    className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
-                                                >
-                                                    {prospect.phone || "—"}
-                                                </a>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <a
-                                                    href={`mailto:${prospect.email}`}
-                                                    className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-blue-400" : "text-gray-900 hover:text-blue-600"}`}
-                                                >
-                                                    {prospect.email || "—"}
-                                                </a>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.source || "—"}
-                                                </span>
-                                            </div>
-                                        </td>
+                                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(prospect.id)}>
+                          <div className="px-6 py-2">
+                            <div className="flex items-center gap-x-3">
+
+                              <div 
+                                className="flex flex-col cursor-pointer"
+                                
+                              >
+                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                  {prospect.contactName || "—"}
+                                </span>
+                                <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                  {prospect.createdAt || "—"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(prospect.id)}>
+                          <div className="px-6 py-2">
+                            <div className="flex items-center gap-x-3">
+
+                              <div 
+                                className="flex flex-col cursor-pointer"
+                                
+                              >
+                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                                  {prospect.name || "—"}
+                                </span>
+                                <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                  {prospect.id || "—"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="size-px whitespace-nowrap cursor-pointer">
+                          <div className="px-6 py-2">
+                            <div className="flex flex-col ">
+                              {prospect.phone ? (
+                                <a
+                                  href={`tel:${prospect.phone.replace(
+                                    /[^0-9+]/g,
+                                    ""
+                                  )}`}
+                                  className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}
+                                >
+                                  {prospect.phone}
+                                </a>
+                              ) : (
+                                <span className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>—</span>
+                              )}
+                              {prospect.email ? (
+                                <div className="flex items-center gap-2 group">
+                                  <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                    {prospect.email}
+                                  </span>
+                                 
+                                </div>
+                              ) : (
+                                <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>—</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                                      
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <StatusDropdown
@@ -324,20 +352,8 @@ export default function ProspectsTable() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.lastActivity || "—"}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="size-px whitespace-nowrap">
-                                            <div className="px-6 py-2">
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {prospect.createdAt || "—"}
-                                                </span>
-                                            </div>
-                                        </td>
+                                       
+                                        
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <PriorityDropdown
@@ -353,13 +369,12 @@ export default function ProspectsTable() {
                                                 <div className="flex items-center gap-2 min-w-[120px]">
                                                     <div className={`flex-1 h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
                                                         <div
-                                                            className={`h-full rounded-full transition-all duration-300 ${
-                                                                prospect.conversionChance >= 80
+                                                            className={`h-full rounded-full transition-all duration-300 ${prospect.conversionChance >= 80
                                                                     ? "bg-emerald-500"
                                                                     : prospect.conversionChance >= 60
                                                                         ? "bg-orange-500"
                                                                         : "bg-red-500"
-                                                            }`}
+                                                                }`}
                                                             style={{ width: `${prospect.conversionChance}%` }}
                                                         />
                                                     </div>
@@ -442,7 +457,7 @@ export default function ProspectsTable() {
                 {/* End Table */}
 
                 {/* Footer */}
-                <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                <div className={`px-6 py-2 grid gap-3 md:flex md:justify-between md:items-center border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
                     <div className="inline-flex items-center gap-x-2">
                         <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
                             Showing: {filteredProspects.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredProspects.length)} of {filteredProspects.length}

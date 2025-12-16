@@ -1,9 +1,11 @@
 // Utility to build a Cal.com booking URL with encoded query params
-// Expects lead: { id, name, email } and salesperson: { id }
+// Expects lead: { id, name, email }, salesperson: { id }, and optional eventTypeId
 // Returns a string URL
 
-export function generateCalUrl(lead = {}, salesperson = {}) {
-  const baseUrl = "https://cal.com/karun-karthikeyan-8wsv1t/15min";
+import { CAL_BASE_URL, getCalEventUrl } from "../config/calConfig";
+
+export function generateCalUrl(lead = {}, salesperson = {}, eventTypeId = "discovery") {
+  const baseUrl = getCalEventUrl(eventTypeId);
 
   const params = new URLSearchParams();
 
@@ -15,7 +17,6 @@ export function generateCalUrl(lead = {}, salesperson = {}) {
   const query = params.toString();
   return query ? `${baseUrl}?${query}` : baseUrl;
 }
-
 
 
 

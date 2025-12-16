@@ -291,8 +291,8 @@ export default function AppointmentsPage() {
                             <Calendar className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
                           </div>
                           <div>
-                            <h3 className={`text-lg font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                              {appointment.title || "Meeting"}
+                            <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                              {appointment.title.trim().slice(0,50) + (appointment.title.length > 50 ? "..." : "") || "Meeting"}
                             </h3>
                             
                           </div>

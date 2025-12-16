@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../../lib/supabase/serverClient";
 import { getCrmUser } from "../../../../lib/crm/auth";
+import { CAL_API_BASE_URL } from "../../../../config/calConfig";
 
 // POST - Reschedule appointment via Cal.com API
 export async function POST(request) {
@@ -24,7 +25,8 @@ export async function POST(request) {
 
     // Get Cal.com API credentials from environment variables
     const calApiKey = process.env.CALCOM_API_KEY;
-    const calApiUrl = process.env.CALCOM_API_URL || "https://api.cal.com/v2";
+    // Use self-hosted Cal.com API URL from config
+    const calApiUrl = CAL_API_BASE_URL;
 
     if (!calApiKey) {
       console.warn("⚠️ CALCOM_API_KEY not set, updating database only");

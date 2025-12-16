@@ -1066,7 +1066,7 @@ export default function LeadsTable() {
             {/* End Table */}
 
             {/* Footer */}
-            <div className={`px-6 py-4 grid gap-3 md:flex md:justify-between md:items-center border-t  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+            <div className={`px-6 py-2 grid gap-3 md:flex md:justify-between md:items-center border-t  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
               <div className="inline-flex items-center gap-x-2">
                 <p className={`text-sm ${theme === "dark" ? "text-gray-400/80" : "text-gray-600"}`}>
                   Showing: {filteredLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredLeads.length)} of {filteredLeads.length}
@@ -1144,7 +1144,7 @@ export default function LeadsTable() {
                 return (
                   <div
                     key={status}
-                    className={`flex min-w-[350px] flex-col min-h-[700px] max-h-auto  ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
+                    className={`flex min-w-[350px] md:min-w-[270px] 2xl:min-w-[350px] flex-col min-h-[700px] max-h-auto  ${theme === "dark" ? "bg-transparent" : "bg-white"}  transition-all duration-200 ease-out  ${dragOverStatus === status
                       ? "  shadow-sm scale-[1.01]"
                       : " ring-transparent"
                       }`}
@@ -1215,12 +1215,7 @@ export default function LeadsTable() {
                                 </span>
                                 <span>{lead.assignedTo}</span>
                               </div>
-                              <div className="flex items-center justify-between">
-                                <span className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                  Activity
-                                </span>
-                                <span>{lead.lastActivity}</span>
-                              </div>
+                             
                               <div className="flex items-center justify-between">
                                 <span className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                                   Created

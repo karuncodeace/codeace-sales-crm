@@ -4,6 +4,7 @@ import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 import { useTheme } from "../../context/themeContext";
 import { X, Calendar, Video, Phone, Clock } from "lucide-react";
 import BookingModal from "../BookingModal";
+import { getCalLink } from "../../../config/calConfig";
 
 export default function BookMeetingButton({ lead }) {
   const { theme } = useTheme();
@@ -19,9 +20,8 @@ export default function BookMeetingButton({ lead }) {
   }, []);
 
   const callTypes = [
-    { id: "discovery", label: "Discovery Call", duration: "15-20 min intro", calLink: "karun-karthikeyan-8wsv1t/discovery-call" },
-    { id: "sales", label: "Sales Call", duration: "Deep-dive sales call", calLink: "karun-karthikeyan-8wsv1t/sales-call" },
-   
+    { id: "discovery", label: "Discovery Call", duration: "15-20 min intro", calLink: getCalLink("discovery") },
+    { id: "kick-off", label: "Kick-off Call", duration: "Project kick-off meeting", calLink: getCalLink("kick-off") },
   ];
 
   const handleBook = () => {
