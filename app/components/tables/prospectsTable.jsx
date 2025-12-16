@@ -37,7 +37,7 @@ export default function ProspectsTable() {
         router.push(`/prospects/${prospectId}`);
     };
 
-    // Fetch prospects from API (leads with conversion_chance >= 60)
+    // Fetch prospects from API (leads with total_score > 20)
     const { data: prospectsData, error: prospectsError, isLoading } = useSWR("/api/prospects", fetcher);
 
     const handleApplyFilters = (filters) => {
@@ -246,7 +246,7 @@ export default function ProspectsTable() {
                                     >
                                         {searchTerm.trim()
                                             ? `No prospects match "${searchTerm.trim()}". Try a different search.`
-                                            : "No prospects found with 60%+ conversion chance."
+                                            : "No prospects found with score > 20."
                                         }
                                     </td>
                                 </tr>

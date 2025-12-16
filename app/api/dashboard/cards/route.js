@@ -1,72 +1,121 @@
 import { supabaseServer } from "../../../../lib/supabase/serverClient";
-import { getCrmUser, getFilteredQuery } from "../../../../lib/crm/auth";
 
 export async function GET() {
   try {
     const supabase = await supabaseServer();
     
-    // Get CRM user for role-based filtering
-    const crmUser = await getCrmUser();
-    
-    // If no CRM user found, return zeros instead of 403 to prevent loading loops
-    if (!crmUser) {
-      console.warn("No CRM user found - returning zero dashboard metrics");
-      return Response.json({
-        leadsGenerated: 0,
-        firstCallDone: 0,
-        qualifiedLeads: 0,
-        meetingScheduled: 0,
-        meetingConducted: 0,
-        followUpCalls: 0,
-        proposalsSent: 0,
-        conversionRate: 0
-      });
+    if (!supabase) {
+      return Response.json(
+        { error: "Database connection failed" },
+        { status: 500 }
+      );
     }
     
-    // Get filtered queries based on role
-    let leadsQuery = getFilteredQuery(supabase, "leads_table", crmUser);
-    let tasksQuery = getFilteredQuery(supabase, "tasks_table", crmUser);
+    // Helper function to safely execute queries
+    const safeQuery = async (queryFn, defaultValue) => {
+      try {
+        const result = await queryFn();
+        if (result.error) {
+          console.error("Query error:", result.error);
+          return defaultValue;
+        }
+        return result;
+      } catch (error) {
+        console.error("Query exception:", error);
+        return defaultValue;
+      }
+    };
     
-    // Fetch all counts with role-based filtering
-    const [
-      { count: leadsGenerated },
-      { count: qualifiedLeads },
-      { count: firstCallDone },
-      { count: meetingScheduled },
-      { count: meetingConducted },
-      { count: followUpCalls },
-      { count: proposalsSent }
-    ] = await Promise.all([
-      leadsQuery.select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "leads_table", crmUser).eq("status", "Qualified").select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "tasks_table", crmUser).eq("type", "Call").eq("status", "Completed").select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "tasks_table", crmUser).eq("type", "Meeting").eq("status", "Scheduled").select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "tasks_table", crmUser).eq("type", "Meeting").eq("status", "Completed").select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "tasks_table", crmUser).eq("type", "Follow-Up").select("*", { count: "exact", head: true }),
-      getFilteredQuery(supabase, "tasks_table", crmUser).eq("type", "Proposal").select("*", { count: "exact", head: true })
-    ]);
+    // 1. Total leads from leads_table
+    const { count: leadsGenerated = 0 } = await safeQuery(
+      () => supabase.from("leads_table").select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
     
-    // Calculate conversion rate (qualified leads / total leads * 100)
-    const conversionRate = leadsGenerated > 0 
-      ? ((qualifiedLeads || 0) / leadsGenerated * 100).toFixed(1)
-      : 0;
+    // 2. First call done count from first_call_done field (may not exist)
+    const firstCallDoneResult = await safeQuery(
+      () => supabase.from("leads_table")
+        .eq("first_call_done", true)
+        .select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
+    const firstCallDone = firstCallDoneResult.count ?? 0;
+    
+    // 3. Qualified leads count from status field
+    const { count: qualifiedLeads = 0 } = await safeQuery(
+      () => supabase.from("leads_table")
+        .eq("status", "Qualified")
+        .select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
+    
+    // 4. Meeting scheduled count from appointments table
+    const { count: meetingScheduled = 0 } = await safeQuery(
+      () => supabase.from("appointments").select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
+    
+    // 5. Fetch leads with total_score for conversion rate calculation
+    const leadsForConversionResult = await safeQuery(
+      () => supabase.from("leads_table").select("total_score"),
+      { data: [] }
+    );
+    const leadsForConversion = leadsForConversionResult.data ?? [];
+    
+    // 6. Follow up calls count from status field
+    const { count: followUpCalls = 0 } = await safeQuery(
+      () => supabase.from("leads_table")
+        .eq("status", "Follow-Up")
+        .select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
+    
+    // 7. Proposals sent count from status field
+    const { count: proposalsSent = 0 } = await safeQuery(
+      () => supabase.from("leads_table")
+        .eq("status", "Proposal")
+        .select("*", { count: "exact", head: true }),
+      { count: 0 }
+    );
+    
+    // 8. Calculate conversion rate: percentage of leads with total_score > 20 out of 25
+    let conversionRate = 0;
+    if (leadsForConversion && leadsForConversion.length > 0) {
+      const totalLeads = leadsForConversion.length;
+      const convertedLeads = leadsForConversion.filter(lead => {
+        const score = lead.total_score !== null && lead.total_score !== undefined 
+          ? Number(lead.total_score) 
+          : 0;
+        return score > 20;
+      }).length;
+      
+      conversionRate = totalLeads > 0 
+        ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(1))
+        : 0;
+    }
     
     const data = {
       leadsGenerated: leadsGenerated || 0,
       firstCallDone: firstCallDone || 0,
       qualifiedLeads: qualifiedLeads || 0,
       meetingScheduled: meetingScheduled || 0,
-      meetingConducted: meetingConducted || 0,
+      meetingConducted: 0, // Keep it 0 as requested
       followUpCalls: followUpCalls || 0,
       proposalsSent: proposalsSent || 0,
-      conversionRate: parseFloat(conversionRate)
+      conversionRate: conversionRate
     };
 
+    console.log("✅ Dashboard Cards API Final Data:", data);
     return Response.json(data);
   } catch (error) {
-    console.error("Cards API Error:", error.message);
+    console.error("Cards API Error:", error);
+    console.error("Error stack:", error.stack);
     return Response.json(
-      { error: "Failed to fetch cards data" },
+      { 
+        error: "Failed to fetch cards data",
+        message: error.message,
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

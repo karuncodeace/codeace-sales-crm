@@ -20,8 +20,8 @@ export default function BookMeetingButton({ lead }) {
   }, []);
 
   const callTypes = [
-    { id: "discovery", label: "Discovery Call", duration: "15-20 min intro", calLink: getCalLink("discovery") },
-    { id: "kick-off", label: "Kick-off Call", duration: "Project kick-off meeting", calLink: getCalLink("kick-off") },
+    { id: "discovery", label: "Discovery Call", duration: "It's a discovery Call", calLink: getCalLink("discovery") },
+    { id: "kick-off", label: "Kick-off Call", duration: "It's a Project Kick-off Call ", calLink: getCalLink("kick-off") },
   ];
 
   const handleBook = () => {
@@ -145,7 +145,7 @@ export default function BookMeetingButton({ lead }) {
                           {callType.label}
                         </h3>
                         <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                          {callType.duration} meeting
+                          {callType.duration}
                         </p>
                       </div>
                     </div>

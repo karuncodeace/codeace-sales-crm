@@ -2,17 +2,17 @@
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { fetcher } from "../../../lib/swr/fetcher";
-import Image from "next/image";
+
 // Fallback data for immediate display
 const fallbackCardsData = {
-  leadsGenerated: 25,
-  firstCallDone: 12,
-  qualifiedLeads: 32,
-  meetingScheduled: 12,
-  meetingConducted: 8,
-  followUpCalls: 45,
-  proposalsSent: 18,
-  conversionRate: 24.5
+  leadsGenerated: 0,
+  firstCallDone: 0,
+  qualifiedLeads: 0,
+  meetingScheduled: 0,
+  meetingConducted: 0,
+  followUpCalls: 0,
+  proposalsSent: 0,
+  conversionRate: 0
 };
 
 export default function Cards() {
@@ -33,15 +33,6 @@ export default function Cards() {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4 mt-5 ">
-        {/* Card */}
-       <div className=
-       {`rounded-xl p-4 relative ${theme === "dark"
-        ? "bg-[#262626] border border-gray-700 text-gray-300"
-        : "bg-[#ffffff] border border-gray-200"
-        }`}
-       >
-       
-       </div>
         <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -49,7 +40,7 @@ export default function Cards() {
                 Leads Generated
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.leadsGenerated ?? 25}
+                {error ? "N/A" : data?.leadsGenerated ?? 0}
               </p>
             </div>
             <div
@@ -72,7 +63,7 @@ export default function Cards() {
                 First Call Done
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.firstCallDone ?? 12}
+                {error ? "N/A" : data?.firstCallDone ?? 0}
               </p>
             </div>
             <div
@@ -92,7 +83,7 @@ export default function Cards() {
                 Qualified Leads
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.qualifiedLeads ?? 32}
+                {error ? "N/A" : data?.qualifiedLeads ?? 0}
               </p>
             </div>
             <div
@@ -129,7 +120,7 @@ export default function Cards() {
                 Meeting Scheduled
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.meetingScheduled ?? 12}
+                {error ? "N/A" : data?.meetingScheduled ?? 0}
               </p>
             </div>
             <div
@@ -151,7 +142,7 @@ export default function Cards() {
                 Meeting Conducted
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.meetingConducted ?? 8}
+                {error ? "N/A" : data?.meetingConducted ?? 0}
               </p>
             </div>
             <div
@@ -173,7 +164,7 @@ export default function Cards() {
                 Follow Up Calls
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.followUpCalls ?? 45}
+                {error ? "N/A" : data?.followUpCalls ?? 0}
               </p>
             </div>
             <div
@@ -193,7 +184,7 @@ export default function Cards() {
                 Proposals Sent
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : data?.proposalsSent ?? 18}
+                {error ? "N/A" : data?.proposalsSent ?? 0}
               </p>
             </div>
             <div
@@ -216,7 +207,7 @@ export default function Cards() {
                 Conversion Rate
               </h3>
               <p className="text-2xl font-semibold text-blue-600 mt-1">
-                {error ? "N/A" : `${data?.conversionRate ?? 24.5}%`}
+                {error ? "N/A" : `${data?.conversionRate ?? 0}%`}
               </p>
             </div>
             <div

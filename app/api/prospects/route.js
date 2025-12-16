@@ -39,10 +39,10 @@ export async function GET() {
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
-  // Fetch leads with conversion_chance >= 60 (prospects)
+  // Fetch leads with total_score > 20 (prospects)
   const { data, error } = await query
-    .gte("conversion_chance", 60)
-    .order("conversion_chance", { ascending: false });
+    .gt("total_score", 20)
+    .order("total_score", { ascending: false });
 
   if (error) {
     console.error("Prospects API Error:", error.message);
