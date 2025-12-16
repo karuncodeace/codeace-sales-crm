@@ -238,7 +238,12 @@ export default function LeadDetailPage() {
 
                 {/* Action Menu Button */}
                 <div className="relative flex items-center gap-3">
-                     <CallBtn />   
+                     <CallBtn 
+                       leadId={lead.id || lead.lead_id}
+                       phone={lead.phone || lead.lead_phone}
+                       name={lead.name || lead.lead_name}
+                       email={lead.email || lead.lead_email}
+                     />   
                     <BookMeetingButton lead={lead} />
                 </div>
             </div>
