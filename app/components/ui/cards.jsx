@@ -2,6 +2,7 @@
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { fetcher } from "../../../lib/swr/fetcher";
+import Image from "next/image";
 
 // Fallback data for immediate display
 const fallbackCardsData = {
@@ -33,7 +34,44 @@ export default function Cards() {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4 mt-5 ">
-        <div className={`  rounded-xl  p-4 ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
+      <div className={`relative rounded-xl  overflow-hidden ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
+          {/* Left background image - full height, 90% width */}
+          <div className="absolute left-0 top-0 h-full w-[100%] opacity-80 z-0">
+            <Image
+              src="/card-bg.svg"
+              alt="Card background"
+              fill
+              className="object-cover object-left"
+            />
+          </div>
+          
+          {/* Content */}
+          <div className="relative z-20 pl-[15px] pt-[12px] flex flex-col  ">
+           <div>
+           <h3 className={`text-[14px] font-medium ${theme === "dark" ? "text-gray-300" : "text-black"}`}>
+              Leads Generated
+            </h3>
+           </div>
+           <div className="mt-2">
+           <p className="text-[22px] font-bold text-black ">
+              {error ? "N/A" : data?.leadsGenerated ?? 0}
+            </p>
+           </div>
+          </div>
+          
+          {/* Icon in bottom left */}
+          <div className="absolute bottom-[-10px] right-0 z-20 p-0">
+            <Image
+              src="/leads-generated.svg"
+              alt="Leads Generated Icon"
+              width={70}
+              height={100}
+              className="object-contain"
+            />
+          </div>
+      </div>
+
+        <div className={`  rounded-xl  p-4 relative  ${theme === "dark" ? "bg-[#262626] border border-gray-700 text-gray-300 " : "bg-white border border-gray-200"}`}>
           <div className="flex items-center justify-between">
             <div>
               <h3 className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>

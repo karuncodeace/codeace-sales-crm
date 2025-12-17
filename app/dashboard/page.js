@@ -60,7 +60,7 @@ export default function DashboardPage() {
         <div>
           <Cards/>
         </div>
-        <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-10 xl:mt-6">
+        <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-10 xl:mt-8">
           <div className="">
             <WeeklyLineChart />
           </div>

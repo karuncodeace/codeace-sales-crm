@@ -93,6 +93,7 @@ export default function DonutChart() {
         legend: {
           position: "bottom",
           fontSize: "12px",
+          offsetY: 10,
           labels: {
             colors: isDark ? "#E2E8F0" : "#64748b",
           },
@@ -185,7 +186,7 @@ export default function DonutChart() {
       </div>
 
       {/* 🔄 Re-render when theme changes */}
-      <div className="h-[430px] md:h-[300px] 2xl:h-[400px]">
+      <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
       <ApexChart key={theme} options={options} series={series} type="donut" height="100%" 
       
       />

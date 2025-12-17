@@ -181,7 +181,7 @@ export default function weeklyLineChart() {
         >
           <div className="mb-4">
             <h3
-              className={`text-lg md:text-base 2xl:text-[12px] font-semibold ${
+              className={`text-lg md:text-base 2xl:text-lg font-semibold ${
                 isDark ? "text-gray-200" : "text-gray-900"
               }`}
             >

@@ -52,7 +52,7 @@ export default function weeklyLineChart() {
       legend: {
         horizontalAlign: "left",
         fontSize: "12px",
-        offsetY: 0 ,
+        offsetY: 10 ,
         labels: {
           colors: isDark ? "#E2E8F0" : "#1E293B",
         },
