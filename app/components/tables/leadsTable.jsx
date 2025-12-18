@@ -50,8 +50,8 @@ function normalizeStatus(status) {
 
 const statusStyles = {
   New: {
-    light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-100",
-    dark: "text-blue-500 bg-blue-900/40 ring-1 ring-inset ring-blue-700",
+    light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
+    dark: "text-orange-500 bg-orange-900/40 ring-1 ring-inset ring-orange-700",
   },
   Contacted: {
     light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
@@ -85,8 +85,8 @@ const priorityStyles = {
     dark: "text-orange-300 bg-orange-900/40 ring-1 ring-inset ring-orange-800",
   },
   Cold: {
-    light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-200",
-    dark: "text-blue-300 bg-blue-900/40 ring-1 ring-inset ring-blue-800",
+    light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-200",
+    dark: "text-orange-300 bg-orange-900/40 ring-1 ring-inset ring-orange-800",
   },
 };
 

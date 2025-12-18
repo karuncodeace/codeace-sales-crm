@@ -41,16 +41,16 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
             dark: "bg-orange-900/40 text-orange-400 ring-1 ring-inset ring-orange-800",
         },
         Cold: {
-            light: "bg-blue-100 text-blue-600",
-            dark: "bg-blue-900/40 text-blue-400 ring-1 ring-inset ring-blue-800",
+            light: "bg-orange-100 text-orange-600",
+            dark: "bg-orange-900/40 text-orange-400 ring-1 ring-inset ring-orange-800",
         },
     };
 
     // Status badge styles
     const statusStyles = {
         New: {
-            light: "text-blue-700 bg-blue-50 ring-1 ring-inset ring-blue-100",
-            dark: "text-blue-100 bg-blue-900/40 ring-1 ring-inset ring-blue-700",
+            light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
+            dark: "text-orange-100 bg-orange-900/40 ring-1 ring-inset ring-orange-700",
         },
         Contacted: {
             light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
@@ -216,7 +216,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
     // Get activity icon and color based on type
     const getActivityIcon = (type) => {
         const icons = {
-            call: { icon: Phone, bg: theme === "dark" ? "bg-blue-900/40" : "bg-blue-100", color: theme === "dark" ? "text-blue-400" : "text-blue-600" },
+            call: { icon: Phone, bg: theme === "dark" ? "bg-orange-900/40" : "bg-orange-100", color: theme === "dark" ? "text-orange-400" : "text-orange-600" },
             email: { icon: Mail, bg: theme === "dark" ? "bg-green-900/40" : "bg-green-100", color: theme === "dark" ? "text-green-400" : "text-green-600" },
             note: { icon: FileText, bg: theme === "dark" ? "bg-purple-900/40" : "bg-purple-100", color: theme === "dark" ? "text-purple-400" : "text-purple-600" },
             status: { icon: TrendingUp, bg: theme === "dark" ? "bg-orange-900/40" : "bg-orange-100", color: theme === "dark" ? "text-orange-400" : "text-orange-600" },
@@ -240,7 +240,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
     const getPriorityStyle = (priority) => {
         const styles = {
             High: theme === "dark" ? "bg-yellow-900/40 text-yellow-400" : "bg-yellow-100 text-yellow-700",
-            Medium: theme === "dark" ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700",
+            Medium: theme === "dark" ? "bg-orange-900/40 text-orange-400" : "bg-orange-100 text-orange-700",
             Low: theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600",
         };
         return styles[priority] || styles.Medium;
@@ -403,7 +403,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
                                 {/* Lead Score */}
                                 <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <Target className={`w-4 h-4 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`} />
+                                        <Target className={`w-4 h-4 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
                                         <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
                                             Lead Score
                                         </span>

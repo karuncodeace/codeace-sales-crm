@@ -348,21 +348,21 @@ export default function ViewProfile() {
                   ? `${isDark ? "bg-gray-700 border-gray-600" : "bg-white/20 border-white/30"}`
                   : `bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 ${isDark ? "border-gray-600" : "border-orange-300"} text-white`
               }`}>
-                {userData?.avatar ? (
-                  <img
-                    src={userData.avatar}
-                    alt={userData?.name || "User"}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback to initials if image fails to load
-                      try {
-                        e.target.style.display = 'none';
-                        const parent = e.target?.parentElement;
-                        if (parent) {
-                          parent.className = `w-32 h-32 rounded-full flex items-center justify-center text-4xl font-bold border-4 shadow-2xl overflow-hidden bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 ${isDark ? "border-gray-600" : "border-orange-300"} text-white`;
-                          parent.innerHTML = `<span>${getInitials(userData?.name || "User")}</span>`;
-                        }
-                      } catch (err) {
+                  {userData?.avatar ? (
+                    <img
+                      src={userData.avatar || "/profile-avator.png"}
+                      alt={userData?.name || "User"}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        try {
+                          e.target.style.display = 'none';
+                          const parent = e.target?.parentElement;
+                          if (parent) {
+                            parent.className = `w-32 h-32 rounded-full flex items-center justify-center text-4xl font-bold border-4 shadow-2xl overflow-hidden bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 ${isDark ? "border-gray-600" : "border-orange-300"} text-white`;
+                            parent.innerHTML = `<span>${getInitials(userData?.name || "User")}</span>`;
+                          }
+                        } catch (err) {
                         console.error("Error handling image fallback:", err);
                       }
                     }}
@@ -422,13 +422,13 @@ export default function ViewProfile() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Tasks Card */}
           <div className={`relative overflow-hidden rounded-2xl p-6 ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} shadow-lg hover:shadow-xl transition-shadow`}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full -mr-16 -mt-16"></div>
             <div className="relative">
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                   Total Tasks
                 </h3>
-                <div className={`p-3 rounded-xl ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-600"}`}>
+                <div className={`p-3 rounded-xl ${isDark ? "bg-orange-500/20 text-orange-400" : "bg-orange-100 text-orange-600"}`}>
                   <Target className="h-6 w-6" />
                 </div>
               </div>
@@ -630,7 +630,7 @@ export default function ViewProfile() {
           {/* Profile Information */}
           <div className={`rounded-2xl p-6 ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} shadow-lg`}>
             <div className="flex items-center gap-3 mb-6">
-              <div className={`p-3 rounded-xl ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-600"}`}>
+              <div className={`p-3 rounded-xl ${isDark ? "bg-orange-500/20 text-orange-400" : "bg-orange-100 text-orange-600"}`}>
                 <User className="h-6 w-6" />
               </div>
               <h2 className={`text-xl font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>

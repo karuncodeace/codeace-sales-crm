@@ -94,7 +94,7 @@ export default function ActivityTab({ leadId }) {
     // Get contacted through display info
     const getContactedThroughInfo = (method) => {
         const methods = {
-            call: { label: "Call", icon: "", color: "blue" },
+            call: { label: "Call", icon: "", color: "orange" },
             email: { label: "Email", icon: "", color: "green" },
             meeting: { label: "Meeting", icon: "", color: "purple" },
             whatsapp: { label: "WhatsApp", icon: "", color: "emerald" },
@@ -148,7 +148,7 @@ export default function ActivityTab({ leadId }) {
 
     const filterOptions = [
         { id: "all", label: "All Activities", icon: null },
-        { id: "call", label: "Calls", icon: Phone, color: "blue" },
+        { id: "call", label: "Calls", icon: Phone, color: "orange" },
         { id: "email", label: "Emails", icon: Mail, color: "green" },
         { id: "meeting", label: "Meetings", icon: Calendar, color: "purple" },
         { id: "whatsapp", label: "WhatsApp", icon: MessageSquare, color: "emerald" },
@@ -193,7 +193,7 @@ export default function ActivityTab({ leadId }) {
 
     const getActivityIcon = (type) => {
         const iconConfig = {
-            call: { icon: Phone, bg: "bg-blue-100 dark:bg-blue-900/40", color: "text-blue-600 dark:text-blue-400" },
+            call: { icon: Phone, bg: "bg-orange-100 dark:bg-orange-900/40", color: "text-orange-600 dark:text-orange-400" },
             email: { icon: Mail, bg: "bg-green-100 dark:bg-green-900/40", color: "text-green-600 dark:text-green-400" },
             meeting: { icon: Calendar, bg: "bg-purple-100 dark:bg-purple-900/40", color: "text-purple-600 dark:text-purple-400" },
             note: { icon: FileText, bg: "bg-amber-100 dark:bg-amber-900/40", color: "text-amber-600 dark:text-amber-400" },
@@ -487,7 +487,7 @@ export default function ActivityTab({ leadId }) {
                                                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                                                         activity.outcome === "Positive" 
                                                             ? theme === "dark" ? "bg-green-900/40 text-green-400" : "bg-green-100 text-green-700"
-                                                            : theme === "dark" ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"
+                                                            : theme === "dark" ? "bg-orange-900/40 text-orange-400" : "bg-orange-100 text-orange-700"
                                                     }`}>
                                                         {activity.outcome}
                                                     </span>
@@ -512,8 +512,8 @@ export default function ActivityTab({ leadId }) {
                                             <div className="flex flex-wrap items-center gap-2 mb-3">
                                                 {activity.contactedThroughInfo && (
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                                        activity.contactedThroughInfo.color === "blue"
-                                                            ? theme === "dark" ? "bg-blue-900/40 text-blue-400 ring-1 ring-blue-700" : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                                                        activity.contactedThroughInfo.color === "orange"
+                                                            ? theme === "dark" ? "bg-orange-900/40 text-orange-400 ring-1 ring-orange-700" : "bg-orange-50 text-orange-700 ring-1 ring-orange-200"
                                                             : activity.contactedThroughInfo.color === "green"
                                                             ? theme === "dark" ? "bg-green-900/40 text-green-400 ring-1 ring-green-700" : "bg-green-50 text-green-700 ring-1 ring-green-200"
                                                             : activity.contactedThroughInfo.color === "purple"

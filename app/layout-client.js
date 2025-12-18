@@ -34,6 +34,8 @@ function LayoutStructure({ children, fonts }) {
   const pathname = usePathname();
   
   const isLoginPage = pathname === "/login";
+  const isLogoutPage = pathname === "/logout";
+  const isAuthCallbackPage = pathname === "/auth/callback";
 
   // Auto-logout after 24 hours
   useEffect(() => {
@@ -55,7 +57,7 @@ function LayoutStructure({ children, fonts }) {
         className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
         suppressHydrationWarning
       >
-        {isLoginPage ? (
+        {isLoginPage || isLogoutPage || isAuthCallbackPage ? (
           children
         ) : (
           <SidebarProvider>

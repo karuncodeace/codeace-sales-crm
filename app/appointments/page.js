@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
 import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
+import { CAL_BASE_URL } from "../../config/calConfig";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
@@ -73,6 +74,24 @@ export default function AppointmentsPage() {
     } catch (err) {
       return { date: "N/A", time: "N/A", full: "N/A" };
     }
+  };
+
+  // Format join URL to use self-hosted Cal.com base URL if needed
+  const formatJoinUrl = (joinUrl) => {
+    if (!joinUrl) return null;
+    
+    // If it's already a full URL, return as is
+    if (joinUrl.startsWith("http://") || joinUrl.startsWith("https://")) {
+      return joinUrl;
+    }
+    
+    // If it's a relative URL or just a path, prepend self-hosted base URL
+    if (joinUrl.startsWith("/")) {
+      return `${CAL_BASE_URL}${joinUrl}`;
+    }
+    
+    // If it doesn't start with /, assume it's a full path and prepend base URL
+    return `${CAL_BASE_URL}/${joinUrl}`;
   };
 
   // Get status badge styling
@@ -286,15 +305,23 @@ export default function AppointmentsPage() {
                     <div className="flex items-start justify-between">
                       {/* Left Section - Main Info */}
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className={`p-2 rounded-lg ${isDark ? "bg-orange-900/30" : "bg-orange-100"}`}>
-                            <Calendar className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${isDark ? "bg-orange-900/30" : "bg-orange-100"}`}>
+                              <Calendar className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+                            </div>
+                            <div>
+                              <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                                {appointment.title?.trim().slice(0,50) + (appointment.title?.length > 50 ? "..." : "") || "Meeting"}
+                              </h3>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                              {appointment.title.trim().slice(0,50) + (appointment.title.length > 50 ? "..." : "") || "Meeting"}
-                            </h3>
-                            
+                          {/* Status Badge */}
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(appointment.status)}
+                            <span className={getStatusBadge(appointment.status)}>
+                              {appointment.status?.charAt(0).toUpperCase() + appointment.status?.slice(1) || "Unknown"}
+                            </span>
                           </div>
                         </div>
 
@@ -321,7 +348,9 @@ export default function AppointmentsPage() {
                             <div className="flex items-start gap-3">
                               <User className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                               <div>
-                               
+                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                                  Lead
+                                </p>
                                 <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
                                   {appointment.lead_name}
                                 </p>
@@ -334,8 +363,42 @@ export default function AppointmentsPage() {
                             </div>
                           )}
 
-                        
+                          {/* Attendee Information */}
+                          {(appointment.attendee_name || appointment.attendee_email) && (
+                            <div className="flex items-start gap-3">
+                              <Mail className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
+                              <div>
+                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                                  Attendee
+                                </p>
+                                {appointment.attendee_name && (
+                                  <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                                    {appointment.attendee_name}
+                                  </p>
+                                )}
+                                {appointment.attendee_email && (
+                                  <p className={`text-xs ${appointment.attendee_name ? "mt-1" : ""} ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                                    {appointment.attendee_email}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
+                          {/* Location */}
+                          {appointment.location && (
+                            <div className="flex items-start gap-3">
+                              <MapPin className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
+                              <div>
+                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                                  Location
+                                </p>
+                                <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                                  {appointment.location}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         
 
                           {/* Join URL */}
@@ -345,7 +408,7 @@ export default function AppointmentsPage() {
                               <div>
                                 
                                 <a
-                                  href={appointment.join_url}
+                                  href={formatJoinUrl(appointment.join_url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className={`text-sm flex items-center gap-1 hover:underline ${
@@ -372,8 +435,8 @@ export default function AppointmentsPage() {
                               disabled={isProcessing}
                               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                 isDark
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                                  : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                  ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                  : "bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                               }`}
                             >
                               <CalendarClock className="w-3.5 h-3.5" />
@@ -398,24 +461,31 @@ export default function AppointmentsPage() {
 
                       {/* Footer - Metadata */}
                       <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                        <div className="flex items-center justify-between text-xs">
+                        <div className="flex flex-col gap-2 text-xs">
+                          {appointment.cal_event_id && (
+                            <div className="flex items-center gap-2">
+                              <span className={isDark ? "text-gray-400" : "text-gray-500"}>Event ID:</span>
+                              <span className={isDark ? "text-gray-300" : "text-gray-700"}>{appointment.cal_event_id}</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-4">
-                            {appointment.cal_event_id && (
-                              <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                                Event ID: {appointment.cal_event_id}
-                              </span>
-                            )}
                             {appointment.created_at && (
-                              <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                                Created: {formatDateTime(appointment.created_at).date}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={isDark ? "text-gray-400" : "text-gray-500"}>Created:</span>
+                                <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                                  {formatDateTime(appointment.created_at).date}
+                                </span>
+                              </div>
+                            )}
+                            {appointment.updated_at && appointment.updated_at !== appointment.created_at && (
+                              <div className="flex items-center gap-2">
+                                <span className={isDark ? "text-gray-400" : "text-gray-500"}>Updated:</span>
+                                <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                                  {formatDateTime(appointment.updated_at).date}
+                                </span>
+                              </div>
                             )}
                           </div>
-                          {appointment.updated_at && appointment.updated_at !== appointment.created_at && (
-                            <span className={isDark ? "text-gray-500" : "text-gray-500"}>
-                              Updated: {formatDateTime(appointment.updated_at).date}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -541,8 +611,8 @@ function RescheduleModal({ appointment, onClose, onReschedule, isDark, isProcess
               disabled={isProcessing || !newStartTime || !newEndTime}
               className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isDark
-                  ? "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                  : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+                  ? "bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+                  : "bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
               }`}
             >
               {isProcessing ? "Rescheduling..." : "Reschedule"}
