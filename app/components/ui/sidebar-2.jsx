@@ -227,6 +227,49 @@ export default function Sidebar2() {
                 </svg>
             ),
         },
+        {
+            label: "Bookings",
+            path: "/bookings",
+            icon: (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    height="24"
+                    color="currentColor"
+                    fill="none"
+                >
+                    <path
+                        d="M16 2V6M8 2V6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M21 13V12C21 8.22876 21 6.34315 19.8284 5.17157C18.6569 4 16.7712 4 13 4H11C7.22876 4 5.34315 4 4.17157 5.17157C3 6.34315 3 8.22876 3 12V14C3 17.7712 3 19.6569 4.17157 20.8284C5.34315 22 7.22876 22 11 22H14"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M15 17.5C15.4915 16.9943 16.7998 15 17.5 15C18.2002 15 19.5085 16.9943 20 17.5M17.5 15.5L17.5 22"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M3 10H21"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+        },
     ];
 
     const handleMenuClick = (path) => {
@@ -286,7 +329,7 @@ export default function Sidebar2() {
 
             {/* Menu Items */}
             <nav className="flex-1  py-4 pt-8 md:pt-4 2xl:pt-4 px-3 flex flex-col">
-                <div className="space-y-5 md:space-y-3 2xl:space-y-5 flex-1">
+                <div className="space-y-5 md:space-y-3 2xl:space-y-3 flex-1 ">
                     {menuItems.map((item) => {
                         const active = isActive(item.path);
                         return (
@@ -294,8 +337,8 @@ export default function Sidebar2() {
                                 {isCollapsed ? (
                                     <TooltipIcon label={item.label}>
                                         <div>
-                                            <div onClick={() => handleMenuClick(item.path)}
-                                                className={`w-full h-12  rounded-lg p-1   gap-3 transition-colors flex items-center justify-center ${active
+                                            <div  onClick={() => handleMenuClick(item.path)}
+                                                className={`w-full h-12  rounded-lg p-1   gap-3 transition-colors flex items-center justify-center cursor-pointer ${active
                                                     ? "bg-orange-600 text-white"
                                                     : theme === "dark"
                                                         ? "text-gray-400 hover:bg-gray-800 hover:text-white"
@@ -306,8 +349,8 @@ export default function Sidebar2() {
                                         </div>
                                     </TooltipIcon>
                                 ) : (
-                                    <div onClick={() => handleMenuClick(item.path)}
-                                        className={`w-full p-3 rounded-lg  gap-3 flex items-center transition-colors ${active
+                                    <div  onClick={() => handleMenuClick(item.path)}
+                                        className={`w-full p-3 rounded-lg  gap-3 flex items-center transition-colors cursor-pointer ${active
                                             ? "bg-orange-600 text-white"
                                             : theme === "dark"
                                                 ? "text-gray-400 hover:bg-gray-800 hover:text-white"
