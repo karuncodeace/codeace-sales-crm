@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
-import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X } from "lucide-react";
+import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -12,7 +12,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 export default function BookingsPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [statusFilter, setStatusFilter] = useState("booked");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -29,18 +29,34 @@ export default function BookingsPage() {
   // Normalize bookings to array to avoid runtime errors
   const bookingsList = Array.isArray(bookings) ? bookings : [];
 
+  // Debug: Log bookings data
+  React.useEffect(() => {
+    if (bookings) {
+      console.log("📊 Bookings data received:", {
+        totalCount: bookingsList.length,
+        bookings: bookingsList.map(b => ({ 
+          id: b.id, 
+          status: b.status, 
+          invitee_name: b.invitee_name 
+        }))
+      });
+    }
+  }, [bookings, bookingsList]);
+
   // Map booking status to display status (bookings use "scheduled", appointments use "booked")
-  const getDisplayStatus = (status) => {
-    if (status === "scheduled") return "booked";
-    return status || "unknown";
+  // Check is_rescheduled flag to detect rescheduled bookings
+  const getDisplayStatus = (booking) => {
+    if (booking.is_rescheduled) return "rescheduled";
+    if (booking.status === "scheduled") return "booked";
+    return booking.status || "unknown";
   };
 
   // Calculate counts for each status
   const statusCounts = {
     all: bookingsList.length,
-    booked: bookingsList.filter((booking) => getDisplayStatus(booking.status) === "booked").length,
-    rescheduled: bookingsList.filter((booking) => getDisplayStatus(booking.status) === "rescheduled").length,
-    cancelled: bookingsList.filter((booking) => getDisplayStatus(booking.status) === "cancelled").length,
+    booked: bookingsList.filter((booking) => getDisplayStatus(booking) === "booked").length,
+    rescheduled: bookingsList.filter((booking) => getDisplayStatus(booking) === "rescheduled").length,
+    cancelled: bookingsList.filter((booking) => getDisplayStatus(booking) === "cancelled").length,
   };
 
   // Filter and sort bookings based on status
@@ -50,14 +66,14 @@ export default function BookingsPage() {
     // Filter by status if not "all"
     if (statusFilter !== "all") {
       filtered = filtered.filter((booking) => {
-        const displayStatus = getDisplayStatus(booking.status);
+        const displayStatus = getDisplayStatus(booking);
         return displayStatus === statusFilter;
       });
     } else {
       // When "all" is selected, sort so scheduled/booked bookings appear first
       filtered = [...filtered].sort((a, b) => {
-        const aStatus = getDisplayStatus(a.status);
-        const bStatus = getDisplayStatus(b.status);
+        const aStatus = getDisplayStatus(a);
+        const bStatus = getDisplayStatus(b);
         if (aStatus === "booked" && bStatus !== "booked") return -1;
         if (aStatus !== "booked" && bStatus === "booked") return 1;
         // For same status, sort by start_time (most recent first)
@@ -210,7 +226,7 @@ export default function BookingsPage() {
             Filter by Status:
           </span>
           <div className="flex gap-2">
-            {["booked", "rescheduled", "cancelled"].map((status) => (
+            {["all", "booked", "rescheduled", "cancelled"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -285,7 +301,7 @@ export default function BookingsPage() {
                 {filteredBookings.map((booking) => {
                   const startTime = formatDateTime(booking.start_time);
                   const endTime = formatDateTime(booking.end_time);
-                  const displayStatus = getDisplayStatus(booking.status);
+                  const displayStatus = getDisplayStatus(booking);
 
                   return (
                     <div
@@ -364,6 +380,24 @@ export default function BookingsPage() {
                               </div>
                             </div>
                           )}
+
+                          {/* Meeting Link */}
+                          {booking.meeting_link && (
+                            <div className="flex items-center gap-3">
+                              <Video className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+                              <a
+                                href={booking.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-sm flex items-center gap-1 hover:underline ${
+                                  isDark ? "text-orange-400" : "text-orange-600"
+                                }`}
+                              >
+                                Join the meet
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -405,10 +439,10 @@ export default function BookingsPage() {
                       {/* Footer - Metadata */}
                       <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
                         <div className="flex justify-between text-xs">
-                          {booking.event_type_id && (
+                          {booking.id  && (
                             <div className="flex items-center gap-2">
                               <span className={isDark ? "text-gray-400" : "text-gray-500"}>Event Type ID:</span>
-                              <span className={isDark ? "text-gray-300" : "text-gray-700"}>{booking.event_type_id}</span>
+                              <span className={isDark ? "text-gray-300" : "text-gray-700"}>{booking.id}</span>
                             </div>
                           )}
                           <div className="flex items-center gap-4">
@@ -420,14 +454,7 @@ export default function BookingsPage() {
                                 </span>
                               </div>
                             )}
-                            {booking.updated_at && booking.updated_at !== booking.created_at && (
-                              <div className="flex items-center gap-2">
-                                <span className={isDark ? "text-gray-400" : "text-gray-500"}>Updated:</span>
-                                <span className={isDark ? "text-gray-300" : "text-gray-700"}>
-                                  {formatDateTime(booking.updated_at).date}
-                                </span>
-                              </div>
-                            )}
+                           
                           </div>
                         </div>
                       </div>

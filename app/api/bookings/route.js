@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { createBooking } from "../../../lib/bookings/createBooking";
-import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { supabaseServer, supabaseAdmin } from "../../../lib/supabase/serverClient";
 import { getCrmUser } from "../../../lib/crm/auth";
 
 // Get all bookings from the bookings table
 export async function GET() {
   try {
-    const supabase = await supabaseServer();
-    
     // Get CRM user for authentication check only
     const crmUser = await getCrmUser();
     
@@ -17,6 +15,9 @@ export async function GET() {
       return NextResponse.json([]);
     }
     
+    // Use admin client to bypass RLS and get ALL bookings
+    const supabase = supabaseAdmin();
+    
     // Fetch ALL bookings from the table (no filtering)
     console.log("🔍 Bookings API: Fetching ALL bookings", { 
       userId: crmUser.id, 
@@ -24,9 +25,10 @@ export async function GET() {
       email: crmUser.email 
     });
     
-    const { data, error } = await supabase
+    // Fetch ALL bookings - explicitly remove any limits
+    const { data, error, count } = await supabase
       .from("bookings")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("start_time", { ascending: true });
     
     if (error) {
@@ -36,8 +38,14 @@ export async function GET() {
     
     console.log("✅ Bookings API: Query result", { 
       dataCount: data?.length || 0,
-      returnedBookingIds: data?.map(b => ({ id: b.id, invitee_name: b.invitee_name, status: b.status })) || []
+      totalCount: count || 0,
+      returnedBookingIds: data?.map(b => ({ id: b.id, invitee_name: b.invitee_name, status: b.status, is_rescheduled: b.is_rescheduled })) || []
     });
+    
+    // If count doesn't match data length, there might be a limit issue
+    if (count !== null && count !== data?.length) {
+      console.warn(`⚠️ Bookings API: Count mismatch! Total in DB: ${count}, Returned: ${data?.length}`);
+    }
     
     return NextResponse.json(data || []);
   } catch (err) {
