@@ -12,9 +12,9 @@ export async function GET() {
       return Response.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get sales person data
-    const { data: salesPerson, error } = await supabase
-      .from("sales_persons")
+    // Get user data
+    const { data: userData, error } = await supabase
+      .from("users")
       .select("*")
       .eq("id", crmUser.id)
       .single();
@@ -30,7 +30,7 @@ export async function GET() {
       const { data: profilePhoto, error: photoError } = await supabase
         .from("profile_photos")
         .select("photo_url")
-        .eq("sales_person_id", crmUser.id)
+        .or(`user_id.eq.${crmUser.id},sales_person_id.eq.${crmUser.id}`)
         .single();
 
       if (!photoError && profilePhoto) {
@@ -43,7 +43,7 @@ export async function GET() {
 
     return Response.json({ 
       success: true, 
-      data: salesPerson,
+      data: userData,
       photo_url: photoUrl
     });
   } catch (error) {
@@ -69,7 +69,7 @@ export async function PATCH(request) {
 
     const updateData = {};
 
-    // Update full_name if provided (matching the sales_persons table schema)
+    // Update full_name if provided (matching the users table schema)
     if (name) {
       updateData.full_name = name;
     }
@@ -152,10 +152,10 @@ export async function PATCH(request) {
     const photoUrl = updateData._photo_url;
     delete updateData._photo_url;
 
-    // Update sales_persons table (name, phone, etc.) - only fields that exist
+    // Update users table (name, phone, etc.) - only fields that exist
     if (Object.keys(updateData).length > 0) {
       const { data, error: updateError } = await supabase
-        .from("sales_persons")
+        .from("users")
         .update(updateData)
         .eq("id", crmUser.id)
         .select()
@@ -184,15 +184,33 @@ export async function PATCH(request) {
       );
 
       // Upsert to profile_photos table
+      // Try user_id first, fallback to sales_person_id for backward compatibility
       const { error: photoTableError } = await supabaseAdmin
         .from("profile_photos")
         .upsert({
-          sales_person_id: crmUser.id,
+          user_id: crmUser.id,
           photo_url: photoUrl,
           updated_at: new Date().toISOString(),
         }, {
-          onConflict: "sales_person_id"
+          onConflict: "user_id"
         });
+      
+      // If that fails, try with sales_person_id for backward compatibility
+      if (photoTableError && photoTableError.message?.includes("user_id")) {
+        const { error: fallbackError } = await supabaseAdmin
+          .from("profile_photos")
+          .upsert({
+            sales_person_id: crmUser.id,
+            photo_url: photoUrl,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: "sales_person_id"
+          });
+        
+        if (fallbackError && !fallbackError.message?.includes("does not exist")) {
+          console.error("Error updating profile_photos table (fallback):", fallbackError);
+        }
+      }
 
       if (photoTableError) {
         // If table doesn't exist, log but don't fail
@@ -208,7 +226,7 @@ export async function PATCH(request) {
 
     // Fetch updated data
     const { data: updatedData } = await supabase
-      .from("sales_persons")
+      .from("users")
       .select("*")
       .eq("id", crmUser.id)
       .single();

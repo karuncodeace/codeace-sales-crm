@@ -3,12 +3,14 @@ import { supabaseServer } from "../../../lib/supabase/serverClient";
 export async function GET() {
   const supabase = await supabaseServer();
   
+  // Get all users with role 'sales' or 'admin' from users table
   const { data, error } = await supabase
-    .from("sales_persons")
-    .select("*");
+    .from("users")
+    .select("*")
+    .in("role", ["sales", "admin"]);
 
   if (error) {
-    console.error("Sales Persons API Error:", error.message);
+    console.error("Users API Error:", error.message);
     return Response.json([]);
   }
 
@@ -35,22 +37,21 @@ export async function PATCH(request) {
       return Response.json({ error: "salesPersonId is required" }, { status: 400 });
     }
     
-    // Update the email in sales_persons table
+    // Update the email in users table
     const { data, error } = await supabase
-      .from("sales_persons")
+      .from("users")
       .update({ email: authEmail })
       .eq("id", salesPersonId)
       .select()
       .single();
     
     if (error) {
-      console.error("Error updating sales person email:", error);
+      console.error("Error updating user email:", error);
       return Response.json({ error: error.message }, { status: 500 });
     }
     
-    console.log("✅ Updated sales person email:", { 
+    console.log("✅ Updated user email:", { 
       id: salesPersonId, 
-      oldEmail: "gauthamkrishna@codeace.com", 
       newEmail: authEmail 
     });
     

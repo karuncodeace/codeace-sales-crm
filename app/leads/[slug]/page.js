@@ -276,7 +276,11 @@ export default function LeadDetailPage() {
                     lead={lead} 
                     leadId={leadId} 
                     setTab={setTab} 
-                    onEditScores={() => setIsEditScoreModalOpen(true)} 
+                    onEditScores={() => setIsEditScoreModalOpen(true)}
+                    onUpdateLead={(updatedLead) => {
+                        mutate(updatedLead, false); // Optimistically update
+                        mutate(); // Refresh from server
+                    }}
                 />
             )}
       

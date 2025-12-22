@@ -1,21 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 
 export default function AuthCallback() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState("verifying");
   const [message, setMessage] = useState("Verifying your credentials...");
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        // First, check for errors in query params (from Supabase redirect)
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorParam = urlParams.get("error");
+        const errorDescription = urlParams.get("error_description");
+        
+        if (errorParam) {
+          console.error("Auth callback error param:", { errorParam, errorDescription });
+          setStatus("error");
+          setMessage("Authentication failed. Please check your OAuth configuration.");
+          setTimeout(() => {
+            const redirect = `/login?error=server_error&message=${encodeURIComponent(errorDescription || "OAuth configuration error")}`;
+            router.push(redirect);
+          }, 2500);
+          return;
+        }
+
         // Get the hash from the URL (contains the tokens)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
+        const errorInHash = hashParams.get("error");
+        
+        if (errorInHash) {
+          console.error("Auth callback error in hash:", errorInHash);
+          setStatus("error");
+          setMessage("Authentication failed. Please try signing in again.");
+          setTimeout(() => router.push("/login?error=callback_error"), 2500);
+          return;
+        }
 
         if (accessToken && refreshToken) {
           setStatus("authenticating");
@@ -31,6 +57,7 @@ export default function AuthCallback() {
           });
 
           if (error) {
+            console.error("Session error:", error);
             setStatus("error");
             setMessage("We couldn't verify your credentials. Please try signing in again.");
             setTimeout(() => router.push("/login?error=session_error"), 2500);
@@ -44,8 +71,8 @@ export default function AuthCallback() {
             // Save login timestamp for auto-logout
             localStorage.setItem("login_time", Date.now().toString());
             
-            // Small delay to show success state
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // Small delay to show success state and allow user creation if needed
+            await new Promise(resolve => setTimeout(resolve, 1200));
             
             // Use window.location for a full page reload to ensure cookies are sent
             window.location.href = "/dashboard";
@@ -55,8 +82,13 @@ export default function AuthCallback() {
             setTimeout(() => router.push("/login?error=no_session"), 2500);
           }
         } else {
-          // No tokens in hash, check for existing session
-          const { data: { session } } = await supabaseBrowser.auth.getSession();
+          // Try to get session from URL using Supabase's getSessionFromUrl
+          // This handles the OAuth callback properly
+          const { data: { session }, error: sessionError } = await supabaseBrowser.auth.getSession();
+          
+          if (sessionError) {
+            console.error("Session retrieval error:", sessionError);
+          }
           
           if (session) {
             setStatus("success");
@@ -68,6 +100,26 @@ export default function AuthCallback() {
             await new Promise(resolve => setTimeout(resolve, 500));
             window.location.href = "/dashboard";
           } else {
+            // Try to extract session from URL hash/query if available
+            // Supabase might have redirected with code that needs to be exchanged
+            const code = urlParams.get("code") || hashParams.get("code");
+            
+            if (code) {
+              // If there's a code, Supabase should handle it automatically
+              // Wait a bit and check session again
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              const { data: { session: retrySession } } = await supabaseBrowser.auth.getSession();
+              
+              if (retrySession) {
+                setStatus("success");
+                setMessage("Session found! Redirecting...");
+                localStorage.setItem("login_time", Date.now().toString());
+                await new Promise(resolve => setTimeout(resolve, 500));
+                window.location.href = "/dashboard";
+                return;
+              }
+            }
+            
             setStatus("error");
             setMessage("No authentication data received. Please try signing in again.");
             setTimeout(() => router.push("/login?error=no_tokens"), 2500);
@@ -82,7 +134,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [router]);
+  }, [router, searchParams]);
 
   const statusConfig = {
     verifying: {

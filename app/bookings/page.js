@@ -441,7 +441,7 @@ export default function BookingsPage() {
                         <div className="flex justify-between text-xs">
                           {booking.id  && (
                             <div className="flex items-center gap-2">
-                              <span className={isDark ? "text-gray-400" : "text-gray-500"}>Event Type ID:</span>
+                              <span className={isDark ? "text-gray-400" : "text-gray-500"}>Booking ID:</span>
                               <span className={isDark ? "text-gray-300" : "text-gray-700"}>{booking.id}</span>
                             </div>
                           )}

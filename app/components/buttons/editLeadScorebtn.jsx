@@ -148,18 +148,6 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <input
-                                type="number"
-                                min="0"
-                                max="5"
-                                value={scores.lead_score}
-                                onChange={(e) => handleScoreChange("lead_score", e.target.value)}
-                                className={`w-24 px-4 py-3 rounded-lg text-3xl font-bold text-center border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    isDark
-                                        ? "bg-gray-700 border-gray-600 text-white"
-                                        : "bg-white border-gray-300 text-gray-900"
-                                }`}
-                            />
                             <div className="flex-1">
                                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                                     <div
@@ -171,6 +159,18 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                                     {scores.lead_score} / 5
                                 </span>
                             </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="5"
+                                value={scores.lead_score}
+                                onChange={(e) => handleScoreChange("lead_score", e.target.value)}
+                                className={`w-20 px-3 py-2.5 rounded-xl text-2xl font-bold text-center border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm ${
+                                    isDark
+                                        ? "bg-gray-700/80 border-blue-500/50 text-blue-400 hover:border-blue-400 focus:bg-gray-700"
+                                        : "bg-white border-blue-300 text-blue-600 hover:border-blue-400 focus:bg-blue-50/50"
+                                } [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            />
                         </div>
                     </div>
 
@@ -190,18 +190,6 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                value={scores.responsiveness_score}
-                                onChange={(e) => handleScoreChange("responsiveness_score", e.target.value)}
-                                className={`w-24 px-4 py-3 rounded-lg text-3xl font-bold text-center border-2 focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                                    isDark
-                                        ? "bg-gray-700 border-gray-600 text-white"
-                                        : "bg-white border-gray-300 text-gray-900"
-                                }`}
-                            />
                             <div className="flex-1">
                                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                                     <div
@@ -213,6 +201,18 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                                     {scores.responsiveness_score} / 10
                                 </span>
                             </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                value={scores.responsiveness_score}
+                                onChange={(e) => handleScoreChange("responsiveness_score", e.target.value)}
+                                className={`w-20 px-3 py-2.5 rounded-xl text-2xl font-bold text-center border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 shadow-sm ${
+                                    isDark
+                                        ? "bg-gray-700/80 border-green-500/50 text-green-400 hover:border-green-400 focus:bg-gray-700"
+                                        : "bg-white border-green-300 text-green-600 hover:border-green-400 focus:bg-green-50/50"
+                                } [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            />
                         </div>
                     </div>
 
@@ -232,18 +232,6 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                value={scores.conversion_probability_score}
-                                onChange={(e) => handleScoreChange("conversion_probability_score", e.target.value)}
-                                className={`w-24 px-4 py-3 rounded-lg text-3xl font-bold text-center border-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
-                                    isDark
-                                        ? "bg-gray-700 border-gray-600 text-white"
-                                        : "bg-white border-gray-300 text-gray-900"
-                                }`}
-                            />
                             <div className="flex-1">
                                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                                     <div
@@ -255,6 +243,18 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                                     {scores.conversion_probability_score} / 10
                                 </span>
                             </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                value={scores.conversion_probability_score}
+                                onChange={(e) => handleScoreChange("conversion_probability_score", e.target.value)}
+                                className={`w-20 px-3 py-2.5 rounded-xl text-2xl font-bold text-center border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm ${
+                                    isDark
+                                        ? "bg-gray-700/80 border-yellow-500/50 text-yellow-400 hover:border-yellow-400 focus:bg-gray-700"
+                                        : "bg-white border-yellow-300 text-yellow-600 hover:border-yellow-400 focus:bg-yellow-50/50"
+                                } [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            />
                         </div>
                     </div>
 

@@ -23,13 +23,22 @@ export async function GET(request) {
   // Build query with role-based filtering
   let query = supabase.from("stage_notes").select("*");
   
-  // For salespersons, only show stage_notes for leads assigned to them
-  if (crmUser.role === "salesperson") {
-    // Get all lead_ids assigned to this salesperson
+  // For sales, only show stage_notes for leads assigned to them
+  if (crmUser.role === "sales") {
+    // Get sales_person_id from the relationship: users.id -> sales_persons.user_id -> sales_persons.id
+    const salesPersonId = crmUser.salesPersonId;
+    
+    if (!salesPersonId) {
+      console.warn("Stage Notes API: No sales_person_id found for user", crmUser.id);
+      return Response.json([]);
+    }
+    
+    // Get all lead_ids assigned to this sales person
+    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id -> leads_table.assigned_to
     const { data: assignedLeads } = await supabase
       .from("leads_table")
       .select("id")
-      .eq("assigned_to", crmUser.id);
+      .eq("assigned_to", salesPersonId);
     
     const assignedLeadIds = assignedLeads?.map(l => l.id) || [];
     

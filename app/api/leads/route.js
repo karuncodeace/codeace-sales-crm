@@ -23,7 +23,8 @@ export async function GET() {
   });
   
   // For debugging: Check what assigned_to values exist in the database
-  if (crmUser.role === "salesperson") {
+  if (crmUser.role === "sales") {
+    const salesPersonId = crmUser.salesPersonId;
     const { data: allLeads, error: debugError } = await supabase
       .from("leads_table")
       .select("id, lead_name, assigned_to");
@@ -32,8 +33,10 @@ export async function GET() {
       totalLeads: allLeads?.length || 0,
       leadsWithAssignedTo: allLeads?.filter(l => l.assigned_to).length || 0,
       uniqueAssignedTo: [...new Set(allLeads?.map(l => l.assigned_to).filter(Boolean))],
-      lookingFor: crmUser.id,
-      matchingLeads: allLeads?.filter(l => l.assigned_to === crmUser.id).length || 0,
+      userId: crmUser.id,
+      salesPersonId: salesPersonId,
+      lookingFor: salesPersonId,
+      matchingLeads: allLeads?.filter(l => l.assigned_to === salesPersonId).length || 0,
       sampleLeads: allLeads?.slice(0, 5).map(l => ({ id: l.id, name: l.lead_name, assigned_to: l.assigned_to }))
     });
   }
@@ -134,12 +137,18 @@ export async function POST(request) {
   }
 
   // Determine assigned_to based on role
+  // assigned_to in leads_table references sales_persons.id
   let finalAssignedTo = assignedTo;
-  if (crmUser.role === "salesperson") {
-    // Salesperson: always assign to themselves
-    finalAssignedTo = crmUser.id;
+  if (crmUser.role === "sales") {
+    // Sales: always assign to their sales_person_id
+    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
+    finalAssignedTo = crmUser.salesPersonId || null;
+    if (!finalAssignedTo) {
+      console.warn("Leads POST: No sales_person_id found for user", crmUser.id);
+      return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
+    }
   } else if (crmUser.role === "admin") {
-    // Admin: can assign to anyone (use provided assignedTo or leave null)
+    // Admin: can assign to any sales_person_id (use provided assignedTo or leave null)
     finalAssignedTo = assignedTo || null;
   }
 
@@ -247,13 +256,19 @@ export async function PATCH(request) {
     if (next_stage_notes !== undefined) updateData.next_stage_notes = next_stage_notes;
     
     // Handle assigned_to update
+    // assigned_to in leads_table references sales_persons.id
     let finalAssignedTo = assignedTo;
     if (assignedTo !== undefined) {
-      if (crmUser.role === "salesperson") {
-        // Salesperson can only assign to themselves
-        finalAssignedTo = crmUser.id;
+      if (crmUser.role === "sales") {
+        // Sales can only assign to their sales_person_id
+        // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
+        finalAssignedTo = crmUser.salesPersonId || null;
+        if (!finalAssignedTo) {
+          console.warn("Leads PATCH: No sales_person_id found for user", crmUser.id);
+          return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
+        }
       } else if (crmUser.role === "admin") {
-        // Admin can assign to anyone
+        // Admin can assign to any sales_person_id
         finalAssignedTo = assignedTo || null;
       }
       updateData.assigned_to = finalAssignedTo;

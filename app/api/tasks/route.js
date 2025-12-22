@@ -17,35 +17,45 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("lead_id");
 
-  // For salesperson, we need to show tasks that either:
+  // For sales, we need to show tasks that either:
   // 1. Have sales_person_id = crmUser.id, OR
   // 2. Belong to leads where assigned_to = crmUser.id (even if task doesn't have sales_person_id)
   let data, error;
   
-  if (crmUser.role === "salesperson") {
-    // First, get all lead IDs assigned to this salesperson
+  if (crmUser.role === "sales") {
+    // Get sales_person_id from the relationship: users.id -> sales_persons.user_id -> sales_persons.id
+    const salesPersonId = crmUser.salesPersonId;
+    
+    if (!salesPersonId) {
+      console.warn("Tasks API: No sales_person_id found for user", crmUser.id);
+      return Response.json([]);
+    }
+    
+    // First, get all lead IDs assigned to this sales person
+    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id -> leads_table.assigned_to
     const { data: assignedLeads, error: leadsError } = await supabase
       .from("leads_table")
       .select("id")
-      .eq("assigned_to", crmUser.id);
+      .eq("assigned_to", salesPersonId);
     
     const assignedLeadIds = assignedLeads?.map(lead => lead.id) || [];
     
-    console.log("🔍 Tasks API: Fetching tasks for salesperson", { 
-      userId: crmUser.id, 
+    console.log("🔍 Tasks API: Fetching tasks for sales user", { 
+      userId: crmUser.id,
+      salesPersonId: salesPersonId,
       email: crmUser.email,
       assignedLeadIds: assignedLeadIds.length,
       leadId: leadId || "all"
     });
     
     // Fetch tasks in two queries and combine:
-    // 1. Tasks with sales_person_id = crmUser.id
+    // 1. Tasks with sales_person_id = salesPersonId
     // 2. Tasks for leads assigned to this salesperson
     const [tasksBySalesperson, tasksByLeads] = await Promise.all([
       supabase
         .from("tasks_table")
         .select("*")
-        .eq("sales_person_id", crmUser.id),
+        .eq("sales_person_id", salesPersonId),
       assignedLeadIds.length > 0
         ? supabase
             .from("tasks_table")
@@ -191,11 +201,17 @@ export async function POST(request) {
   }
 
   // Determine sales_person_id based on role (support both field names for backward compatibility)
+  // sales_person_id in tasks_table references sales_persons.id
   let finalSalesPersonId = sales_person_id || salesperson_id;
   
-  if (crmUser.role === "salesperson") {
-    // Salesperson: always assign to themselves
-    finalSalesPersonId = crmUser.id;
+  if (crmUser.role === "sales") {
+    // Sales: always assign to their sales_person_id
+    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
+    finalSalesPersonId = crmUser.salesPersonId || null;
+    if (!finalSalesPersonId) {
+      console.warn("Tasks POST: No sales_person_id found for user", crmUser.id);
+      return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
+    }
   } else if (crmUser.role === "admin") {
     // Admin: can assign to anyone, but if not provided, try to get from lead
     if (!finalSalesPersonId && lead?.assigned_to) {

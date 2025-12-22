@@ -5,11 +5,12 @@ import useSWR from "swr";
 import { Phone, Mail, MapPin, User, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Copy, Check, Target, MessageSquare, Zap, Edit2 } from "lucide-react";
 import { useTheme } from "../../../context/themeContext";
 import EmailModal from "../../../components/ui/email-modal";
+import EditLeadModal from "../../../components/buttons/editLeadModal";
 
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
+export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpdateLead }) {
     const { theme } = useTheme();
     const [emailModal, setEmailModal] = useState({
         isOpen: false,
@@ -17,6 +18,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
         recipientName: "",
     });
     const [copiedEmail, setCopiedEmail] = useState(false);
+    const [isEditLeadModalOpen, setIsEditLeadModalOpen] = useState(false);
 
     // Fetch tasks for this lead
     const { data: tasksData } = useSWR(
@@ -262,9 +264,18 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Left Column - Contact & Lead Information */}
                     <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}>
-                        <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                            Contact Information
-                        </h3>
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                Contact Information
+                            </h3>
+                            <button
+                                onClick={() => setIsEditLeadModalOpen(true)}
+                                className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
+                                title="Edit Lead"
+                            >
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                        </div>
                         <div className="space-y-4 grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
@@ -339,9 +350,12 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
 
                         {/* Lead Information */}
                         <div className="mt-8">
-                            <h3 className={`text-lg font-semibold mb-5 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                Additional Information
-                            </h3>
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                    Additional Information
+                                </h3>
+                               
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
                                     { label: "Lead ID", value: lead.id || "—", icon: FileText },
@@ -536,6 +550,19 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores }) {
                 recipientEmail={emailModal.recipientEmail}
                 recipientName={emailModal.recipientName}
                 leadId={leadId}
+            />
+
+            {/* Edit Lead Modal */}
+            <EditLeadModal
+                open={isEditLeadModalOpen}
+                onClose={() => setIsEditLeadModalOpen(false)}
+                lead={lead}
+                onUpdate={(updatedLead) => {
+                    if (onUpdateLead) {
+                        onUpdateLead(updatedLead);
+                    }
+                    setIsEditLeadModalOpen(false);
+                }}
             />
         </div>
     );

@@ -109,9 +109,14 @@ export default function BookingPage() {
                                                 ))}
                                             </div>
                                         ) : filteredSlots.length === 0 ? (
-                                            <p className="text-gray-500 text-sm py-4">
-                                                No slots available for this date.
-                                            </p>
+                                            <div className="text-gray-500 text-sm py-4">
+                                                <p className="mb-2">No slots available for this date.</p>
+                                                {eventType && (
+                                                    <p className="text-xs text-gray-400">
+                                                        Make sure availability rules are configured for this event type.
+                                                    </p>
+                                                )}
+                                            </div>
                                         ) : (
                                             <SlotPicker
                                                 slots={filteredSlots}

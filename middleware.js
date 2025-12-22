@@ -53,9 +53,9 @@ export async function middleware(request) {
     return NextResponse.redirect(dashboardUrl);
   }
 
-  // Note: Role-based authorization (checking sales_persons table) is handled
+  // Note: Role-based authorization (checking users table) is handled
   // in API routes during data fetching, not in middleware routing.
-  // This prevents redirect loops and allows both admin and salesperson to access pages.
+  // This prevents redirect loops and allows both admin and sales users to access pages.
   // The API routes will filter data based on role.
 
   return supabaseResponse;
