@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [status, setStatus] = useState("verifying");
   const [message, setMessage] = useState("Verifying your credentials...");
 
@@ -134,7 +133,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [router, searchParams]);
+  }, [router]);
 
   const statusConfig = {
     verifying: {
@@ -217,5 +216,32 @@ export default function AuthCallback() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center p-8">
+            <div className="mb-8 flex justify-center">
+              <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-orange-100"></div>
+              <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+            </div>
+            <p className="text-lg font-medium text-gray-600 mt-6">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

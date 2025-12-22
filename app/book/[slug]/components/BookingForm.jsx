@@ -1,13 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { useTheme } from "../../../context/themeContext";
 
-export default function BookingForm({ eventType, selectedSlot, onBookingSuccess }) {
+export default function BookingForm({ eventType, selectedSlot, onBookingSuccess, slug }) {
+  const { theme } = useTheme();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
   });
+
+  // Convert slug to title (e.g., "discovery-call" -> "Discovery Call")
+  const slugToTitle = (slug) => {
+    if (!slug) return "";
+    return slug
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const title = slugToTitle(slug);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -122,22 +135,33 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
   const isDisabled = !selectedSlot || !isFormValid || loading;
 
   return (
-    <div className="bg-white  rounded-lg p-6">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">
+    <div className={`${theme === "light" ? "bg-white border border-gray-200" : "bg-[#262626] border border-gray-700"} rounded-lg p-6`}>
+      <h2 className={`text-lg font-semibold ${theme === "light" ? "text-gray-800" : "text-white"} mb-4`}>
         Booking Details
       </h2>
 
+      {title && (
+        <div className={`mb-4 p-3 ${theme === "light" ? "bg-gray-50" : "bg-[#1f1f1f]"} border ${theme === "light" ? "border-gray-200" : "border-gray-700"} rounded-md`}>
+          <label className={`block text-xs font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"} mb-1`}>
+            Event Type
+          </label>
+          <p className={`text-base font-medium ${theme === "light" ? "text-gray-800" : "text-white"}`}>
+            {title}
+          </p>
+        </div>
+      )}
+
       {!selectedSlot && (
-        <div className="mb-4 p-3 bg-gray-100 border border-gray-200 rounded-md">
-          <p className="text-sm text-gray-600">
+          <div className={`mb-4 p-3 ${theme === "light" ? "bg-gray-100 border border-gray-200" : "bg-[#262626] border border-gray-700"}  rounded-md`}>
+          <p className={`text-sm ${theme === "light" ? "text-gray-600" : "text-gray-500"}`}>
             Please select a time slot to continue
           </p>
         </div>
       )}
 
       {selectedSlot && (
-        <div className="mb-4 p-3 bg-white border border-gray-200 rounded-md">
-          <p className="text-sm font-medium text-gray-800" placeholder="Selected Time">
+        <div className={`mb-4 p-3 ${theme === "light" ? "bg-white" : "bg-[#262626]"} border ${theme === "light" ? "border-gray-200" : "border-gray-700"} rounded-md`}>
+          <p className={`text-sm font-medium ${theme === "light" ? "text-gray-800" : "text-white"}`} placeholder="Selected Time">
             {formatSelectedTime(selectedSlot.start)}
           </p>
         </div>
@@ -147,7 +171,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
         <div>
           <label
             htmlFor="name"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
             Name <span className="text-red-500">*</span>
           </label>
@@ -159,25 +183,25 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
             onChange={handleChange}
             disabled={!selectedSlot}
             className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent
+              w-full px-4 py-2 border rounded-md focus:outline-none  ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
               ${
                 errors.name
-                  ? "border-red-300"
-                  : "border-gray-200"
+                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
               }
-              ${!selectedSlot ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
+              ${!selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
             `}
             placeholder="Your full name"
           />
           {errors.name && (
-            <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.name}</p>
           )}
         </div>
 
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
             Email <span className="text-red-500">*</span>
           </label>
@@ -189,27 +213,27 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
             onChange={handleChange}
             disabled={!selectedSlot}
             className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent
+              w-full px-4 py-2 border rounded-md focus:outline-none  ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
               ${
                 errors.email
-                  ? "border-red-300"
-                  : "border-gray-200"
+                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
               }
-              ${!selectedSlot ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
+              ${!selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
             `}
             placeholder="your.email@example.com"
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.email}</p>
           )}
         </div>
 
         <div>
           <label
             htmlFor="phone"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
-            Phone <span className="text-gray-400">(optional)</span>
+            Phone <span className={`${theme === "light" ? "text-gray-400" : "text-gray-500"}`}>(optional)</span>
           </label>
           <input
             type="tel"
@@ -219,24 +243,24 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
             onChange={handleChange}
             disabled={!selectedSlot}
             className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent
+              w-full px-4 py-2 border rounded-md focus:outline-none  ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
               ${
                 errors.phone
-                  ? "border-red-300"
-                  : "border-gray-200"
+                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
               }
-              ${!selectedSlot ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
+              ${!selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
             `}
             placeholder="+1 (555) 123-4567"
           />
           {errors.phone && (
-            <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.phone}</p>
           )}
         </div>
 
         {submitError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{submitError}</p>
+          <div className={`p-3 ${theme === "light" ? "bg-red-50 border border-red-200" : "bg-[#262626] border border-red-500"} rounded-md`}>
+            <p className={`text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{submitError}</p>
           </div>
         )}
 
@@ -245,11 +269,11 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess 
           type="submit"
           disabled={isDisabled}
           className={`
-            w-[25%] py-3 px-4 flex items-center justify-center rounded-md font-medium text-white transition-all cursor-pointer
+            w-[25%] py-3 px-4 flex items-center justify-center rounded-md font-medium ${theme === "light" ? "text-white" : "text-white"} transition-all cursor-pointer
             ${
               isDisabled
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-orange-500 hover:bg-orange-600"
+                ? `${theme === "light" ? "bg-gray-400 cursor-not-allowed text-white" : "bg-orange-500 cursor-not-allowed text-white"}`
+                : `${theme === "light" ? "bg-orange-500 hover:bg-orange-600" : "bg-orange-500 hover:bg-orange-600 text-white"}`
             }
           `}
         >

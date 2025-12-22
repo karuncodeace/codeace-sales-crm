@@ -9,8 +9,10 @@ import Calendar from "./components/calender";
 import { useEventType } from "./hooks/useEventType";
 import { useSlots } from "./hooks/useSlots";
 import { getTodayDateString } from "./utils/dateUtils";
+import { useTheme } from "../../context/themeContext";
 
 export default function BookingPage() {
+    const { theme } = useTheme();
     const params = useParams();
     const slug = params.slug;
 
@@ -52,7 +54,7 @@ export default function BookingPage() {
             <div className="min-h-screen  flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading event details...</p>
+                    <p className={`${theme === "light" ? "text-gray-600" : "text-white"}`}>Loading event details...</p>
                 </div>
             </div>
         );
@@ -62,8 +64,8 @@ export default function BookingPage() {
         return (
             <div className="min-h-screen  flex items-center justify-center px-4">
                 <div className="text-center max-w-md">
-                    <h1 className="text-2xl font-semibold text-gray-800 mb-2">Event Not Found</h1>
-                    <p className="text-gray-600">{error || slotsError}</p>
+                    <h1 className={`text-2xl font-semibold ${theme === "light" ? "text-gray-800" : "text-white"} mb-2`}>Event Not Found</h1>
+                    <p className={`${theme === "light" ? "text-gray-600" : "text-white"}`}>{error || slotsError}</p>
                 </div>
             </div>
         );
@@ -83,7 +85,7 @@ export default function BookingPage() {
             <div className="w-full px-4 sm:px-4 lg:px-6 xl:px-8 2xl:px-1 pt-5   ">
                 <div className="max-w-full mx-auto">
                     <div className="mt-8 mb-8">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Book a Meeting</h1>
+                        <h1 className={`text-2xl sm:text-3xl font-bold ${theme === "light" ? "text-gray-900" : "text-white"}`}>Book a <span className={`${theme === "light" ? "text-orange-500" : "text-orange-500"}`}>Meeting</span></h1>
                     </div>
                     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10 mb-8">
                         <div className="w-full lg:w-[45%] xl:w-[42%] flex-shrink-0">
@@ -96,7 +98,7 @@ export default function BookingPage() {
                             {eventType && (
                                 <>
                                     <div className="flex-shrink-0">
-                                        <label className="block text-lg font-bold text-gray-700 mb-4">
+                                        <label className={`block text-lg font-bold ${theme === "light" ? "text-gray-700" : "text-white"} mb-4`}>
                                             Available Times
                                         </label>
                                         {slotsLoading ? (
@@ -104,15 +106,15 @@ export default function BookingPage() {
                                                 {[1, 2, 3].map((i) => (
                                                     <div
                                                         key={i}
-                                                        className="h-12 bg-gray-100 rounded-md animate-pulse"
+                                                        className={`h-12 ${theme === "light" ? "bg-gray-100" : "bg-[#262626]"} rounded-md animate-pulse`}
                                                     ></div>
                                                 ))}
                                             </div>
                                         ) : filteredSlots.length === 0 ? (
-                                            <div className="text-gray-500 text-sm py-4">
+                                            <div className={`${theme === "light" ? "text-gray-500" : "text-gray-500"} text-sm py-4`}>
                                                 <p className="mb-2">No slots available for this date.</p>
                                                 {eventType && (
-                                                    <p className="text-xs text-gray-400">
+                                                    <p className={`text-xs ${theme === "light" ? "text-gray-400" : "text-gray-500"}`}>
                                                         Make sure availability rules are configured for this event type.
                                                     </p>
                                                 )}
@@ -131,6 +133,7 @@ export default function BookingPage() {
                                             eventType={eventType}
                                             selectedSlot={selectedSlot}
                                             onBookingSuccess={handleBookingSuccess}
+                                            slug={slug}
                                         />
                                     </div>
                                 </>

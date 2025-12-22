@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTheme } from "../../../context/themeContext";
 
 export default function Calendar({ selectedDate, onDateSelect }) {
+    const { theme } = useTheme();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     
     const months = [
@@ -70,24 +72,24 @@ export default function Calendar({ selectedDate, onDateSelect }) {
     }, [selectedDate]);
     
     return (
-        <div className="w-full bg-white p-10 rounded-[30px] ">
+        <div className={`w-full ${theme === "light" ? "bg-white" : "bg-[#262626]"} p-10 rounded-[30px] `}>
             {/* Month and Year Header */}
             <div className="flex items-center justify-between mb-4">
                 <button
                     onClick={() => navigateMonth(-1)}
-                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                    className={`${theme === "light" ? "text-gray-600 hover:text-gray-800" : "text-white hover:text-gray-500"}  transition-colors`}
                     aria-label="Previous month"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <h2 className="text-lg font-bold text-gray-800">
+                <h2 className={`text-lg font-bold ${theme === "light" ? "text-gray-800" : "text-white"}`}>
                     {monthName} {year}
                 </h2>
                 <button
                     onClick={() => navigateMonth(1)}
-                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                    className={`${theme === "light" ? "text-gray-600 hover:text-gray-800" : "text-white hover:text-gray-500"}  transition-colors`}
                     aria-label="Next month"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,7 +103,7 @@ export default function Calendar({ selectedDate, onDateSelect }) {
                 {daysOfWeek.map((day) => (
                     <div
                         key={day}
-                        className="text-center text-sm text-gray-700  font-medium py-2"
+                        className={`text-center text-sm ${theme === "light" ? "text-gray-700" : "text-gray-500"}  font-medium py-2`}
                     >
                         {day}
                     </div>
@@ -132,8 +134,8 @@ export default function Calendar({ selectedDate, onDateSelect }) {
                                 ${isSelected
                                     ? 'bg-orange-500 text-white rounded-full'
                                     : isPast
-                                    ? 'text-gray-300 cursor-not-allowed rounded-md'
-                                    : 'text-gray-800 hover:bg-gray-100 cursor-pointer rounded-full'
+                                    ? `${theme === "light" ? "text-gray-300 cursor-not-allowed rounded-md" : "text-gray-500 cursor-not-allowed rounded-md"}`
+                                    : `${theme === "light" ? "text-gray-800 hover:bg-gray-100" : "text-white hover:bg-gray-700"} cursor-pointer rounded-full`
                                 }
                             `}
                         >

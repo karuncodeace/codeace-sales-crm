@@ -1,10 +1,13 @@
 "use client";
 
+import { useTheme } from "../../../context/themeContext";
+
 export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
+  const { theme } = useTheme();
   // Safety check: ensure slots is an array
   if (!slots || !Array.isArray(slots)) {
     return (
-      <p className="text-gray-500 text-sm py-4">
+      <p className={`${theme === "light" ? "text-gray-500" : "text-gray-500"} text-sm py-4`}>
         No time slots available.
       </p>
     );
@@ -212,7 +215,7 @@ export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
   // Show message if slots exist but all are filtered out
   if (slots.length > 0 && filteredSlots.length === 0) {
     return (
-      <p className="text-gray-500 text-sm py-4">
+      <p className={`${theme === "light" ? "text-gray-500" : "text-gray-500"} text-sm py-4`}>
         No slots available within working hours (10:00 AM - 5:00 PM).
       </p>
     );
@@ -221,7 +224,7 @@ export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
   // Show message if no slots at all
   if (filteredSlots.length === 0) {
     return (
-      <p className="text-gray-500 text-sm py-4">
+      <p className={`${theme === "light" ? "text-gray-500" : "text-gray-500"} text-sm py-4`}>
         No time slots available.
       </p>
     );
@@ -241,14 +244,15 @@ export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
                   key={slot.start}
                   onClick={() => onSelectSlot(slot)}
                   className={`
-                    px-4 py-2 text-sm font-medium rounded-md  transition-all
+                    px-4 py-2 text-sm font-medium rounded-md  transition-all cursor-pointer flex items-center justify-center gap-2 
                     ${
                       isSlotSelected(slot)
-                        ? "bg-orange-500 border-gray-800 shadow-sm text-white"
-                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 "
+                        ? `${theme === "light" ? "bg-orange-500 border-gray-800 shadow-sm text-white" : "bg-orange-500 border-gray-800 shadow-sm text-white"}`
+                        : `${theme === "light" ? "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 " : "bg-[#262626] border-gray-700 text-white hover:bg-gray-700 "}`
                     }
                   `}
                 >
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                   {formatTime(slot.start)}
                 </button>
               ))}
