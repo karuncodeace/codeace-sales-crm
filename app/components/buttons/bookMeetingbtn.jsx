@@ -1,12 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 import { useTheme } from "../../context/themeContext";
-import { X, Calendar, Video, Phone, Clock } from "lucide-react";
-import BookingModal from "../BookingModal";
-import { getCalLink } from "../../../config/calConfig";
+import { X, Calendar, Clock } from "lucide-react";
 
 export default function BookMeetingButton({ lead }) {
+  const router = useRouter();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,8 +20,8 @@ export default function BookMeetingButton({ lead }) {
   }, []);
 
   const callTypes = [
-    { id: "discovery", label: "Discovery Call", duration: "It's a discovery Call", calLink: getCalLink("discovery") },
-    { id: "kick-off", label: "Kick-off Call", duration: "It's a Project Kick-off Call ", calLink: getCalLink("kick-off") },
+    { id: "discovery-call", label: "Discovery Call", duration: "It's a discovery Call" },
+    { id: "sales-call", label: "Sales Call", duration: "It's a Sales Call" },
   ];
 
   const handleBook = () => {
@@ -30,27 +30,15 @@ export default function BookMeetingButton({ lead }) {
 
   const handleCallTypeSelect = (callType) => {
     setSelectedCallType(callType);
+    // Navigate to the corresponding booking page
+    router.push(`/book/${callType.id}`);
+    handleClose();
   };
 
   const handleClose = () => {
     setIsModalOpen(false);
     setSelectedCallType(null);
   };
-
-  const handleBookingComplete = (data) => {
-    handleClose();
-    // Optionally show success message or refresh data
-  };
-
-  const handleBookingError = (error) => {
-    console.error("Booking error:", error);
-    // Error is already handled in BookingWidget
-  };
-
-  const salespersonId = lead?.assigned_to || currentUser?.id || "";
-  const leadId = lead?.id || "";
-  const leadName = lead?.name || lead?.lead_name || "";
-  const leadEmail = lead?.email || lead?.lead_email || "";
 
   return (
     <>
@@ -162,21 +150,6 @@ export default function BookMeetingButton({ lead }) {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Booking Modal with Embed */}
-      {isModalOpen && selectedCallType && (
-        <BookingModal
-          isOpen={isModalOpen}
-          onClose={handleClose}
-          leadId={leadId}
-          leadName={leadName}
-          leadEmail={leadEmail}
-          salespersonId={salespersonId}
-          callType={selectedCallType}
-          onBookingComplete={handleBookingComplete}
-          onError={handleBookingError}
-        />
       )}
     </>
   );
