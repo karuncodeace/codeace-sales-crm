@@ -86,12 +86,27 @@ export async function generateFcmPayload({ deviceToken, data = {} }) {
   // Generate access token for Authorization header (Bearer token)
   const accessToken = await generateToken();
 
-  // Create payload with user's fcm_token in the token field
+  // Create payload matching exact curl format:
+  // {
+  //   "message": {
+  //     "token": "{logged in user token}",
+  //     "data": {
+  //       "id": "...",
+  //       "phone": "...",
+  //       "name": "...",
+  //       "email": "...",
+  //       "click_action": "FLUTTER_NOTIFICATION_CLICK"
+  //     }
+  //   }
+  // }
   const payload = {
     message: {
       token: deviceToken, // User's fcm_token from sales_persons table
       data: {
-        ...data,
+        id: data.id,
+        phone: data.phone,
+        name: data.name,
+        email: data.email,
         click_action: data.click_action || "FLUTTER_NOTIFICATION_CLICK",
       },
     },

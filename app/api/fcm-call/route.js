@@ -121,22 +121,25 @@ export async function POST(request) {
       );
     }
 
-    console.log("📤 Sending FCM notification:", {
-      authorizationToken: accessToken?.substring(0, 30) + "... (used in Authorization header)",
-      userDeviceToken: deviceToken?.substring(0, 20) + "... (used in payload.message.token)",
-      leadName: name,
-      phone: phone,
-      payload: {
-        message: {
-          token: payload.message.token?.substring(0, 20) + "... (user's fcm_token from database)",
-          data: payload.message.data,
-        },
-      },
-    });
+    // Log the exact payload being sent (matching curl format)
+    console.log("📤 Sending FCM notification with payload:");
+    console.log(JSON.stringify(payload, null, 2));
+    console.log("🔑 Authorization token:", accessToken?.substring(0, 30) + "...");
 
     // Send FCM notification
-    // - Generated accessToken goes in Authorization header (Bearer token)
-    // - User's fcm_token (deviceToken) goes in payload.message.token field
+    // Payload format matches curl:
+    // {
+    //   "message": {
+    //     "token": "{logged in user token}",
+    //     "data": {
+    //       "id": "...",
+    //       "phone": "...",
+    //       "name": "...",
+    //       "email": "...",
+    //       "click_action": "FLUTTER_NOTIFICATION_CLICK"
+    //     }
+    //   }
+    // }
     const fcmResponse = await fetch(
       "https://fcm.googleapis.com/v1/projects/crm-call-android/messages:send",
       {
@@ -145,7 +148,7 @@ export async function POST(request) {
           Authorization: `Bearer ${accessToken}`, // Generated token from Google Auth
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload), // Contains user's fcm_token in payload.message.token
+        body: JSON.stringify(payload), // Exact format matching curl
       }
     );
 
