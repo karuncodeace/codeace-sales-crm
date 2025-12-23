@@ -26,6 +26,7 @@ export default function ProspectsTable() {
     const [openFilter, setOpenFilter] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState({
         source: "",
         status: "",
@@ -193,7 +194,45 @@ export default function ProspectsTable() {
                             className={`w-full pl-2 pr-4 text-sm focus:outline-none ${theme === "dark" ? "text-gray-300 bg-transparent" : "text-gray-900 bg-transparent"}`}
                         />
                     </div>
-
+                    {/* Refresh Button */}
+                    <div>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                setIsRefreshing(true);
+                                try {
+                                    await mutate("/api/prospects");
+                                } finally {
+                                    setIsRefreshing(false);
+                                }
+                            }}
+                            disabled={isRefreshing}
+                            className={`inline-flex items-center justify-center rounded-lg border p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
+                                theme === "dark"
+                                    ? "border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                                    : "border-gray-200 text-gray-700 hover:bg-gray-100"
+                            }`}
+                            aria-label="Refresh prospects table"
+                            title="Refresh table"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                width="20"
+                                height="20"
+                                color="currentColor"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className={`${isRefreshing ? "animate-spin" : ""}`}
+                            >
+                                <path d="M20.4879 15C19.2524 18.4956 15.9187 21 12 21C7.02943 21 3 16.9706 3 12C3 7.02943 7.02943 3 12 3C15.7292 3 18.9286 5.26806 20.2941 8.5" />
+                                <path d="M15 9H18C19.4142 9 20.1213 9 20.5607 8.56066C21 8.12132 21 7.41421 21 6V3" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 {/* Table */}
                 <div className="flex-1 overflow-y-auto overflow-x-auto">

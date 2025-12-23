@@ -1,49 +1,6 @@
-import { GoogleAuth } from "google-auth-library";
+import { generateToken, generateFcmPayload } from "../../../utils/generateFcmToken";
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser } from "../../../lib/crm/auth";
-
-// Cache token for ~55 minutes so it isn't regenerated on every request
-let cachedAccessToken = null;
-let cachedExpiry = 0;
-
-async function getAccessToken() {
-  const now = Date.now();
-  if (cachedAccessToken && now < cachedExpiry) {
-    return cachedAccessToken;
-  }
-
-  // Get credentials from environment variable or fallback to file
-  let credentials = null;
-  
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    try {
-      // Parse JSON from environment variable
-      credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-    } catch (error) {
-      console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", error);
-      throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_JSON format");
-    }
-  }
-
-  const auth = new GoogleAuth({
-    // Use credentials object if available, otherwise fallback to keyFile
-    ...(credentials ? { credentials } : { keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || "service-account.json" }),
-    scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
-  });
-
-  const client = await auth.getClient();
-  const tokenResponse = await client.getAccessToken();
-
-  if (!tokenResponse || !tokenResponse.token) {
-    throw new Error("Failed to obtain FCM access token");
-  }
-
-  cachedAccessToken = tokenResponse.token;
-  // Token is valid for 1h; refresh slightly earlier (55 minutes).
-  cachedExpiry = now + 55 * 60 * 1000;
-
-  return cachedAccessToken;
-}
 
 export async function POST(request) {
   try {
@@ -105,6 +62,7 @@ export async function POST(request) {
       );
     }
 
+    // Get the logged-in user's FCM device token from sales_persons table
     const deviceToken = salesPerson.fcm_token;
 
     if (!deviceToken) {
@@ -116,12 +74,12 @@ export async function POST(request) {
       );
     }
 
-    const accessToken = await getAccessToken();
-
-    // Payload format that matches the working curl example
-    const payload = {
-      message: {
-        token: deviceToken,
+    // Generate FCM access token (for Authorization header) using Google Auth
+    console.log("🔄 Generating FCM access token for Authorization header...");
+    let payload, accessToken;
+    try {
+      const result = await generateFcmPayload({
+        deviceToken, // User's fcm_token from sales_persons table (goes in payload.message.token)
         data: {
           id: String(lead_id),
           phone: String(phone),
@@ -129,25 +87,65 @@ export async function POST(request) {
           email: String(email),
           click_action: "FLUTTER_NOTIFICATION_CLICK",
         },
-      },
-    };
+      });
+      payload = result.payload;
+      accessToken = result.accessToken;
+    } catch (tokenError) {
+      console.error("❌ Error generating FCM token:", tokenError);
+      return Response.json(
+        {
+          error: "Failed to generate FCM access token",
+          details: tokenError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!accessToken) {
+      console.error("❌ Access token is missing");
+      return Response.json(
+        {
+          error: "Access token generation failed",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!payload || !payload.message || !payload.message.token) {
+      console.error("❌ Payload is invalid:", payload);
+      return Response.json(
+        {
+          error: "Payload generation failed",
+        },
+        { status: 500 }
+      );
+    }
 
     console.log("📤 Sending FCM notification:", {
-      token: deviceToken?.substring(0, 20) + "...",
+      authorizationToken: accessToken?.substring(0, 30) + "... (used in Authorization header)",
+      userDeviceToken: deviceToken?.substring(0, 20) + "... (used in payload.message.token)",
       leadName: name,
       phone: phone,
-      payloadKeys: Object.keys(payload.message),
+      payload: {
+        message: {
+          token: payload.message.token?.substring(0, 20) + "... (user's fcm_token from database)",
+          data: payload.message.data,
+        },
+      },
     });
 
+    // Send FCM notification
+    // - Generated accessToken goes in Authorization header (Bearer token)
+    // - User's fcm_token (deviceToken) goes in payload.message.token field
     const fcmResponse = await fetch(
       "https://fcm.googleapis.com/v1/projects/crm-call-android/messages:send",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`, // Generated token from Google Auth
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload), // Contains user's fcm_token in payload.message.token
       }
     );
 

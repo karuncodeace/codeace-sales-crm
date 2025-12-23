@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
@@ -25,9 +26,11 @@ import {
   X,
   Upload,
   Save,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function ViewProfile() {
+  const router = useRouter();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [copied, setCopied] = useState(false);
@@ -336,6 +339,20 @@ export default function ViewProfile() {
 
   return (
     <div className={`w-full min-h-screen `}>
+      {/* Back to Dashboard Button */}
+      <div className="mb-4 mt-5">
+        <button
+          onClick={() => router.push("/")}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            isDark
+              ? "bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white"
+              : " text-black bg-gray-100 "
+          }`}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </button>
+      </div>
       {/* Hero Banner Section */}
       <div className={`relative overflow-hidden rounded-3xl border  shadow-lg mt-5 ${isDark ? "bg-gradient-to-br from-[#262626] via-[#1f1f1f] to-[#262626] border-gray-700 " : "bg-white text-black border-gray-200 "}`}>
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>

@@ -46,6 +46,7 @@ export default function LeadsPage() {
             Add Lead
           </button>
         </div>
+        
       </div>
 
      <div>
