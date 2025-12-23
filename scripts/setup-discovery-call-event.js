@@ -37,3 +37,4 @@ console.log(`
    Should load the booking page successfully.
 `);
 
+

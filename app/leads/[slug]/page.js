@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { Phone, Mail, MessageSquare, MoreHorizontal, ArrowLeft, MapPin, User, Target, IndianRupee, Flame, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Loader2, Copy, Check, Plus, Edit2, Trash2, StickyNote } from "lucide-react";
+import { Phone, Mail, MessageSquare, MoreHorizontal, ArrowLeft, MapPin, User, Target, IndianRupee, Flame, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Loader2, Copy, Check, Plus, Edit2, Trash2, StickyNote, ChevronDown } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
 import EmailModal from "../../components/ui/email-modal";
 import OverveiwTab from "./components/overveiwTab";
@@ -45,6 +45,8 @@ export default function LeadDetailPage() {
     
     const { theme } = useTheme();
     const [tab, setTab] = useState("overview");
+    const [isConnectMenuOpen, setIsConnectMenuOpen] = useState(false);
+    const connectMenuRef = useRef(null);
     
     // Handle scroll to demo section
     useEffect(() => {
@@ -68,6 +70,23 @@ export default function LeadDetailPage() {
             }, 300);
         }
     }, [searchParams, leadId, router]);
+
+    // Close connect menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (connectMenuRef.current && !connectMenuRef.current.contains(event.target)) {
+                setIsConnectMenuOpen(false);
+            }
+        };
+
+        if (isConnectMenuOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isConnectMenuOpen]);
     const [emailModal, setEmailModal] = useState({
         isOpen: false,
         recipientEmail: "",
@@ -236,15 +255,43 @@ export default function LeadDetailPage() {
                 </div>
                 
 
-                {/* Action Menu Button */}
-                <div className="relative flex items-center gap-3">
-                     <CallBtn 
-                       leadId={lead.id || lead.lead_id}
-                       phone={lead.phone || lead.lead_phone}
-                       name={lead.name || lead.lead_name}
-                       email={lead.email || lead.lead_email}
-                     />   
-                    <BookMeetingButton lead={lead} />
+                {/* Connect Through Dropdown */}
+                <div ref={connectMenuRef} className="relative">
+                    <button
+                        onClick={() => setIsConnectMenuOpen(!isConnectMenuOpen)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700 shadow-md hover:shadow-lg ${
+                            isConnectMenuOpen ? "bg-orange-600" : ""
+                        }`}
+                    >
+                        <span>Reach Out</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isConnectMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {isConnectMenuOpen && (
+                        <div
+                            className={`absolute right-0 mt-2 w-64 rounded-xl shadow-2xl py-3 z-50 transition-all duration-200 ${
+                                theme === "dark"
+                                    ? "bg-[#262626] border border-gray-700"
+                                    : "bg-white border border-gray-200"
+                            }`}
+                        >
+                            <div className="px-3 space-y-2">
+                                <div className="w-full [&>button]:w-full [&>button]:justify-center">
+                                    <CallBtn 
+                                        leadId={lead.id || lead.lead_id}
+                                        phone={lead.phone || lead.lead_phone}
+                                        name={lead.name || lead.lead_name}
+                                        email={lead.email || lead.lead_email}
+                                    />
+                                </div>
+                                <div className={`h-px ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}></div>
+                                <div className="w-full [&>button]:w-full [&>button]:justify-center">
+                                    <BookMeetingButton lead={lead} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

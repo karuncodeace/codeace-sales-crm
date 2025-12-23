@@ -50,26 +50,33 @@ export async function GET() {
   }
 
   // Map the data to the format expected by the frontend
-  const prospects = (data || []).map((lead) => ({
-    id: lead.id,
-    name: lead.lead_name,
-    phone: lead.phone || "",
-    email: lead.email || "",
-    contactName: lead.contact_name || "",
-    source: lead.lead_source,
-    status: lead.status,
-    priority: lead.priority,
-    assignedTo: lead.assigned_to || "",
-    createdAt: lead.created_at
-      ? new Date(lead.created_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "",
-    lastActivity: formatLastActivity(lead.last_activity),
-    conversionChance: lead.conversion_chance || 0,
-  }));
+  const prospects = (data || []).map((lead) => {
+    const totalScore = lead.total_score !== null && lead.total_score !== undefined 
+      ? Number(lead.total_score) 
+      : 0;
+    
+    return {
+      id: lead.id,
+      name: lead.lead_name,
+      phone: lead.phone || "",
+      email: lead.email || "",
+      contactName: lead.contact_name || "",
+      source: lead.lead_source,
+      status: lead.status,
+      priority: lead.priority,
+      assignedTo: lead.assigned_to || "",
+      createdAt: lead.created_at
+        ? new Date(lead.created_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "",
+      lastActivity: formatLastActivity(lead.last_activity),
+      totalScore: totalScore,
+      conversionChance: Math.round((totalScore / 25) * 100),
+    };
+  });
 
   return Response.json(prospects);
 }

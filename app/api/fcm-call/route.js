@@ -69,16 +69,38 @@ export async function POST(request) {
 
     const supabase = await supabaseServer();
 
-    const { data: salesPerson, error: salesPersonError } = await supabase
-      .from("sales_persons")
-      .select("id, fcm_token")
-      .eq("id", crmUser.id)
-      .single();
+    // Use salesPersonId if available (already fetched in getCrmUser), otherwise query by user_id
+    let salesPerson = null;
+    let salesPersonError = null;
+
+    if (crmUser.salesPersonId) {
+      // Direct lookup using sales_persons.id
+      const result = await supabase
+        .from("sales_persons")
+        .select("id, fcm_token")
+        .eq("id", crmUser.salesPersonId)
+        .single();
+      salesPerson = result.data;
+      salesPersonError = result.error;
+    } else {
+      // Fallback: query by user_id (users.id -> sales_persons.user_id)
+      const result = await supabase
+        .from("sales_persons")
+        .select("id, fcm_token")
+        .eq("user_id", crmUser.id)
+        .single();
+      salesPerson = result.data;
+      salesPersonError = result.error;
+    }
 
     if (salesPersonError || !salesPerson) {
-      console.error("Error fetching sales person FCM token:", salesPersonError);
+      console.error("Error fetching sales person FCM token:", salesPersonError, {
+        crmUserId: crmUser.id,
+        salesPersonId: crmUser.salesPersonId,
+        role: crmUser.role
+      });
       return Response.json(
-        { error: "Unable to find sales person or FCM token" },
+        { error: "Unable to find sales person or FCM token. Please ensure you have a sales person profile set up." },
         { status: 500 }
       );
     }
@@ -96,6 +118,7 @@ export async function POST(request) {
 
     const accessToken = await getAccessToken();
 
+    // Payload format that matches the working curl example
     const payload = {
       message: {
         token: deviceToken,
@@ -108,6 +131,13 @@ export async function POST(request) {
         },
       },
     };
+
+    console.log("📤 Sending FCM notification:", {
+      token: deviceToken?.substring(0, 20) + "...",
+      leadName: name,
+      phone: phone,
+      payloadKeys: Object.keys(payload.message),
+    });
 
     const fcmResponse = await fetch(
       "https://fcm.googleapis.com/v1/projects/crm-call-android/messages:send",
@@ -124,7 +154,7 @@ export async function POST(request) {
     const fcmJson = await fcmResponse.json().catch(() => null);
 
     if (!fcmResponse.ok) {
-      console.error("FCM send error:", fcmResponse.status, fcmJson);
+      console.error("❌ FCM send error:", fcmResponse.status, fcmJson);
       return Response.json(
         {
           error: "Failed to send FCM message",
@@ -134,9 +164,15 @@ export async function POST(request) {
       );
     }
 
+    console.log("✅ FCM notification sent successfully:", {
+      messageId: fcmJson?.name,
+      success: fcmJson?.name ? true : false,
+    });
+
     return Response.json({
       success: true,
       fcmResponse: fcmJson,
+      messageId: fcmJson?.name,
     });
   } catch (error) {
     console.error("Error in /api/fcm-call:", error);

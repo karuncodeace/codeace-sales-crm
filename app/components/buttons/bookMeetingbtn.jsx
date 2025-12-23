@@ -56,23 +56,14 @@ export default function BookMeetingButton({ lead }) {
     <>
       <button
         onClick={handleBook}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+        className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+          isDark
+            ? "bg-gray-800 text-gray-200 hover:bg-orange-600 hover:text-white"
+            : "bg-gray-50 text-gray-900 hover:bg-orange-600 hover:text-white border border-gray-200 hover:border-orange-600"
+        }`}
       >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          viewBox="0 0 24 24" 
-          width="20" 
-          height="20" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="1.5" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        >
-          <path d="M12.001 5.00003V19.002" />
-          <path d="M19.002 12.002L4.99998 12.002" />
-        </svg>
-        <span>Book Meeting</span>
+        <Calendar className="w-4 h-4" />
+        <span>Schedule Meeting</span>
       </button>
 
       {/* Call Type Selection Modal */}

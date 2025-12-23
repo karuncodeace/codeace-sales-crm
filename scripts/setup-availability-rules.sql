@@ -60,3 +60,4 @@ ORDER BY ar.day_of_week;
 -- 5 = Friday
 -- 6 = Saturday
 
+

@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Phone } from "lucide-react";
+import { useTheme } from "../../context/themeContext";
 
 export default function CallBtn({ leadId, phone, name, email }) {
+  const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
@@ -31,7 +34,7 @@ export default function CallBtn({ leadId, phone, name, email }) {
         alert(data.error || "Failed to initiate call. Please try again.");
       } else {
         console.log("FCM call triggered successfully:", data);
-        // Optionally show success message
+        alert(`Call initiated successfully! Calling ${name} at ${phone}`);
       }
     } catch (err) {
       console.error("Error triggering FCM call:", err);
@@ -45,9 +48,14 @@ export default function CallBtn({ leadId, phone, name, email }) {
     <button
       onClick={handleClick}
       disabled={isLoading || !leadId || !phone || !name || !email}
-      className="px-4 py-2 rounded-md bg-orange-500 text-white disabled:opacity-60 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors"
+      className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 ${
+        theme === "dark"
+          ? "bg-gray-800 text-gray-200 hover:bg-orange-600 hover:text-white"
+          : "bg-gray-50 text-gray-900 hover:bg-orange-600 hover:text-white border border-gray-200 hover:border-orange-600"
+      }`}
     >
-      {isLoading ? "Calling..." : "Call"}
+      <Phone className="w-4 h-4" />
+      {isLoading ? "Calling..." : "Call Now"}
     </button>
   );
 }

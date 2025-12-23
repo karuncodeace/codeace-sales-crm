@@ -366,22 +366,32 @@ export default function ProspectsTable() {
                                         {/* Conversion Chance Progress Bar */}
                                         <td className="size-px whitespace-nowrap">
                                             <div className="px-6 py-2">
-                                                <div className="flex items-center gap-2 min-w-[120px]">
-                                                    <div className={`flex-1 h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
-                                                        <div
-                                                            className={`h-full rounded-full transition-all duration-300 ${prospect.conversionChance >= 80
-                                                                    ? "bg-emerald-500"
-                                                                    : prospect.conversionChance >= 60
-                                                                        ? "bg-orange-500"
-                                                                        : "bg-red-500"
-                                                                }`}
-                                                            style={{ width: `${prospect.conversionChance}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className={`text-xs font-medium min-w-[36px] ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                                        {prospect.conversionChance}%
-                                                    </span>
-                                                </div>
+                                                {(() => {
+                                                    // Calculate conversion chance from total_score out of 25
+                                                    const totalScore = prospect.totalScore !== null && prospect.totalScore !== undefined 
+                                                        ? Number(prospect.totalScore) 
+                                                        : 0;
+                                                    const conversionChance = Math.round((totalScore / 25) * 100);
+                                                    
+                                                    return (
+                                                        <div className="flex items-center gap-2 min-w-[120px]">
+                                                            <div className={`flex-1 h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-300 ${conversionChance >= 80
+                                                                            ? "bg-emerald-500"
+                                                                            : conversionChance >= 60
+                                                                                ? "bg-orange-500"
+                                                                                : "bg-red-500"
+                                                                        }`}
+                                                                    style={{ width: `${conversionChance}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className={`text-xs font-medium min-w-[36px] ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                                                                {conversionChance}%
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="size-px whitespace-nowrap">
