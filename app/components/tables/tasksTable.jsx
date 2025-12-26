@@ -318,8 +318,20 @@ export default function TasksPage() {
 
     // Transform API tasks to display format
     const transformedTasks = useMemo(() => {
+        // Debug: Log what we received from API
+        console.log("🔍 TasksTable: Received tasksData", {
+            isArray: Array.isArray(tasksData),
+            dataType: typeof tasksData,
+            length: tasksData?.length,
+            hasError: tasksData?.error,
+            sample: tasksData?.slice?.(0, 3)
+        });
+        
         // Handle error responses or non-array data
-        if (!tasksData || !Array.isArray(tasksData) || tasksData.error) return [];
+        if (!tasksData || !Array.isArray(tasksData) || tasksData.error) {
+            console.warn("⚠️ TasksTable: Invalid tasksData", { tasksData });
+            return [];
+        }
 
         // Helper to get due date - from activities or default to 1 day from task creation
         const getTaskDueDate = (task) => {

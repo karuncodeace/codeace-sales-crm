@@ -38,6 +38,10 @@ export async function GET(request) {
       .select("id")
       .eq("assigned_to", salesPersonId);
     
+    if (leadsError) {
+      console.error("Tasks API: Error fetching assigned leads:", leadsError);
+    }
+    
     const assignedLeadIds = assignedLeads?.map(lead => lead.id) || [];
     
     console.log("🔍 Tasks API: Fetching tasks for sales user", { 
@@ -45,12 +49,34 @@ export async function GET(request) {
       salesPersonId: salesPersonId,
       email: crmUser.email,
       assignedLeadIds: assignedLeadIds.length,
+      assignedLeadIds: assignedLeadIds,
       leadId: leadId || "all"
     });
     
     // Fetch tasks in two queries and combine:
     // 1. Tasks with sales_person_id = salesPersonId
-    // 2. Tasks for leads assigned to this salesperson
+    // 2. Tasks for leads assigned to this salesperson (even if task doesn't have sales_person_id)
+    // This ensures we get all tasks for the sales person, even if some tasks don't have sales_person_id set
+    
+    // Get all tasks for debugging and fallback filtering
+    const { data: allTasks } = await supabase
+      .from("tasks_table")
+      .select("id, title, sales_person_id, lead_id");
+    
+    // First, let's get a sample of all tasks to debug format matching
+    const sampleTasks = allTasks?.slice(0, 10) || [];
+    
+    console.log("🔍 Tasks API: Sample tasks from DB", {
+      sampleTasks: sampleTasks.map(t => ({ 
+        id: t.id, 
+        sales_person_id: t.sales_person_id, 
+        sales_person_id_type: typeof t.sales_person_id,
+        lead_id: t.lead_id 
+      })),
+      lookingForSalesPersonId: salesPersonId,
+      lookingForType: typeof salesPersonId
+    });
+    
     const [tasksBySalesperson, tasksByLeads] = await Promise.all([
       supabase
         .from("tasks_table")
@@ -63,6 +89,41 @@ export async function GET(request) {
             .in("lead_id", assignedLeadIds)
         : { data: [], error: null }
     ]);
+    
+    // Log detailed results for debugging
+    if (tasksBySalesperson.error) {
+      console.error("Tasks API: Error fetching tasks by sales_person_id:", tasksBySalesperson.error);
+    }
+    if (tasksByLeads.error) {
+      console.error("Tasks API: Error fetching tasks by leads:", tasksByLeads.error);
+    }
+    
+    // If no tasks found and we have assigned leads, log a warning
+    if ((!tasksBySalesperson.data || tasksBySalesperson.data.length === 0) && 
+        (!tasksByLeads.data || tasksByLeads.data.length === 0)) {
+      if (assignedLeadIds.length > 0) {
+        console.warn("⚠️ Tasks API: No tasks found for sales person despite having assigned leads", {
+          salesPersonId,
+          assignedLeadIds,
+          assignedLeadCount: assignedLeadIds.length
+        });
+      } else {
+        console.warn("⚠️ Tasks API: No tasks found - sales person has no assigned leads", {
+          salesPersonId,
+          userId: crmUser.id
+        });
+      }
+    }
+    
+    // Log query results for debugging
+    console.log("🔍 Tasks API: Query results", {
+      tasksBySalespersonCount: tasksBySalesperson.data?.length || 0,
+      tasksBySalespersonError: tasksBySalesperson.error?.message,
+      tasksByLeadsCount: tasksByLeads.data?.length || 0,
+      tasksByLeadsError: tasksByLeads.error?.message,
+      sampleTasksBySalesperson: tasksBySalesperson.data?.slice(0, 3).map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id })),
+      sampleTasksByLeads: tasksByLeads.data?.slice(0, 3).map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id }))
+    });
     
     // Combine results and remove duplicates
     const tasksById = new Map();
@@ -82,6 +143,32 @@ export async function GET(request) {
     // Convert map to array
     let combinedTasks = Array.from(tasksById.values());
     
+    // Fallback: If no tasks found but we have assigned leads, try a manual filter
+    // This handles cases where there might be type mismatches in the database query
+    if (combinedTasks.length === 0 && assignedLeadIds.length > 0 && allTasks) {
+      console.log("⚠️ Tasks API: No tasks found via queries, trying manual filter fallback");
+      const manualFiltered = allTasks.filter(task => {
+        const spMatch = task.sales_person_id === salesPersonId || 
+                       String(task.sales_person_id) === String(salesPersonId);
+        const leadMatch = assignedLeadIds.includes(task.lead_id);
+        return spMatch || leadMatch;
+      });
+      
+      if (manualFiltered.length > 0) {
+        console.log("✅ Tasks API: Found tasks via manual filter", { count: manualFiltered.length });
+        // Get full task data for manually filtered tasks
+        const manualTaskIds = manualFiltered.map(t => t.id);
+        const { data: fullManualTasks } = await supabase
+          .from("tasks_table")
+          .select("*")
+          .in("id", manualTaskIds);
+        
+        if (fullManualTasks && fullManualTasks.length > 0) {
+          combinedTasks = fullManualTasks;
+        }
+      }
+    }
+    
     // Filter by lead_id if provided
     if (leadId) {
       combinedTasks = combinedTasks.filter(task => task.lead_id === leadId);
@@ -97,26 +184,45 @@ export async function GET(request) {
     data = combinedTasks;
     error = tasksBySalesperson.error || tasksByLeads.error;
     
-    // For debugging
-    const { data: allTasks } = await supabase
-      .from("tasks_table")
-      .select("id, title, sales_person_id, lead_id");
-    
+    // For debugging - analyze all tasks to see what we're working with
     if (allTasks) {
+      // Check for exact matches and type comparisons
+      const exactMatches = allTasks.filter(t => t.sales_person_id === salesPersonId);
+      const stringMatches = allTasks.filter(t => String(t.sales_person_id) === String(salesPersonId));
+      const leadMatches = allTasks.filter(t => assignedLeadIds.includes(t.lead_id));
+      
       console.log("🔍 DEBUG: All tasks in database:", {
         totalTasks: allTasks?.length || 0,
         tasksWithSalesPersonId: allTasks?.filter(t => t.sales_person_id).length || 0,
         tasksForAssignedLeads: allTasks?.filter(t => assignedLeadIds.includes(t.lead_id)).length || 0,
         uniqueSalesPersonIds: [...new Set(allTasks?.map(t => t.sales_person_id).filter(Boolean))],
-        lookingFor: crmUser.id,
-        matchingTasks: allTasks?.filter(t => t.sales_person_id === crmUser.id || assignedLeadIds.includes(t.lead_id)).length || 0,
-        sampleTasks: allTasks?.slice(0, 5).map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id }))
+        lookingForSalesPersonId: salesPersonId,
+        lookingForType: typeof salesPersonId,
+        exactMatches: exactMatches.length,
+        stringMatches: stringMatches.length,
+        leadMatches: leadMatches.length,
+        matchingTasks: allTasks?.filter(t => {
+          const spMatch = t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId);
+          const leadMatch = assignedLeadIds.includes(t.lead_id);
+          return spMatch || leadMatch;
+        }).length || 0,
+        sampleTasks: allTasks?.slice(0, 10).map(t => ({ 
+          id: t.id, 
+          title: t.title, 
+          sales_person_id: t.sales_person_id, 
+          sales_person_id_type: typeof t.sales_person_id,
+          lead_id: t.lead_id,
+          matchesSalesPerson: t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId),
+          matchesLead: assignedLeadIds.includes(t.lead_id)
+        }))
       });
     }
     
-    console.log("✅ Tasks API: Query result", { 
+    console.log("✅ Tasks API: Final result for sales user", { 
       dataCount: data?.length || 0, 
-      returnedTaskIds: data?.map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id })) || []
+      returnedTaskIds: data?.map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id })) || [],
+      assignedLeadIdsCount: assignedLeadIds.length,
+      hasError: !!error
     });
   } else {
     // Admin: use filtered query (which returns all tasks)
@@ -149,16 +255,22 @@ export async function GET(request) {
     return Response.json([]);
   }
 
-  console.log("✅ Tasks API: Query result", { 
-    dataCount: data?.length || 0, 
-    returnedTaskIds: data?.map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id })) || []
-  });
-
   // Handle null or undefined data
   if (!data || !Array.isArray(data)) {
     console.warn("Tasks API: No data returned or data is not an array");
     return Response.json([]);
   }
+
+  // Final logging before returning
+  console.log("✅ Tasks API: Returning response", {
+    dataCount: data.length,
+    firstFewTasks: data.slice(0, 3).map(t => ({ 
+      id: t.id, 
+      title: t.title, 
+      sales_person_id: t.sales_person_id,
+      lead_id: t.lead_id 
+    }))
+  });
 
   return Response.json(data || []);
 }

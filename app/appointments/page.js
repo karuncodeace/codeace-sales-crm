@@ -4,52 +4,79 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
-import { Calendar, Clock, User, Mail, MapPin, Video, ExternalLink, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X } from "lucide-react";
+import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
-import { CAL_BASE_URL } from "../../config/calConfig";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-export default function AppointmentsPage() {
+export default function BookingsPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [statusFilter, setStatusFilter] = useState("booked");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch all appointments (no status filter on server)
-  const { data: appointments, error, isLoading, mutate } = useSWR(
-    `/api/appointments`,
+  // Fetch all bookings (no status filter on server)
+  const { data: bookings, error, isLoading, mutate } = useSWR(
+    `/api/bookings`,
     fetcher,
     {
       refreshInterval: 30000, // Refresh every 30 seconds
     }
   );
 
-  // Normalize appointments to array to avoid runtime errors
-  const appointmentsList = Array.isArray(appointments) ? appointments : [];
+  // Normalize bookings to array to avoid runtime errors
+  const bookingsList = Array.isArray(bookings) ? bookings : [];
+
+  // Debug: Log bookings data
+  React.useEffect(() => {
+    if (bookings) {
+      console.log("📊 Bookings data received:", {
+        totalCount: bookingsList.length,
+        bookings: bookingsList.map(b => ({ 
+          id: b.id, 
+          status: b.status, 
+          invitee_name: b.invitee_name 
+        }))
+      });
+    }
+  }, [bookings, bookingsList]);
+
+  // Map booking status to display status (bookings use "scheduled", appointments use "booked")
+  // Check is_rescheduled flag to detect rescheduled bookings
+  const getDisplayStatus = (booking) => {
+    if (booking.is_rescheduled) return "rescheduled";
+    if (booking.status === "scheduled") return "booked";
+    return booking.status || "unknown";
+  };
 
   // Calculate counts for each status
   const statusCounts = {
-    all: appointmentsList.length,
-    booked: appointmentsList.filter((apt) => apt.status === "booked").length,
-    rescheduled: appointmentsList.filter((apt) => apt.status === "rescheduled").length,
-    cancelled: appointmentsList.filter((apt) => apt.status === "cancelled").length,
+    all: bookingsList.length,
+    booked: bookingsList.filter((booking) => getDisplayStatus(booking) === "booked").length,
+    rescheduled: bookingsList.filter((booking) => getDisplayStatus(booking) === "rescheduled").length,
+    cancelled: bookingsList.filter((booking) => getDisplayStatus(booking) === "cancelled").length,
   };
 
-  // Filter and sort appointments based on status
-  const filteredAppointments = React.useMemo(() => {
-    let filtered = appointmentsList;
+  // Filter and sort bookings based on status
+  const filteredBookings = React.useMemo(() => {
+    let filtered = bookingsList;
     
     // Filter by status if not "all"
     if (statusFilter !== "all") {
-      filtered = filtered.filter((apt) => apt.status === statusFilter);
+      filtered = filtered.filter((booking) => {
+        const displayStatus = getDisplayStatus(booking);
+        return displayStatus === statusFilter;
+      });
     } else {
-      // When "all" is selected, sort so booked appointments appear first
+      // When "all" is selected, sort so scheduled/booked bookings appear first
       filtered = [...filtered].sort((a, b) => {
-        if (a.status === "booked" && b.status !== "booked") return -1;
-        if (a.status !== "booked" && b.status === "booked") return 1;
+        const aStatus = getDisplayStatus(a);
+        const bStatus = getDisplayStatus(b);
+        if (aStatus === "booked" && bStatus !== "booked") return -1;
+        if (aStatus !== "booked" && bStatus === "booked") return 1;
         // For same status, sort by start_time (most recent first)
         const aTime = a.start_time ? new Date(a.start_time).getTime() : 0;
         const bTime = b.start_time ? new Date(b.start_time).getTime() : 0;
@@ -58,7 +85,7 @@ export default function AppointmentsPage() {
     }
     
     return filtered;
-  }, [appointmentsList, statusFilter]);
+  }, [bookingsList, statusFilter]);
 
   // Format date and time
   const formatDateTime = (dateString) => {
@@ -76,23 +103,6 @@ export default function AppointmentsPage() {
     }
   };
 
-  // Format join URL to use self-hosted Cal.com base URL if needed
-  const formatJoinUrl = (joinUrl) => {
-    if (!joinUrl) return null;
-    
-    // If it's already a full URL, return as is
-    if (joinUrl.startsWith("http://") || joinUrl.startsWith("https://")) {
-      return joinUrl;
-    }
-    
-    // If it's a relative URL or just a path, prepend self-hosted base URL
-    if (joinUrl.startsWith("/")) {
-      return `${CAL_BASE_URL}${joinUrl}`;
-    }
-    
-    // If it doesn't start with /, assume it's a full path and prepend base URL
-    return `${CAL_BASE_URL}/${joinUrl}`;
-  };
 
   // Get status badge styling
   const getStatusBadge = (status) => {
@@ -123,43 +133,41 @@ export default function AppointmentsPage() {
     }
   };
 
-  // Handle cancel appointment
-  const handleCancel = async (appointment) => {
-    if (!confirm(`Are you sure you want to cancel the meeting with ${appointment.lead_name || appointment.attendee_name || "this lead"}?`)) {
+  // Handle cancel booking
+  const handleCancel = async (booking) => {
+    if (!confirm(`Are you sure you want to cancel the meeting with ${booking.invitee_name || "this invitee"}?`)) {
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Call Cal.com cancel API first, then update database
-      const response = await fetch(`/api/cal-appointments/cancel`, {
-        method: "POST",
+      const response = await fetch(`/api/bookings/cancel`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          appointment_id: appointment.id,
-          cal_event_id: appointment.cal_event_id 
+          bookingId: booking.id
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to cancel appointment");
+        throw new Error(result.error || "Failed to cancel booking");
       }
 
-      // Refresh appointments list
+      // Refresh bookings list
       mutate();
-      alert("Appointment cancelled successfully!");
+      alert("Booking cancelled successfully!");
     } catch (error) {
-      console.error("Error cancelling appointment:", error);
-      alert(error.message || "Failed to cancel appointment. Please try again.");
+      console.error("Error cancelling booking:", error);
+      alert(error.message || "Failed to cancel booking. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Handle reschedule appointment
-  const handleReschedule = async (appointment, newStartTime, newEndTime) => {
+  // Handle reschedule booking
+  const handleReschedule = async (booking, newStartTime, newEndTime) => {
     if (!newStartTime || !newEndTime) {
       alert("Please select both start and end times");
       return;
@@ -167,31 +175,33 @@ export default function AppointmentsPage() {
 
     setIsProcessing(true);
     try {
-      // Call Cal.com reschedule API first, then update database
-      const response = await fetch(`/api/cal-appointments/reschedule`, {
-        method: "POST",
+      // Get timezone from booking or use user's timezone
+      const timezone = booking.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const response = await fetch(`/api/bookings/reschedule`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          appointment_id: appointment.id,
-          cal_event_id: appointment.cal_event_id,
-          start_time: newStartTime,
-          end_time: newEndTime,
+          bookingId: booking.id,
+          start: newStartTime,
+          end: newEndTime,
+          timezone: timezone,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to reschedule appointment");
+        throw new Error(result.error || "Failed to reschedule booking");
       }
 
-      // Refresh appointments list
+      // Refresh bookings list
       mutate();
       setRescheduleModal({ isOpen: false, appointment: null });
-      alert("Appointment rescheduled successfully!");
+      alert("Booking rescheduled successfully!");
     } catch (error) {
-      console.error("Error rescheduling appointment:", error);
-      alert(error.message || "Failed to reschedule appointment. Please try again.");
+      console.error("Error rescheduling booking:", error);
+      alert(error.message || "Failed to reschedule booking. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -203,10 +213,10 @@ export default function AppointmentsPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-            Appointments
+            Bookings
           </h1>
           <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            View and manage all your booked meetings
+            View and manage all your bookings
           </p>
         </div>
 
@@ -217,7 +227,7 @@ export default function AppointmentsPage() {
             Filter by Status:
           </span>
           <div className="flex gap-2">
-            {["booked", "rescheduled", "cancelled"].map((status) => (
+            {["all", "booked", "rescheduled", "cancelled"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -248,10 +258,47 @@ export default function AppointmentsPage() {
               </button>
             ))}
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
             <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              Showing: {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? "s" : ""}
+              Showing: {filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""}
             </span>
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                setIsRefreshing(true);
+                try {
+                  await mutate();
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+              disabled={isRefreshing}
+              className={`inline-flex items-center justify-center rounded-lg border p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
+                isDark
+                  ? "border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                  : "border-gray-200 text-gray-700 hover:bg-gray-100"
+              }`}
+              aria-label="Refresh bookings table"
+              title="Refresh table"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                color="currentColor"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`${isRefreshing ? "animate-spin" : ""}`}
+              >
+                <path d="M20.4879 15C19.2524 18.4956 15.9187 21 12 21C7.02943 21 3 16.9706 3 12C3 7.02943 7.02943 3 12 3C15.7292 3 18.9286 5.26806 20.2941 8.5" />
+                <path d="M15 9H18C19.4142 9 20.1213 9 20.5607 8.56066C21 8.12132 21 7.41421 21 6V3" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -261,7 +308,7 @@ export default function AppointmentsPage() {
             <div className="text-center">
               <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDark ? "border-orange-500" : "border-orange-600"}`}></div>
               <p className={`mt-4 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                Loading appointments...
+                Loading bookings...
               </p>
             </div>
           </div>
@@ -270,32 +317,33 @@ export default function AppointmentsPage() {
         {/* Error State */}
         {error && (
           <div className={`p-4 rounded-lg ${isDark ? "bg-red-900/20 text-red-400" : "bg-red-50 text-red-600"}`}>
-            <p className="text-sm font-medium">Error loading appointments: {error.message || "Unknown error"}</p>
+            <p className="text-sm font-medium">Error loading bookings: {error.message || "Unknown error"}</p>
           </div>
         )}
 
-        {/* Appointments List */}
+        {/* Bookings List */}
         {!isLoading && !error && (
           <div>
-            {filteredAppointments.length === 0 ? (
+            {filteredBookings.length === 0 ? (
               <div className={`text-center py-12 rounded-lg ${isDark ? "bg-[#262626]" : "bg-white"}`}>
                 <Calendar className={`w-12 h-12 mx-auto mb-4 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
                 <p className={`text-lg font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  No appointments found
+                  No bookings found
                 </p>
                 <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                  {statusFilter !== "all" ? `No ${statusFilter} appointments.` : "You don't have any appointments yet."}
+                  {statusFilter !== "all" ? `No ${statusFilter} bookings.` : "You don't have any bookings yet."}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAppointments.map((appointment) => {
-                  const startTime = formatDateTime(appointment.start_time);
-                  const endTime = formatDateTime(appointment.end_time);
+                {filteredBookings.map((booking) => {
+                  const startTime = formatDateTime(booking.start_time);
+                  const endTime = formatDateTime(booking.end_time);
+                  const displayStatus = getDisplayStatus(booking);
 
                   return (
                     <div
-                      key={appointment.id}
+                      key={booking.id}
                       className={`p-6 rounded-lg border transition-all hover:shadow-lg ${
                         isDark
                           ? "bg-[#262626] border-gray-700 hover:border-gray-600"
@@ -312,15 +360,15 @@ export default function AppointmentsPage() {
                             </div>
                             <div>
                               <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                                {appointment.title?.trim().slice(0,50) + (appointment.title?.length > 50 ? "..." : "") || "Meeting"}
+                                Booking
                               </h3>
                             </div>
                           </div>
                           {/* Status Badge */}
                           <div className="flex items-center gap-2">
-                            {getStatusIcon(appointment.status)}
-                            <span className={getStatusBadge(appointment.status)}>
-                              {appointment.status?.charAt(0).toUpperCase() + appointment.status?.slice(1) || "Unknown"}
+                            
+                            <span className={getStatusBadge(displayStatus)}>
+                              {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1) || "Unknown"}
                             </span>
                           </div>
                         </div>
@@ -343,82 +391,49 @@ export default function AppointmentsPage() {
                             </div>
                           </div>
 
-                          {/* Lead Information */}
-                          {appointment.lead_name && (
-                            <div className="flex items-start gap-3">
+                          {/* Invitee Information */}
+                          {(booking.invitee_name || booking.invitee_email) && (
+                            <div className="flex flex-col  gap-3">
+                              <div className="flex items-center gap-3">
                               <User className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
-                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                                  Lead
-                                </p>
-                                <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                                  {appointment.lead_name}
-                                </p>
-                                {appointment.lead_id && (
-                                  <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                                    ID: {appointment.lead_id}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
 
-                          {/* Attendee Information */}
-                          {(appointment.attendee_name || appointment.attendee_email) && (
-                            <div className="flex items-start gap-3">
-                              <Mail className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
-                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                                  Attendee
-                                </p>
-                                {appointment.attendee_name && (
+                                {booking.invitee_name && (
                                   <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                                    {appointment.attendee_name}
+                                    {booking.invitee_name}
                                   </p>
                                 )}
-                                {appointment.attendee_email && (
-                                  <p className={`text-xs ${appointment.attendee_name ? "mt-1" : ""} ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                                    {appointment.attendee_email}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Location */}
-                          {appointment.location && (
-                            <div className="flex items-start gap-3">
-                              <MapPin className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
-                                <p className={`text-xs font-medium mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                                  Location
-                                </p>
-                                <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                                  {appointment.location}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        
-
-                          {/* Join URL */}
-                          {appointment.join_url && (
-                            <div className="flex items-start gap-3">
-                              <Video className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                              <div>
                                 
-                                <a
-                                  href={formatJoinUrl(appointment.join_url)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`text-sm flex items-center gap-1 hover:underline ${
-                                    isDark ? "text-orange-400" : "text-orange-600"
-                                  }`}
-                                >
-                                  Join Meeting
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
+                               
                               </div>
+                              <div className="flex items-center gap-3">
+                              <Mail className={`w-5 h-5 mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
+
+                                {booking.invitee_email && (
+                                  <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                                    {booking.invitee_email}
+                                  </p>
+                                )}
+                                
+                               
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Meeting Link */}
+                          {booking.meeting_link && (
+                            <div className="flex items-center gap-3">
+                              <Video className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+                              <a
+                                href={booking.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-sm flex items-center gap-1 hover:underline ${
+                                  isDark ? "text-orange-400" : "text-orange-600"
+                                }`}
+                              >
+                                Join the meet
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
                             </div>
                           )}
                         </div>
@@ -426,12 +441,12 @@ export default function AppointmentsPage() {
                     </div>
 
                       {/* Action Buttons */}
-                      {appointment.status !== "cancelled" && (
-                        <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                      {booking.status === "scheduled" && (
+                        <div className={`mt-4 pt-4 flex justify-end ${isDark ? "border-gray-700" : "border-gray-200"}`}>
                           <div className="flex  gap-2">
                             <button
                               type="button"
-                              onClick={() => setRescheduleModal({ isOpen: true, appointment })}
+                              onClick={() => setRescheduleModal({ isOpen: true, appointment: booking })}
                               disabled={isProcessing}
                               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                 isDark
@@ -444,7 +459,7 @@ export default function AppointmentsPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleCancel(appointment)}
+                              onClick={() => handleCancel(booking)}
                               disabled={isProcessing}
                               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                 isDark
@@ -461,30 +476,23 @@ export default function AppointmentsPage() {
 
                       {/* Footer - Metadata */}
                       <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                        <div className="flex flex-col gap-2 text-xs">
-                          {appointment.cal_event_id && (
+                        <div className="flex justify-between text-xs">
+                          {booking.id  && (
                             <div className="flex items-center gap-2">
-                              <span className={isDark ? "text-gray-400" : "text-gray-500"}>Event ID:</span>
-                              <span className={isDark ? "text-gray-300" : "text-gray-700"}>{appointment.cal_event_id}</span>
+                              <span className={isDark ? "text-gray-400" : "text-gray-500"}>Booking ID:</span>
+                              <span className={isDark ? "text-gray-300" : "text-gray-700"}>{booking.id}</span>
                             </div>
                           )}
                           <div className="flex items-center gap-4">
-                            {appointment.created_at && (
+                            {booking.created_at && (
                               <div className="flex items-center gap-2">
                                 <span className={isDark ? "text-gray-400" : "text-gray-500"}>Created:</span>
                                 <span className={isDark ? "text-gray-300" : "text-gray-700"}>
-                                  {formatDateTime(appointment.created_at).date}
+                                  {formatDateTime(booking.created_at).date}
                                 </span>
                               </div>
                             )}
-                            {appointment.updated_at && appointment.updated_at !== appointment.created_at && (
-                              <div className="flex items-center gap-2">
-                                <span className={isDark ? "text-gray-400" : "text-gray-500"}>Updated:</span>
-                                <span className={isDark ? "text-gray-300" : "text-gray-700"}>
-                                  {formatDateTime(appointment.updated_at).date}
-                                </span>
-                              </div>
-                            )}
+                           
                           </div>
                         </div>
                       </div>
@@ -554,7 +562,7 @@ function RescheduleModal({ appointment, onClose, onReschedule, isDark, isProcess
             Reschedule Meeting
           </h2>
           <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            Select new date and time for the meeting with {appointment.lead_name || appointment.attendee_name || "this lead"}
+            Select new date and time for the meeting with {appointment.invitee_name || "this invitee"}
           </p>
         </div>
 
