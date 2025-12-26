@@ -59,10 +59,10 @@ export async function GET(request) {
     // This ensures we get all tasks for the sales person, even if some tasks don't have sales_person_id set
     
     // Get all tasks for debugging and fallback filtering
-    // Try with regular client first
+    // Try with regular client first - include status to verify pending tasks exist
     let { data: allTasks, error: allTasksError } = await supabase
       .from("tasks_table")
-      .select("id, title, sales_person_id, lead_id");
+      .select("id, title, sales_person_id, lead_id, status");
     
     // If no tasks found, try with admin client to check if it's an RLS issue
     if ((!allTasks || allTasks.length === 0) && !allTasksError) {
@@ -70,7 +70,7 @@ export async function GET(request) {
       const adminClient = supabaseAdmin();
       const { data: adminTasks, error: adminError } = await adminClient
         .from("tasks_table")
-        .select("id, title, sales_person_id, lead_id")
+        .select("id, title, sales_person_id, lead_id, status")
         .limit(10);
       
       if (adminTasks && adminTasks.length > 0) {
@@ -99,7 +99,8 @@ export async function GET(request) {
         id: t.id, 
         sales_person_id: t.sales_person_id, 
         sales_person_id_type: typeof t.sales_person_id,
-        lead_id: t.lead_id 
+        lead_id: t.lead_id,
+        status: t.status
       })),
       lookingForSalesPersonId: salesPersonId,
       lookingForType: typeof salesPersonId
@@ -107,14 +108,21 @@ export async function GET(request) {
     
     // If we still have no tasks, try a direct count query to verify table access
     if (!allTasks || allTasks.length === 0) {
-      const { count, error: countError } = await supabase
+      const { count: totalCount, error: totalCountError } = await supabase
         .from("tasks_table")
         .select("*", { count: "exact", head: true });
       
+      const { count: pendingCount, error: pendingCountError } = await supabase
+        .from("tasks_table")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "Pending");
+      
       console.log("🔍 Tasks API: Direct count query", {
-        count,
-        countError: countError?.message,
-        hasRLSError: countError?.code === "PGRST116" || countError?.message?.includes("permission")
+        totalCount,
+        pendingCount,
+        totalCountError: totalCountError?.message,
+        pendingCountError: pendingCountError?.message,
+        hasRLSError: totalCountError?.code === "PGRST116" || totalCountError?.message?.includes("permission")
       });
     }
     
@@ -132,16 +140,30 @@ export async function GET(request) {
       queryClient = adminClient;
     }
     
+    // First, let's check what status values actually exist in the database
+    const { data: statusCheck } = await queryClient
+      .from("tasks_table")
+      .select("status")
+      .limit(100);
+    
+    const uniqueStatuses = [...new Set(statusCheck?.map(t => t.status).filter(Boolean))];
+    console.log("🔍 Tasks API: Status values in database", {
+      uniqueStatuses,
+      sampleStatuses: statusCheck?.slice(0, 10).map(t => t.status)
+    });
+    
     const [tasksBySalesperson, tasksByLeads] = await Promise.all([
       queryClient
         .from("tasks_table")
         .select("*")
-        .eq("sales_person_id", salesPersonId),
+        .eq("sales_person_id", salesPersonId)
+        .eq("status", "Pending"),
       assignedLeadIds.length > 0
         ? queryClient
             .from("tasks_table")
             .select("*")
             .in("lead_id", assignedLeadIds)
+            .eq("status", "Pending")
         : { data: [], error: null }
     ]);
     
@@ -211,12 +233,13 @@ export async function GET(request) {
       
       if (manualFiltered.length > 0) {
         console.log("✅ Tasks API: Found tasks via manual filter", { count: manualFiltered.length });
-        // Get full task data for manually filtered tasks
+        // Get full task data for manually filtered tasks - only pending tasks
         const manualTaskIds = manualFiltered.map(t => t.id);
-        const { data: fullManualTasks } = await supabase
+        const { data: fullManualTasks } = await queryClient
           .from("tasks_table")
           .select("*")
-          .in("id", manualTaskIds);
+          .in("id", manualTaskIds)
+          .eq("status", "Pending");
         
         if (fullManualTasks && fullManualTasks.length > 0) {
           combinedTasks = fullManualTasks;
@@ -246,16 +269,26 @@ export async function GET(request) {
       const stringMatches = allTasks.filter(t => String(t.sales_person_id) === String(salesPersonId));
       const leadMatches = allTasks.filter(t => assignedLeadIds.includes(t.lead_id));
       
+      const pendingTasks = allTasks?.filter(t => t.status === "Pending") || [];
       console.log("🔍 DEBUG: All tasks in database:", {
         totalTasks: allTasks?.length || 0,
+        pendingTasks: pendingTasks.length,
         tasksWithSalesPersonId: allTasks?.filter(t => t.sales_person_id).length || 0,
+        pendingTasksWithSalesPersonId: pendingTasks.filter(t => t.sales_person_id).length || 0,
         tasksForAssignedLeads: allTasks?.filter(t => assignedLeadIds.includes(t.lead_id)).length || 0,
+        pendingTasksForAssignedLeads: pendingTasks.filter(t => assignedLeadIds.includes(t.lead_id)).length || 0,
+        uniqueStatuses: [...new Set(allTasks?.map(t => t.status).filter(Boolean))],
         uniqueSalesPersonIds: [...new Set(allTasks?.map(t => t.sales_person_id).filter(Boolean))],
         lookingForSalesPersonId: salesPersonId,
         lookingForType: typeof salesPersonId,
         exactMatches: exactMatches.length,
         stringMatches: stringMatches.length,
         leadMatches: leadMatches.length,
+        matchingPendingTasks: pendingTasks.filter(t => {
+          const spMatch = t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId);
+          const leadMatch = assignedLeadIds.includes(t.lead_id);
+          return spMatch || leadMatch;
+        }).length || 0,
         matchingTasks: allTasks?.filter(t => {
           const spMatch = t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId);
           const leadMatch = assignedLeadIds.includes(t.lead_id);
@@ -267,6 +300,8 @@ export async function GET(request) {
           sales_person_id: t.sales_person_id, 
           sales_person_id_type: typeof t.sales_person_id,
           lead_id: t.lead_id,
+          status: t.status,
+          isPending: t.status === "Pending",
           matchesSalesPerson: t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId),
           matchesLead: assignedLeadIds.includes(t.lead_id)
         }))
@@ -288,6 +323,9 @@ export async function GET(request) {
       email: crmUser.email,
       leadId: leadId || "all"
     });
+    
+    // Filter by status = 'Pending' to show only pending tasks
+    query = query.eq("status", "Pending");
     
     // Filter by lead_id if provided
     if (leadId) {
