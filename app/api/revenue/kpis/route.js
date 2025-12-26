@@ -31,8 +31,27 @@ export async function GET(request) {
       endDate = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
     } else if (periodType === "quarterly" && quarter) {
       const q = parseInt(quarter);
-      const startMonth = (q - 1) * 3;
-      const endMonth = startMonth + 2;
+      let startMonth, endMonth;
+      
+      // Custom quarter definition:
+      // Q1: April, May, June (months 3-5)
+      // Q2: July, August, September (months 6-8)
+      // Q3: October, November, December (months 9-11)
+      // Q4: January, February, March (months 0-2)
+      if (q === 1) {
+        startMonth = 3; // April
+        endMonth = 5;   // June
+      } else if (q === 2) {
+        startMonth = 6; // July
+        endMonth = 8;   // September
+      } else if (q === 3) {
+        startMonth = 9; // October
+        endMonth = 11;  // December
+      } else if (q === 4) {
+        startMonth = 0; // January
+        endMonth = 2;   // March
+      }
+      
       startDate = new Date(currentYear, startMonth, 1);
       endDate = new Date(currentYear, endMonth + 1, 0, 23, 59, 59, 999);
     } else {
@@ -42,18 +61,39 @@ export async function GET(request) {
       startDate.setDate(startDate.getDate() - 7);
     }
 
-    // Fetch targets
-    let periodId = `${periodType}_${currentYear}`;
+    // Calculate period_start to match with sales_targets
+    let periodStart;
     if (periodType === "monthly") {
-      periodId += `_${month}`;
+      const currentMonth = parseInt(month);
+      periodStart = new Date(currentYear, currentMonth - 1, 1).toISOString().split("T")[0];
     } else if (periodType === "quarterly" && quarter) {
-      periodId += `_Q${quarter}`;
+      const q = parseInt(quarter);
+      let startMonth;
+      
+      // Custom quarter definition (same as in TargetSetupPanel):
+      // Q1: April (month 3), Q2: July (month 6), Q3: October (month 9), Q4: January (month 0)
+      if (q === 1) {
+        startMonth = 3; // April
+      } else if (q === 2) {
+        startMonth = 6; // July
+      } else if (q === 3) {
+        startMonth = 9; // October
+      } else if (q === 4) {
+        startMonth = 0; // January
+      }
+      
+      periodStart = new Date(currentYear, startMonth, 1).toISOString().split("T")[0];
+    } else {
+      // Weekly - use start of the week
+      periodStart = startDate.toISOString().split("T")[0];
     }
 
+    // Fetch targets from sales_targets table
     const { data: targetData } = await supabase
-      .from("revenue_targets")
+      .from("sales_targets")
       .select("*")
-      .eq("period_id", periodId)
+      .eq("period_type", periodType)
+      .eq("period_start", periodStart)
       .maybeSingle();
 
     const targets = targetData || {

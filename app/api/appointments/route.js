@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
+import { updateDailyMetrics } from "../../../lib/sales-metrics/updateMetrics";
 
 // Get all appointments from the table (no role-based filtering)
 export async function GET() {
@@ -120,6 +121,13 @@ export async function POST(request) {
         { error: error.message || "Failed to create appointment" },
         { status: 500 }
       );
+    }
+
+    // Update daily metrics: Meeting scheduled/completed → increment meetings
+    // Count when status is "booked" or "completed"
+    const appointmentStatus = (payload.status || "").toLowerCase();
+    if (appointmentStatus === "booked" || appointmentStatus === "completed") {
+      await updateDailyMetrics({ meetings: 1 });
     }
 
     return NextResponse.json(data, { status: 201 });

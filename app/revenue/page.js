@@ -16,7 +16,18 @@ export default function RevenuePage() {
   const [periodType, setPeriodType] = useState("monthly");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedQuarter, setSelectedQuarter] = useState(Math.floor((new Date().getMonth() + 3) / 3));
+  
+  // Calculate current quarter based on custom definition
+  // Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar
+  const getCurrentQuarter = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11
+    if (currentMonth >= 3 && currentMonth <= 5) return 1; // Apr-Jun
+    if (currentMonth >= 6 && currentMonth <= 8) return 2; // Jul-Sep
+    if (currentMonth >= 9 && currentMonth <= 11) return 3; // Oct-Dec
+    return 4; // Jan-Mar
+  };
+  const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarter());
 
   // Check user role on mount
   useEffect(() => {
@@ -89,7 +100,7 @@ export default function RevenuePage() {
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
           selectedQuarter={selectedQuarter}
-          onPeriodChange={(type, year, month, quarter) => {
+          onPeriodChange={(type, year, month, quarter, weekStartDate) => {
             setPeriodType(type);
             setSelectedYear(year);
             setSelectedMonth(month);
@@ -105,6 +116,12 @@ export default function RevenuePage() {
           year={selectedYear}
           month={selectedMonth}
           quarter={selectedQuarter}
+          onPeriodChange={(type, year, month, quarter, weekStartDate) => {
+            setPeriodType(type);
+            setSelectedYear(year);
+            setSelectedMonth(month);
+            setSelectedQuarter(quarter);
+          }}
         />
       </div>
 

@@ -12,16 +12,11 @@ export default function DonutChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // Fallback data for immediate display
+  // Fallback data for immediate display (empty state)
   const fallbackData = {
-    series: [48, 26, 16, 10],
-    labels: [
-      "Inbound Marketing",
-      "Outbound Prospects",
-      "Partner Referrals",
-      "Field Events",
-    ],
-    total: 2480
+    series: [],
+    labels: [],
+    total: 0
   };
 
   // Fetch data using SWR with fallback for instant display
@@ -43,7 +38,7 @@ export default function DonutChart() {
       title: "Lead Source Breakdown",
       subtitle: "Share of total Leads by acquisition channel",
       height: 350,
-      series: data.series || [48, 26, 16, 10],
+      series: data.series || [],
       options: {
         chart: {
           type: "donut",
@@ -51,12 +46,7 @@ export default function DonutChart() {
           background: "transparent",
         },
 
-        labels: data.labels || [
-          "Inbound Marketing",
-          "Outbound Prospects",
-          "Partner Referrals",
-          "Field Events",
-        ],
+        labels: data.labels || [],
 
         // 🎨 Colors mode-wise (vibrant in light, deeper tone in dark)
         colors: isDark
@@ -116,7 +106,7 @@ export default function DonutChart() {
                   label: "Total Leads",
                   color: isDark ? "#E2E8F0" : "#0f172a",
                   formatter() {
-                    return data.total?.toLocaleString() || "2,480";
+                    return data.total?.toLocaleString() || "0";
                   },
                 },
                 value: {
@@ -166,7 +156,32 @@ export default function DonutChart() {
     );
   }
 
-  // No loading state needed - fallbackData ensures we always have data
+  // Show empty state if no data
+  if (!data || !data.series || data.series.length === 0 || data.total === 0) {
+    return (
+      <div
+        className={`rounded-2xl p-5 border ${
+          isDark
+            ? "bg-[#262626] border-gray-700 text-gray-300"
+            : "bg-white border-gray-200"
+        }`}
+      >
+        <div className="mb-4">
+          <h3 className={`text-lg md:text-base 2xl:text-lg font-semibold ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+            Lead Source Breakdown
+          </h3>
+          <p className={`text-sm md:text-xs 2xl:text-sm ${isDark ? "text-gray-400" : "text-gray-500/80"}`}>
+            Share of total Leads by acquisition channel
+          </p>
+        </div>
+        <div className="h-[430px] md:h-[300px] 2xl:h-[410px] flex items-center justify-center">
+          <p className={`${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            No lead source data available
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

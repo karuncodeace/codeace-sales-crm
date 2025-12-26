@@ -12,12 +12,12 @@ export default function SalesPersonComparisonChart() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // Fallback data for immediate display
+  // Fallback data for immediate display (empty state)
   const fallbackData = {
-    calls: [145, 132, 168],
-    meetings: [32, 28, 45],
-    conversions: [18, 15, 24],
-    salesPersons: ["Sarah", "John", "Emily"]
+    calls: [],
+    meetings: [],
+    conversions: [],
+    salesPersons: []
   };
 
   // Fetch data using SWR with fallback for instant display
@@ -194,7 +194,40 @@ export default function SalesPersonComparisonChart() {
     );
   }
 
-  // No loading state needed - fallbackData ensures we always have data
+  // Show empty state if no data
+  if (!data || !data.salesPersons || data.salesPersons.length === 0) {
+    return (
+      <div
+        className={`rounded-2xl p-5 border ${
+          isDark
+            ? "bg-[#262626] border-gray-700 text-gray-300"
+            : "bg-white border-gray-200"
+        }`}
+      >
+        <div className="mb-4">
+          <h3
+            className={`text-lg font-semibold ${
+              isDark ? "text-gray-200" : "text-gray-900"
+            }`}
+          >
+            Sales Person Performance
+          </h3>
+          <p
+            className={`text-sm ${
+              isDark ? "text-gray-400" : "text-gray-500/70"
+            }`}
+          >
+            Activity and results by sales person
+          </p>
+        </div>
+        <div className="h-[400px] flex items-center justify-center">
+          <p className={`${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            No sales person data available
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

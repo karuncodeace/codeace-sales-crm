@@ -540,6 +540,22 @@ export async function PATCH(request) {
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
+  // Update daily metrics: Task completed → increment calls or meetings based on type
+  if (status !== undefined && String(status).toLowerCase() === "completed") {
+    const previousStatus = existingTask?.status;
+    // Only increment if transitioning TO completed (not from completed)
+    if (previousStatus && String(previousStatus).toLowerCase() !== "completed") {
+      const taskType = (type || existingTask?.type || "").toLowerCase();
+      if (taskType === "call" || taskType === "follow-up") {
+        // Call completed: increment calls
+        await updateDailyMetrics({ calls: 1 });
+      } else if (taskType === "meeting") {
+        // Meeting completed: increment meetings
+        await updateDailyMetrics({ meetings: 1 });
+      }
+    }
+  }
+
   return Response.json({ success: true, task: data?.[0] || data });
 }
 

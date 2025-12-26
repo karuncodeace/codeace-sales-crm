@@ -5,14 +5,71 @@ import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { fetcher } from "@/lib/swr/fetcher";
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, Phone, Calendar, FileText, CheckCircle } from "lucide-react";
+import PeriodFilter from "./PeriodFilter";
 
-export default function RevenueKPICards({ periodType, year, month, quarter }) {
+export default function RevenueKPICards({ periodType, year, month, quarter, onPeriodChange }) {
   const { theme } = useTheme();
 
-  // Build API URL with query params
+  // Helper function to format date as YYYY-MM-DD without timezone issues
+  const formatDateLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Calculate period_start and period_end based on period type
+  const { periodStart, periodEnd } = useMemo(() => {
+    const currentYear = parseInt(year);
+    let start, end;
+    
+    if (periodType === "monthly") {
+      const currentMonth = parseInt(month);
+      start = formatDateLocal(new Date(currentYear, currentMonth - 1, 1));
+      end = formatDateLocal(new Date(currentYear, currentMonth, 0));
+    } else if (periodType === "quarterly") {
+      const q = parseInt(quarter);
+      let startMonth, endMonth;
+      
+      // Custom quarter definition:
+      // Q1: April, May, June (months 3-5)
+      // Q2: July, August, September (months 6-8)
+      // Q3: October, November, December (months 9-11)
+      // Q4: January, February, March (months 0-2)
+      if (q === 1) {
+        startMonth = 3; // April
+        endMonth = 5;   // June
+      } else if (q === 2) {
+        startMonth = 6; // July
+        endMonth = 8;   // September
+      } else if (q === 3) {
+        startMonth = 9; // October
+        endMonth = 11;  // December
+      } else if (q === 4) {
+        startMonth = 0; // January
+        endMonth = 2;   // March
+      }
+      
+      start = formatDateLocal(new Date(currentYear, startMonth, 1));
+      end = formatDateLocal(new Date(currentYear, endMonth + 1, 0));
+    } else {
+      // Weekly - last 7 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      start = formatDateLocal(startDate);
+      end = formatDateLocal(endDate);
+    }
+    
+    return { periodStart: start, periodEnd: end };
+  }, [periodType, year, month, quarter]);
+
+  // Build API URL with query params for target-achievement endpoint
   const apiUrl = useMemo(() => {
     const params = new URLSearchParams({
-      periodType,
+      period_type: periodType,
+      period_start: periodStart,
+      period_end: periodEnd,
       year: year.toString(),
     });
     if (periodType === "monthly") {
@@ -20,8 +77,8 @@ export default function RevenueKPICards({ periodType, year, month, quarter }) {
     } else if (periodType === "quarterly") {
       params.append("quarter", quarter.toString());
     }
-    return `/api/revenue/kpis?${params}`;
-  }, [periodType, year, month, quarter]);
+    return `/api/admin/target-achievement?${params}`;
+  }, [periodType, periodStart, periodEnd, year, month, quarter]);
 
   const { data, error, isLoading } = useSWR(apiUrl, fetcher, {
     revalidateOnFocus: false,
@@ -78,7 +135,9 @@ export default function RevenueKPICards({ periodType, year, month, quarter }) {
     );
   }
 
-  const { revenue, funnel } = data;
+  // Extract data from new API structure
+  const { revenue, leads, calls, meetings, prospects, proposals, converted } = data;
+
 
   const kpiCards = [
     {
@@ -124,68 +183,79 @@ export default function RevenueKPICards({ periodType, year, month, quarter }) {
     {
       title: "Leads",
       icon: Users,
-      actual: funnel.leads.actual,
-      target: funnel.leads.target,
-      percentage: funnel.leads.percentage,
-      remaining: funnel.leads.remaining,
+      actual: leads.actual,
+      target: leads.target,
+      percentage: leads.percentage,
+      remaining: leads.remaining,
       format: (val) => val.toString(),
       color: "blue",
     },
     {
       title: "Calls",
       icon: Phone,
-      actual: funnel.calls.actual,
-      target: funnel.calls.target,
-      percentage: funnel.calls.percentage,
-      remaining: funnel.calls.remaining,
+      actual: calls.actual,
+      target: calls.target,
+      percentage: calls.percentage,
+      remaining: calls.remaining,
       format: (val) => val.toString(),
       color: "green",
     },
     {
       title: "Meetings",
       icon: Calendar,
-      actual: funnel.meetings.actual,
-      target: funnel.meetings.target,
-      percentage: funnel.meetings.percentage,
-      remaining: funnel.meetings.remaining,
+      actual: meetings.actual,
+      target: meetings.target,
+      percentage: meetings.percentage,
+      remaining: meetings.remaining,
       format: (val) => val.toString(),
       color: "orange",
     },
     {
       title: "Prospects",
       icon: Users,
-      actual: funnel.prospects.actual,
-      target: funnel.prospects.target,
-      percentage: funnel.prospects.percentage,
-      remaining: funnel.prospects.remaining,
+      actual: prospects.actual,
+      target: prospects.target,
+      percentage: prospects.percentage,
+      remaining: prospects.remaining,
       format: (val) => val.toString(),
       color: "purple",
     },
     {
       title: "Proposals",
       icon: FileText,
-      actual: funnel.proposals.actual,
-      target: funnel.proposals.target,
-      percentage: funnel.proposals.percentage,
-      remaining: funnel.proposals.remaining,
+      actual: proposals.actual,
+      target: proposals.target,
+      percentage: proposals.percentage,
+      remaining: proposals.remaining,
       format: (val) => val.toString(),
       color: "pink",
     },
     {
       title: "Converted",
       icon: CheckCircle,
-      actual: funnel.converted.actual,
-      target: funnel.converted.target,
-      percentage: funnel.converted.percentage,
-      remaining: funnel.converted.remaining,
+      actual: converted.actual,
+      target: converted.target,
+      percentage: converted.percentage,
+      remaining: converted.remaining,
       format: (val) => val.toString(),
       color: "emerald",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {kpiCards.map((card, index) => {
+    <div className="space-y-4">
+      {/* Filter Component */}
+      <PeriodFilter
+        periodType={periodType}
+        year={year}
+        month={month}
+        quarter={quarter}
+        onPeriodChange={onPeriodChange}
+      />
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {kpiCards.map((card, index) => {
         const Icon = card.icon;
         const statusColor = getStatusColor(card.percentage);
         const statusBgColor = getStatusBgColor(card.percentage);
@@ -253,6 +323,7 @@ export default function RevenueKPICards({ periodType, year, month, quarter }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export default function RevenueCharts({ periodType, year, month, quarter }) {
           show: false,
         },
         fontFamily: "inherit",
+        background: "transparent",
       },
       theme: {
         mode: isDark ? "dark" : "light",

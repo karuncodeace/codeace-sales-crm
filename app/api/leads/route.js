@@ -1,5 +1,6 @@
 import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
+import { updateDailyMetrics } from "../../../lib/sales-metrics/updateMetrics";
 
 export async function GET() {
   const supabase = await supabaseServer();
@@ -202,6 +203,9 @@ export async function POST(request) {
   // Note: Task creation for "New" stage is handled by database trigger
   // Frontend should NOT create tasks here
 
+  // Update daily metrics: Lead created → increment leads
+  await updateDailyMetrics({ leads: 1 });
+
   return Response.json({ success: true, lead: newLead });
 }
 
@@ -372,6 +376,25 @@ export async function PATCH(request) {
           console.error("Exception creating task/activity for status change:", err);
           // Don't fail the lead update if task/activity creation fails
         }
+      }
+    }
+
+    // Update daily metrics based on status changes
+    if (status !== undefined && previousStatus !== undefined && status !== previousStatus) {
+      const newStatus = String(status).toLowerCase();
+      const oldStatus = String(previousStatus).toLowerCase();
+      
+      // Only increment if transitioning TO these statuses (not from them)
+      if (newStatus === "qualified" && oldStatus !== "qualified") {
+        // Lead → Prospect: increment prospects
+        await updateDailyMetrics({ prospects: 1 });
+      } else if (newStatus === "proposal" && oldStatus !== "proposal") {
+        // Proposal sent: increment proposals
+        await updateDailyMetrics({ proposals: 1 });
+      } else if ((newStatus === "converted" || newStatus === "won" || newStatus === "closed") && 
+                 oldStatus !== "converted" && oldStatus !== "won" && oldStatus !== "closed") {
+        // Deal closed-won: increment converted
+        await updateDailyMetrics({ converted: 1 });
       }
     }
 
