@@ -134,38 +134,48 @@ export async function GET(request) {
       .select("id")
       .limit(1);
     
-    if (adminCheck && adminCheck.length > 0 && (!allTasks || allTasks.length === 0)) {
+    const isRLSBlocking = adminCheck && adminCheck.length > 0 && (!allTasks || allTasks.length === 0);
+    
+    if (isRLSBlocking) {
       console.warn("⚠️ Tasks API: RLS is blocking access! Admin client found tasks but regular client didn't.");
       console.warn("⚠️ Using admin client as temporary workaround. Please configure RLS policies to allow sales users to read their tasks!");
       queryClient = adminClient;
     }
     
-    // First, let's check what status values actually exist in the database
-    const { data: statusCheck } = await queryClient
-      .from("tasks_table")
-      .select("status")
-      .limit(100);
-    
-    const uniqueStatuses = [...new Set(statusCheck?.map(t => t.status).filter(Boolean))];
-    console.log("🔍 Tasks API: Status values in database", {
-      uniqueStatuses,
-      sampleStatuses: statusCheck?.slice(0, 10).map(t => t.status)
-    });
-    
-    const [tasksBySalesperson, tasksByLeads] = await Promise.all([
+    // Query tasks - use the appropriate client (admin if RLS blocking)
+    // Fetch all tasks first, then filter by status in JavaScript to avoid potential query issues
+    const [tasksBySalespersonRaw, tasksByLeadsRaw] = await Promise.all([
       queryClient
         .from("tasks_table")
         .select("*")
-        .eq("sales_person_id", salesPersonId)
-        .eq("status", "Pending"),
+        .eq("sales_person_id", salesPersonId),
       assignedLeadIds.length > 0
         ? queryClient
             .from("tasks_table")
             .select("*")
             .in("lead_id", assignedLeadIds)
-            .eq("status", "Pending")
         : { data: [], error: null }
     ]);
+    
+    // Filter by status = "Pending" in JavaScript
+    const tasksBySalesperson = {
+      data: tasksBySalespersonRaw.data?.filter(t => t.status === "Pending") || [],
+      error: tasksBySalespersonRaw.error
+    };
+    
+    const tasksByLeads = {
+      data: tasksByLeadsRaw.data?.filter(t => t.status === "Pending") || [],
+      error: tasksByLeadsRaw.error
+    };
+    
+    console.log("🔍 Tasks API: Query results after RLS check", {
+      isRLSBlocking,
+      usingAdminClient: queryClient === adminClient,
+      tasksBySalespersonCount: tasksBySalesperson.data?.length || 0,
+      tasksBySalespersonError: tasksBySalesperson.error?.message,
+      tasksByLeadsCount: tasksByLeads.data?.length || 0,
+      tasksByLeadsError: tasksByLeads.error?.message
+    });
     
     // Log detailed results for debugging
     if (tasksBySalesperson.error) {
@@ -234,6 +244,7 @@ export async function GET(request) {
       if (manualFiltered.length > 0) {
         console.log("✅ Tasks API: Found tasks via manual filter", { count: manualFiltered.length });
         // Get full task data for manually filtered tasks - only pending tasks
+        // Use the same client we're using for main queries (admin if RLS blocking)
         const manualTaskIds = manualFiltered.map(t => t.id);
         const { data: fullManualTasks } = await queryClient
           .from("tasks_table")
