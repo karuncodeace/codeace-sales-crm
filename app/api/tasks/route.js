@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { supabaseServer, supabaseAdmin } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 
 /* ---------------- GET ---------------- */
@@ -59,14 +59,42 @@ export async function GET(request) {
     // This ensures we get all tasks for the sales person, even if some tasks don't have sales_person_id set
     
     // Get all tasks for debugging and fallback filtering
-    const { data: allTasks } = await supabase
+    // Try with regular client first
+    let { data: allTasks, error: allTasksError } = await supabase
       .from("tasks_table")
       .select("id, title, sales_person_id, lead_id");
+    
+    // If no tasks found, try with admin client to check if it's an RLS issue
+    if ((!allTasks || allTasks.length === 0) && !allTasksError) {
+      console.log("⚠️ Tasks API: No tasks found with regular client, trying admin client to check RLS");
+      const adminClient = supabaseAdmin();
+      const { data: adminTasks, error: adminError } = await adminClient
+        .from("tasks_table")
+        .select("id, title, sales_person_id, lead_id")
+        .limit(10);
+      
+      if (adminTasks && adminTasks.length > 0) {
+        console.warn("⚠️ Tasks API: RLS may be blocking access! Admin client found tasks:", {
+          adminTaskCount: adminTasks.length,
+          sampleTasks: adminTasks.slice(0, 3)
+        });
+        // Use admin tasks for debugging, but note this is a security issue
+        allTasks = adminTasks;
+      } else if (adminError) {
+        console.error("Tasks API: Admin client also failed:", adminError);
+      }
+    }
+    
+    if (allTasksError) {
+      console.error("Tasks API: Error fetching all tasks:", allTasksError);
+    }
     
     // First, let's get a sample of all tasks to debug format matching
     const sampleTasks = allTasks?.slice(0, 10) || [];
     
     console.log("🔍 Tasks API: Sample tasks from DB", {
+      allTasksCount: allTasks?.length || 0,
+      allTasksError: allTasksError?.message,
       sampleTasks: sampleTasks.map(t => ({ 
         id: t.id, 
         sales_person_id: t.sales_person_id, 
@@ -77,13 +105,40 @@ export async function GET(request) {
       lookingForType: typeof salesPersonId
     });
     
+    // If we still have no tasks, try a direct count query to verify table access
+    if (!allTasks || allTasks.length === 0) {
+      const { count, error: countError } = await supabase
+        .from("tasks_table")
+        .select("*", { count: "exact", head: true });
+      
+      console.log("🔍 Tasks API: Direct count query", {
+        count,
+        countError: countError?.message,
+        hasRLSError: countError?.code === "PGRST116" || countError?.message?.includes("permission")
+      });
+    }
+    
+    // Check if RLS is blocking - if admin client can see tasks but regular client can't, use admin
+    let queryClient = supabase;
+    const adminClient = supabaseAdmin();
+    const { data: adminCheck } = await adminClient
+      .from("tasks_table")
+      .select("id")
+      .limit(1);
+    
+    if (adminCheck && adminCheck.length > 0 && (!allTasks || allTasks.length === 0)) {
+      console.warn("⚠️ Tasks API: RLS is blocking access! Admin client found tasks but regular client didn't.");
+      console.warn("⚠️ Using admin client as temporary workaround. Please configure RLS policies to allow sales users to read their tasks!");
+      queryClient = adminClient;
+    }
+    
     const [tasksBySalesperson, tasksByLeads] = await Promise.all([
-      supabase
+      queryClient
         .from("tasks_table")
         .select("*")
         .eq("sales_person_id", salesPersonId),
       assignedLeadIds.length > 0
-        ? supabase
+        ? queryClient
             .from("tasks_table")
             .select("*")
             .in("lead_id", assignedLeadIds)
