@@ -365,6 +365,7 @@ export default function Sidebar2() {
                     {isCollapsed ? (
                         <TooltipIcon label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
                             <button
+                                data-action="toggle-sidebar"
                                 onClick={() => setIsCollapsed(!isCollapsed)}
                                 className={`w-full p-3 rounded-lg flex items-center justify-center transition-colors ${theme === "dark"
                                     ? "text-gray-400 hover:bg-gray-800 hover:text-white"

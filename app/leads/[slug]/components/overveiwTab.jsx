@@ -269,6 +269,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                 Contact Information
                             </h3>
                             <button
+                                data-action="edit"
                                 onClick={() => setIsEditLeadModalOpen(true)}
                                 className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
                                 title="Edit Lead"
@@ -404,6 +405,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                 </h3>
                                 {onEditScores && (
                                     <button
+                                        data-action="edit-scores"
                                         onClick={onEditScores}
                                         className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-orange-400" : "hover:bg-gray-100 text-gray-600 hover:text-orange-600"}`}
                                         title="Edit Scores"

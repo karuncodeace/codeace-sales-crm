@@ -43,6 +43,7 @@ export default function BookMeetingButton({ lead }) {
   return (
     <>
       <button
+        data-action="book-meeting"
         onClick={handleBook}
         className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
           isDark

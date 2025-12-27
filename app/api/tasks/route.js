@@ -93,14 +93,14 @@ export async function GET(request) {
         : { data: [], error: null }
     ]);
     
-    // Filter by status = "Pending" in JavaScript
+    // Return all tasks (both pending and completed) - frontend will filter them
     const tasksBySalesperson = {
-      data: tasksBySalespersonRaw.data?.filter(t => t.status === "Pending") || [],
+      data: tasksBySalespersonRaw.data || [],
       error: tasksBySalespersonRaw.error
     };
     
     const tasksByLeads = {
-      data: tasksByLeadsRaw.data?.filter(t => t.status === "Pending") || [],
+      data: tasksByLeadsRaw.data || [],
       error: tasksByLeadsRaw.error
     };
     
@@ -133,14 +133,13 @@ export async function GET(request) {
       });
       
       if (manualFiltered.length > 0) {
-        // Get full task data for manually filtered tasks - only pending tasks
+        // Get full task data for manually filtered tasks - include all statuses
         // Use the same client we're using for main queries (admin if RLS blocking)
         const manualTaskIds = manualFiltered.map(t => t.id);
         const { data: fullManualTasks } = await queryClient
           .from("tasks_table")
           .select("*")
-          .in("id", manualTaskIds)
-          .eq("status", "Pending");
+          .in("id", manualTaskIds);
         
         if (fullManualTasks && fullManualTasks.length > 0) {
           combinedTasks = fullManualTasks;
@@ -166,8 +165,8 @@ export async function GET(request) {
     // Admin: use filtered query (which returns all tasks)
     let query = getFilteredQuery(supabase, "tasks_table", crmUser);
     
-    // Filter by status = 'Pending' to show only pending tasks
-    query = query.eq("status", "Pending");
+    // Don't filter by status - return all tasks (pending and completed)
+    // Frontend will handle filtering and separation
     
     // Filter by lead_id if provided
     if (leadId) {
@@ -330,7 +329,20 @@ export async function PATCH(request) {
 
   if (title !== undefined) updateData.title = title;
   if (type !== undefined) updateData.type = type;
-  if (status !== undefined) updateData.status = status;
+  if (status !== undefined) {
+    updateData.status = status;
+    // Set completed_at when marking as completed
+    if (String(status).toLowerCase() === "completed") {
+      const previousStatus = existingTask?.status;
+      // Only set completed_at if transitioning TO completed (not already completed)
+      if (!previousStatus || String(previousStatus).toLowerCase() !== "completed") {
+        updateData.completed_at = new Date().toISOString();
+      }
+    } else {
+      // Clear completed_at when unmarking as completed
+      updateData.completed_at = null;
+    }
+  }
   if (priority !== undefined) updateData.priority = priority;
   // Note: comments column doesn't exist in tasks_table, so we don't update it
   // Comments are stored in task_activities table instead

@@ -8,6 +8,7 @@ import SearchBtn from "./components/buttons/searchBtn";
 
 import { ThemeProvider, useTheme } from "./context/themeContext";
 import { SidebarProvider, useSidebar } from "./context/sidebarContext";
+import { KeyboardShortcutsProvider } from "./context/keyboardShortcutsContext";
 import { Toaster } from "react-hot-toast";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
 
@@ -100,7 +101,9 @@ function LayoutStructure({ children, fonts }) {
 export default function LayoutClient({ children, fonts }) {
   return (
     <ThemeProvider>
-      <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+      <KeyboardShortcutsProvider>
+        <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+      </KeyboardShortcutsProvider>
     </ThemeProvider>
   );
 }

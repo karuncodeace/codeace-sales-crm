@@ -102,7 +102,6 @@ export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
             }
         );
     };
-    };
 
     if (isLoading) {
         return (

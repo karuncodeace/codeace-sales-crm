@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useTheme } from "../../context/themeContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 const menuItems = [
     {
@@ -34,6 +34,7 @@ const menuItems = [
 export default function SearchBtn() {
     const { theme } = useTheme();
     const router = useRouter();
+    const pathname = usePathname();
     const [searchQuery, setSearchQuery] = useState("");
     const [isFocused, setIsFocused] = useState(false);
     const searchRef = useRef(null);
@@ -83,6 +84,54 @@ export default function SearchBtn() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Keyboard shortcuts: Press "K" to focus search bar, ESC to unfocus (only on Dashboard)
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            // Only activate on Dashboard page
+            if (pathname !== "/dashboard") return;
+
+            // Check if user is typing in an input, textarea, or contenteditable element
+            const isTyping = 
+                event.target instanceof HTMLInputElement ||
+                event.target instanceof HTMLTextAreaElement ||
+                (event.target instanceof HTMLElement && event.target.isContentEditable);
+
+            // Handle ESC key to unfocus search bar
+            if (event.key === "Escape") {
+                if (searchRef.current && document.activeElement === searchRef.current) {
+                    event.preventDefault();
+                    searchRef.current.blur();
+                    setIsFocused(false);
+                    setSearchQuery("");
+                }
+                return;
+            }
+
+            // If user is typing, don't trigger the "K" shortcut
+            if (isTyping) return;
+
+            // Check if "K" key is pressed (case-insensitive)
+            if (event.key === "k" || event.key === "K") {
+                // Prevent default behavior
+                event.preventDefault();
+                
+                // Focus the search input
+                if (searchRef.current) {
+                    searchRef.current.focus();
+                    setIsFocused(true);
+                }
+            }
+        };
+
+        // Add event listener
+        document.addEventListener("keydown", handleKeyDown);
+
+        // Cleanup
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [pathname]);
 
     return (
         <div className="relative w-full">
