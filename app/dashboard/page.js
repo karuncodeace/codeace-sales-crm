@@ -96,12 +96,7 @@ export default function DashboardPage() {
         </div>
 
         <div>
-          <Cards
-            periodType={periodType}
-            year={selectedYear}
-            month={selectedMonth}
-            quarter={selectedQuarter}
-          />
+          <Cards/>
         </div>
         <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-2 xl:mt-2">
           <div className="">
