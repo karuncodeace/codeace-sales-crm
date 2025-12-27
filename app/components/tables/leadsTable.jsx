@@ -312,7 +312,6 @@ export default function LeadsTable() {
         throw new Error("Failed to update status");
       }
     } catch (error) {
-      console.error("Error updating status:", error);
       // Revalidate to restore correct state on error
       mutate();
     }
@@ -369,7 +368,6 @@ export default function LeadsTable() {
       
       return { title, type };
     } catch (error) {
-      console.error("Error generating task title:", error);
       return null;
     }
   };
@@ -475,7 +473,6 @@ export default function LeadsTable() {
         showCalendar: false,
       });
     } catch (error) {
-      console.error("Error updating status:", error);
       alert(error.message);
       setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -517,7 +514,6 @@ export default function LeadsTable() {
         throw new Error("Failed to update priority");
       }
     } catch (error) {
-      console.error("Error updating priority:", error);
       // Revalidate to restore correct state on error
       mutate();
     }
@@ -922,7 +918,7 @@ export default function LeadsTable() {
                                         setCopiedEmailId(lead.id);
                                         setTimeout(() => setCopiedEmailId(null), 2000);
                                       } catch (err) {
-                                        console.error('Failed to copy:', err);
+                                        // Failed to copy
                                       }
                                     }}
                                     className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
@@ -943,15 +939,6 @@ export default function LeadsTable() {
                             </div>
                           </div>
                         </td>
-                       {/*
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {lead.source}
-                            </span>
-                          </div>
-                        </td>
-*/}
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <StatusDropdown

@@ -153,7 +153,6 @@ export default function EmailModal({ open, onClose, recipientEmail = "", recipie
             }),
           });
         } catch (activityError) {
-          console.error("Error logging email activity:", activityError);
           // Don't fail the whole operation if activity logging fails
         }
       }
@@ -171,7 +170,6 @@ export default function EmailModal({ open, onClose, recipientEmail = "", recipie
       alert("Email sent successfully!");
       
     } catch (error) {
-      console.error("Error sending email:", error);
       alert(error.message || "Failed to send email. Please try again.");
     } finally {
       setIsSubmitting(false);

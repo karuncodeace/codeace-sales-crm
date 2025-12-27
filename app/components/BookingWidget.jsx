@@ -4,7 +4,7 @@ import { useTheme } from "../context/themeContext";
 import { getCalEventUrl } from "../../config/calConfig";
 import { ExternalLink, Calendar } from "lucide-react";
 
-export default function BookingWidget({ leadId, leadName, leadEmail, salespersonId, callType, onBookingComplete, onError }) {
+export default function BookingWidget({ leadId, leadName, leadEmail, salespersonId, callType, onBookingComplete }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -32,7 +32,7 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
   };
 
   return (
-    <div className={`w-full h-full flex flex-col items-center justify-center p-8 ${isDark ? "bg-transparent" : "bg-transparent"}`}>
+    <div className="w-full h-full flex flex-col items-center justify-center p-8">
       <div className={`max-w-md w-full text-center space-y-6 ${isDark ? "text-white" : "text-gray-900"}`}>
         <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
           <Calendar className={`w-8 h-8 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
@@ -49,18 +49,14 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
 
         <button
           onClick={handleOpenBooking}
-          className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-            isDark
-              ? "bg-orange-500 text-white hover:bg-orange-600"
-              : "bg-orange-500 text-white hover:bg-orange-600"
-          }`}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors bg-orange-500 text-white hover:bg-orange-600"
         >
           <Calendar className="w-5 h-5" />
           <span>Open Booking Page</span>
           <ExternalLink className="w-4 h-4" />
         </button>
 
-        <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+        <p className="text-xs text-gray-500">
           You'll be redirected to the booking page in a new tab
         </p>
       </div>

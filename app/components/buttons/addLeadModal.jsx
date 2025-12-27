@@ -90,7 +90,6 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
       setErrors({});
       onClose();
     } catch (error) {
-      console.error("Error creating lead:", error);
       setErrors({ submit: error.message });
     } finally {
       setIsSubmitting(false);

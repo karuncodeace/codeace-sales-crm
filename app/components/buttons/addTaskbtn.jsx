@@ -31,7 +31,6 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
           setExistingTasks(Array.isArray(data) ? data : []);
         })
         .catch((err) => {
-          console.error("Error fetching tasks:", err);
           setExistingTasks([]);
         });
     } else {
@@ -62,7 +61,6 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
       const leadName = selectedLead.name || selectedLead.lead_name || "";
       return generateTaskTitle(currentStage, leadName, options);
     } catch (error) {
-      console.error("Error generating task title:", error);
       return "";
     }
   }, [selectedLead, existingTasks]);

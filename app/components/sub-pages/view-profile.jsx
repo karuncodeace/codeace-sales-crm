@@ -298,7 +298,6 @@ export default function ViewProfile() {
       // Show success message
       alert("Profile updated successfully!");
     } catch (error) {
-      console.error("Error updating profile:", error);
       alert(error.message || "Failed to update profile. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -380,7 +379,7 @@ export default function ViewProfile() {
                             parent.innerHTML = `<span>${getInitials(userData?.name || "User")}</span>`;
                           }
                         } catch (err) {
-                        console.error("Error handling image fallback:", err);
+                          // Error handling image fallback
                       }
                     }}
                   />

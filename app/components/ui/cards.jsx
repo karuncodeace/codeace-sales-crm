@@ -29,7 +29,7 @@ export default function Cards() {
   const { theme } = useTheme();
 
   // Fetch data using SWR with fallback for instant display
-  const { data = fallbackCardsData, error, isValidating } = useSWR(
+  const { data = fallbackCardsData, error } = useSWR(
     "/api/dashboard/cards",
     fetcher,
     {

@@ -65,7 +65,7 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
         setShowCreateIndustry(!data || data.length === 0);
       }
     } catch (error) {
-      console.error("Error fetching industries:", error);
+      // Error fetching industries
     }
   };
 
@@ -89,16 +89,13 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
 
       const response = await res.json();
       const newIndustry = response.data || response;
-      console.log("✅ Industry created:", newIndustry);
       
       setIndustries([...industries, newIndustry]);
       const industryName = newIndustry.name || newIndustryName.trim();
       setFormData({ ...formData, industryType: industryName });
-      console.log("📝 Form data updated with industryType:", industryName);
       setNewIndustryName("");
       setShowCreateIndustry(false);
     } catch (error) {
-      console.error("Error creating industry:", error);
       alert(error.message);
     } finally {
       setIsCreatingIndustry(false);
@@ -148,7 +145,6 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
         turnover: formData.turnover,
         industryType: formData.industryType,
       };
-      console.log("📤 Sending update payload:", payload);
       
       const res = await fetch("/api/leads", {
         method: "PATCH",
@@ -167,7 +163,6 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
       onUpdate(updatedLead);
       onClose();
     } catch (error) {
-      console.error("Error updating lead:", error);
       setErrors({ submit: error.message });
     } finally {
       setIsSubmitting(false);

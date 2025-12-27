@@ -30,14 +30,11 @@ export default function CallBtn({ leadId, phone, name, email }) {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("Failed to trigger FCM call", data);
         alert(data.error || "Failed to initiate call. Please try again.");
       } else {
-        console.log("FCM call triggered successfully:", data);
         alert(`Call initiated successfully! Calling ${name} at ${phone}`);
       }
     } catch (err) {
-      console.error("Error triggering FCM call:", err);
       alert("Error initiating call. Please try again.");
     } finally {
       setIsLoading(false);

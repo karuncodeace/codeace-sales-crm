@@ -112,7 +112,7 @@ export default function ProspectsTable() {
 
             mutate("/api/prospects");
         } catch (error) {
-            console.error("Error updating status:", error);
+            // Error updating status
         }
     };
 
@@ -130,7 +130,7 @@ export default function ProspectsTable() {
 
             mutate("/api/prospects");
         } catch (error) {
-            console.error("Error updating priority:", error);
+            // Error updating priority
         }
     };
 

@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useMemo, useState, useEffect } from "react";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
-import { fetcher } from "../../../lib/swr/fetcher";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -26,9 +25,18 @@ export default function RevenueAreaChart() {
   };
 
   // Fetch data using SWR with fallback for instant display
-  const { data = fallbackData, error, isValidating } = useSWR(
+  const { data = fallbackData, error } = useSWR(
     "/api/dashboard/revenue-area",
-    fetcher,
+    async (url) => {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const error = new Error('An error occurred while fetching the data.');
+        error.info = await res.json().catch(() => ({ error: 'Failed to fetch' }));
+        error.status = res.status;
+        throw error;
+      }
+      return res.json();
+    },
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,

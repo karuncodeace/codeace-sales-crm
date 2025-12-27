@@ -21,7 +21,7 @@ export default function SalesPersonComparisonChart() {
   };
 
   // Fetch data using SWR with fallback for instant display
-  const { data = fallbackData, error, isValidating } = useSWR(
+  const { data = fallbackData, error } = useSWR(
     "/api/dashboard/salesperson-performance",
     fetcher,
     {

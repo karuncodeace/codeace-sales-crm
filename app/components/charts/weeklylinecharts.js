@@ -20,7 +20,7 @@ export default function weeklyLineChart() {
   };
 
   // Fetch data using SWR with fallback for instant display
-  const { data = fallbackData, error, isValidating } = useSWR(
+  const { data = fallbackData, error } = useSWR(
     "/api/dashboard/weekly-sales",
     fetcher,
     {

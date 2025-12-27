@@ -141,7 +141,6 @@ function isDemoSchedulingTask(task, leadStatus) {
 // Helper function to get next stage
 function getNextStage(currentStage) {
   if (!currentStage || currentStage === "null" || currentStage === "undefined") {
-    console.warn("getNextStage called with invalid stage:", currentStage);
     return null;
   }
   
@@ -153,12 +152,10 @@ function getNextStage(currentStage) {
 function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
   // Validate inputs
   if (!nextStage || typeof nextStage !== "string" || nextStage === "null" || nextStage === "undefined") {
-    console.warn("getTaskDetailsForNextStage: Invalid nextStage:", nextStage);
     return null;
   }
   
   if (!canCreateTaskForStage(nextStage)) {
-    console.warn("getTaskDetailsForNextStage: Cannot create task for stage:", nextStage);
     return null;
   }
   
@@ -187,14 +184,12 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
       type: taskTypes[nextStage] || "Call",
     };
   } catch (error) {
-    console.error("Error generating task title:", error);
     return null;
   }
 }
 
 export default function TasksPage() {
     const router = useRouter();
-    const [openActions, setOpenActions] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
@@ -274,7 +269,6 @@ export default function TasksPage() {
             mutate("/api/tasks");
             setOpenAddTask(false);
         } catch (error) {
-            console.error("Error adding task:", error);
             alert(error.message);
         } finally {
             setIsSubmitting(false);
@@ -318,18 +312,8 @@ export default function TasksPage() {
 
     // Transform API tasks to display format
     const transformedTasks = useMemo(() => {
-        // Debug: Log what we received from API
-        console.log("🔍 TasksTable: Received tasksData", {
-            isArray: Array.isArray(tasksData),
-            dataType: typeof tasksData,
-            length: tasksData?.length,
-            hasError: tasksData?.error,
-            sample: tasksData?.slice?.(0, 3)
-        });
-        
         // Handle error responses or non-array data
         if (!tasksData || !Array.isArray(tasksData) || tasksData.error) {
-            console.warn("⚠️ TasksTable: Invalid tasksData", { tasksData });
             return [];
         }
 
@@ -486,12 +470,8 @@ export default function TasksPage() {
 
             mutate("/api/tasks");
         } catch (error) {
-            console.error("Error updating priority:", error);
+            // Error updating priority
         }
-    };
-
-    const handleToggleActions = (taskId) => {
-        setOpenActions((prev) => (prev === taskId ? null : taskId));
     };
 
     const handleMarkComplete = async (task) => {
@@ -503,7 +483,6 @@ export default function TasksPage() {
         
         // Ensure currentStatus is never null/undefined
         if (!currentStatus || currentStatus === "null" || currentStatus === "undefined" || currentStatus === null) {
-            console.warn("Invalid lead status, defaulting to 'New':", currentStatus, "for lead:", lead);
             currentStatus = "New";
         }
         
@@ -519,7 +498,6 @@ export default function TasksPage() {
                 requiresSecondDemo: null,
                 isSubmitting: false,
             });
-            setOpenActions(null);
             return;
         }
 
@@ -538,7 +516,6 @@ export default function TasksPage() {
             isSubmitting: false,
             showCalendar: false,
         });
-        setOpenActions(null);
     };
     
     // Confirm task completion with stage progression
@@ -562,11 +539,8 @@ export default function TasksPage() {
         try {
             const nextStage = getNextStage(validStatus);
             
-            console.log("Task completion - validStatus:", validStatus, "nextStage:", nextStage);
-            
             // Validate nextStage before proceeding
             if (!nextStage) {
-                console.warn("No next stage available for status:", validStatus);
                 // Still mark task as completed even if no next stage
             }
             
@@ -585,7 +559,6 @@ export default function TasksPage() {
             if (!stageNotesRes.ok) {
                 const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
                 const errorMessage = errorData.error || errorData.details || "Failed to save stage notes";
-                console.error("Stage notes error:", errorData);
                 throw new Error(errorMessage);
             }
             
@@ -621,12 +594,9 @@ export default function TasksPage() {
                     try {
                         // Ensure leadName is valid
                         const validLeadName = leadName || "Client";
-                        console.log("Creating task for next stage:", { nextStage, leadName: validLeadName, existingTasksCount: existingTasks.length });
                         
                         const taskDetails = getTaskDetailsForNextStage(nextStage, validLeadName, existingTasks);
                         if (taskDetails) {
-                            console.log("Task details generated:", taskDetails);
-                            
                             // Validate nextStage before creating task
                             if (!nextStage || typeof nextStage !== "string") {
                                 throw new Error(`Cannot create task: Invalid next stage: ${nextStage}`);
@@ -645,20 +615,13 @@ export default function TasksPage() {
 
                             if (!createRes.ok) {
                                 const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
-                                console.error("Failed to create task:", errorData);
                                 throw new Error(errorData.error || "Failed to create next task");
                             }
-                            console.log("Task created successfully");
-                        } else {
-                            console.warn("No task details generated for stage:", nextStage, "leadName:", validLeadName);
                         }
                     } catch (error) {
-                        console.error("Error creating task for next stage:", error);
                         // Don't throw - still complete the current task even if next task creation fails
                         alert(`Task completed, but failed to create next task: ${error.message}`);
                     }
-                } else {
-                    console.log("Skipping task creation:", { activeTasksCount: activeTasks.length, nextStage, hasNextStage: !!nextStage });
                 }
             }
             
@@ -709,7 +672,6 @@ export default function TasksPage() {
             mutate("/api/tasks");
             mutate("/api/leads");
         } catch (error) {
-            console.error("Error completing task:", error);
             alert(error.message);
             setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
         }
@@ -894,7 +856,6 @@ export default function TasksPage() {
                 mutate("/api/leads");
             }
         } catch (error) {
-            console.error("Error handling demo outcome:", error);
             alert(error.message);
             setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
         }
@@ -929,22 +890,9 @@ export default function TasksPage() {
 
             mutate("/api/tasks");
         } catch (error) {
-            console.error("Error rescheduling:", error);
+            // Error rescheduling
         }
     };
-
-    useEffect(() => {
-        if (!openActions) return;
-
-        const handleClickOutside = (event) => {
-            if (!event.target.closest('[data-actions-menu="true"]')) {
-                setOpenActions(null);
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [openActions]);
 
     const getTypeIcon = (type) => {
         const iconClass = "w-4 h-4";
@@ -1120,14 +1068,13 @@ export default function TasksPage() {
                             {[
                                 "Task",
                                 "Type",
-                                "Lead",
                                 "Phone",
                                 "Due",
                                 "Status",
                                 "Assigned To",
                                 "Priority",
 
-                                "Actions",
+                                
                                 
                             ].map((column) => (
                                 <th
@@ -1183,9 +1130,15 @@ export default function TasksPage() {
                                                 <span className={`text-sm font-medium ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                                                     {task.title}
                                                 </span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                                        {task.id}
+                                                    </span> 
+                                                <span className="text-xs text-gray-500">|</span>
                                                 <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                                    {task.id}
-                                                </span>
+                                                        {task.lead_id}
+                                                    </span> 
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -1199,13 +1152,7 @@ export default function TasksPage() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2">
-                                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                {task.lead_id}
-                                            </span>
-                                        </div>
-                                    </td>
+                                  
                                     <td className="size-px whitespace-nowrap">
                                         <div className="px-6 py-2">
                                             <a
@@ -1257,95 +1204,6 @@ export default function TasksPage() {
                                             />
                                         </div>
                                     </td>
-
-                                    <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2">
-                                            <div
-                                                className="relative"
-                                                data-actions-menu="true"
-                                            >
-                                                <button
-                                                    type="button"
-                                                    aria-label="Open actions menu"
-                                                    onClick={() => handleToggleActions(task.id)}
-                                                    className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-hidden ${theme === "dark"
-                                                        ? "border-gray-700 text-gray-400 hover:text-gray-200"
-                                                        : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
-                                                        }`}
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        viewBox="0 0 24 24"
-                                                        width="20"
-                                                        height="20"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            d="M11.9967 11.5C12.549 11.5 12.9967 11.9477 12.9967 12.5C12.9967 13.0523 12.549 13.5 11.9967 13.5C11.4444 13.5 10.9967 13.0523 10.9967 12.5C10.9967 11.9477 11.4444 11.5 11.9967 11.5Z"
-                                                            strokeWidth="1.5"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                        <path
-                                                            d="M11.9967 5.5C12.549 5.5 12.9967 5.94772 12.9967 6.5C12.9967 7.05228 12.549 7.5 11.9967 7.5C11.4444 7.5 10.9967 7.05228 10.9967 6.5C10.9967 5.94772 11.4444 5.5 11.9967 5.5Z"
-                                                            strokeWidth="1.5"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                        <path
-                                                            d="M11.9967 17.5C12.549 17.5 12.9967 17.9477 12.9967 18.5C12.9967 19.0523 12.549 19.5 11.9967 19.5C11.4444 19.5 10.9967 19.0523 10.9967 18.5C10.9967 17.9477 11.4444 17.5 11.9967 17.5Z"
-                                                            strokeWidth="1.5"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                    </svg>
-                                                </button>
-
-                                                {openActions === task.id && (
-                                                    <div className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl ${theme === "dark"
-                                                        ? "bg-gray-800 text-gray-200 border-gray-700"
-                                                        : "bg-white text-gray-700 border-gray-200"
-                                                        }`}>
-                                                        {["View", "Edit"].map((action) => (
-                                                            <button
-                                                                key={action}
-                                                                type="button"
-                                                                className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                                            >
-                                                                {action}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                   {/* <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2 max-w-[200px]">
-                                            {task.comments ? (
-                                                <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                                    <div className="flex items-start gap-1.5">
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            viewBox="0 0 20 20"
-                                                            fill="currentColor"
-                                                            className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500"
-                                                        >
-                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
-                                                        </svg>
-                                                        <span className="line-clamp-2 break-words" title={task.comments}>
-                                                            {task.comments}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <span className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                                    No comments
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>*/}
                                 </tr>
                             ))
                         )}

@@ -19,7 +19,6 @@ const TooltipIcon = ({ label, className = "", children, onClick }) => (
 );
 
 export default function Sidebar() {
-  const [selectedIcon, setSelectedIcon] = useState("dashboard");
   const router = useRouter();
   const handleIconClick = (page) => {
     router.push(page);

@@ -38,7 +38,7 @@ export default function Sidebar2() {
                     }
                 }
             } catch (error) {
-                console.error("Error fetching user role:", error);
+                // Error fetching user role
             }
         };
         fetchUserRole();

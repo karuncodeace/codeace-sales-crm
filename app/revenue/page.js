@@ -81,10 +81,9 @@ export default function RevenuePage() {
 
   return (
     <div className="w-full">
-      <Header name="Admin" currentPage="Revenue & Sales Performance Dashboard" />
       
       {/* Page Header */}
-      <div className="mb-6">
+      <div className="mb-6 mt-10">
         <h1 className={`text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
           Revenue & Sales Performance Dashboard
         </h1>

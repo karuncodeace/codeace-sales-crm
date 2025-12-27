@@ -21,7 +21,7 @@ export default function KPICallBarChart() {
   };
 
   // Fetch data using SWR with fallback for instant display
-  const { data = fallbackData, error, isValidating } = useSWR(
+  const { data = fallbackData, error } = useSWR(
     "/api/dashboard/kpi-breakdown",
     fetcher,
     {
