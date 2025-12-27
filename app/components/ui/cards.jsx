@@ -1,4 +1,5 @@
 "use client"
+import { useMemo } from "react";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { fetcher } from "../../../lib/swr/fetcher";
@@ -25,12 +26,83 @@ const fallbackCardsData = {
   conversionRate: 0
 };
 
-export default function Cards() {
+export default function Cards({ periodType, year, month, quarter }) {
   const { theme } = useTheme();
+
+  // Helper function to format date as YYYY-MM-DD without timezone issues
+  const formatDateLocal = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  // Calculate period_start and period_end based on period type
+  const { periodStart, periodEnd } = useMemo(() => {
+    const currentYear = parseInt(year || new Date().getFullYear());
+    const currentMonth = parseInt(month || new Date().getMonth() + 1);
+    const currentQuarter = parseInt(quarter || 1);
+    let start, end;
+    
+    if (periodType === "monthly") {
+      // Start: first day of the month (month is 0-indexed in Date constructor)
+      const startDate = new Date(currentYear, currentMonth - 1, 1);
+      start = formatDateLocal(startDate);
+      
+      // End: last day of the month
+      // For month 12 (December), currentMonth is 12, so currentMonth (12) gives January next year, day 0 = Dec 31
+      const endDate = new Date(currentYear, currentMonth, 0);
+      end = formatDateLocal(endDate);
+    } else if (periodType === "quarterly") {
+      const q = currentQuarter;
+      let startMonth, endMonth;
+      
+      // Custom quarter definition:
+      // Q1: April, May, June (months 3-5)
+      // Q2: July, August, September (months 6-8)
+      // Q3: October, November, December (months 9-11)
+      // Q4: January, February, March (months 0-2)
+      if (q === 1) {
+        startMonth = 3; // April
+        endMonth = 5;   // June
+      } else if (q === 2) {
+        startMonth = 6; // July
+        endMonth = 8;   // September
+      } else if (q === 3) {
+        startMonth = 9; // October
+        endMonth = 11;  // December
+      } else if (q === 4) {
+        startMonth = 0; // January
+        endMonth = 2;   // March
+      }
+      
+      start = formatDateLocal(new Date(currentYear, startMonth, 1));
+      end = formatDateLocal(new Date(currentYear, endMonth + 1, 0));
+    } else {
+      // Weekly - last 7 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      start = formatDateLocal(startDate);
+      end = formatDateLocal(endDate);
+    }
+    
+    return { periodStart: start, periodEnd: end };
+  }, [periodType, year, month, quarter]);
+
+  // Build API URL with query params
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (periodType) params.set("period_type", periodType);
+    if (periodStart) params.set("period_start", periodStart);
+    if (periodEnd) params.set("period_end", periodEnd);
+    const queryString = params.toString();
+    return `/api/dashboard/cards${queryString ? `?${queryString}` : ""}`;
+  }, [periodType, periodStart, periodEnd]);
 
   // Fetch data using SWR with fallback for instant display
   const { data = fallbackCardsData, error, isValidating } = useSWR(
-    "/api/dashboard/cards",
+    apiUrl,
     fetcher,
     {
       revalidateOnFocus: false,

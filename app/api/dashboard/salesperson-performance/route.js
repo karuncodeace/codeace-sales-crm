@@ -11,7 +11,6 @@ export async function GET() {
     
     // If no CRM user found, return empty data
     if (!crmUser) {
-      console.warn("No CRM user found - returning empty sales person performance data");
       return Response.json({
         calls: [],
         meetings: [],
@@ -19,13 +18,6 @@ export async function GET() {
         salesPersons: []
       });
     }
-
-    console.log("🔍 Fetching sales persons for user:", {
-      userId: crmUser.id,
-      role: crmUser.role,
-      email: crmUser.email,
-      salesPersonId: crmUser.salesPersonId
-    });
 
     // Fetch all sales persons with their performance metrics from the table
     // First try with the performance fields, fallback to basic fields if they don't exist
@@ -49,7 +41,6 @@ export async function GET() {
         .eq("id", crmUser.salesPersonId);
     } else {
       // Sales user without salesPersonId - return empty
-      console.warn("Sales user without salesPersonId - returning empty data");
       return Response.json({
         calls: [],
         meetings: [],
@@ -61,25 +52,12 @@ export async function GET() {
     // Try fetching with performance fields first
     const resultWithFields = await queryBuilder;
     
-    console.log("📊 Sales persons query result:", {
-      hasData: !!resultWithFields.data,
-      dataLength: resultWithFields.data?.length || 0,
-      hasError: !!resultWithFields.error,
-      error: resultWithFields.error ? {
-        message: resultWithFields.error.message,
-        code: resultWithFields.error.code,
-        details: resultWithFields.error.details,
-        hint: resultWithFields.error.hint
-      } : null
-    });
-    
     if (resultWithFields.error) {
       // Check if error is due to missing columns
       const errorMessage = resultWithFields.error.message || "";
       const errorCode = resultWithFields.error.code || "";
       
       if (errorMessage.includes("column") || errorCode === "42703" || errorMessage.includes("does not exist")) {
-        console.warn("⚠️ Performance fields not found, fetching without them:", errorMessage);
         // Try fetching without performance fields
         let basicQueryBuilder;
         if (crmUser.role === "admin") {
@@ -94,35 +72,16 @@ export async function GET() {
         }
         const resultBasic = await basicQueryBuilder;
         
-        console.log("📊 Basic sales persons query result:", {
-          hasData: !!resultBasic.data,
-          dataLength: resultBasic.data?.length || 0,
-          hasError: !!resultBasic.error,
-          error: resultBasic.error ? {
-            message: resultBasic.error.message,
-            code: resultBasic.error.code
-          } : null
-        });
-        
         if (resultBasic.error) {
-          console.error("❌ Error fetching sales persons (basic):", resultBasic.error);
+          console.error("Error fetching sales persons (basic):", resultBasic.error);
           salesPersonsError = resultBasic.error;
         } else {
           salesPersons = resultBasic.data || [];
-          console.log("✅ Fetched sales persons (basic):", salesPersons.length);
         }
       } else {
         // Other error (RLS, permission, etc.)
-        console.error("❌ Error fetching sales persons:", {
-          message: resultWithFields.error.message,
-          code: resultWithFields.error.code,
-          details: resultWithFields.error.details,
-          hint: resultWithFields.error.hint
-        });
-        
         // Check if RLS is blocking - try with admin client for admin users
         if (crmUser.role === "admin") {
-          console.warn("⚠️ RLS might be blocking. Trying with admin client...");
           const adminClient = supabaseAdmin();
           let adminQueryBuilder = adminClient
             .from("sales_persons")
@@ -131,7 +90,6 @@ export async function GET() {
           const adminResult = await adminQueryBuilder;
           
           if (!adminResult.error && adminResult.data) {
-            console.log("✅ Admin client successfully fetched sales persons:", adminResult.data.length);
             salesPersons = adminResult.data || [];
             salesPersonsError = null;
             queryClient = adminClient;
@@ -142,7 +100,6 @@ export async function GET() {
               .select("id, user_id, full_name");
             
             if (!adminBasicResult.error && adminBasicResult.data) {
-              console.log("✅ Admin client fetched sales persons (basic):", adminBasicResult.data.length);
               salesPersons = adminBasicResult.data || [];
               salesPersonsError = null;
               queryClient = adminClient;
@@ -156,16 +113,10 @@ export async function GET() {
       }
     } else {
       salesPersons = resultWithFields.data || [];
-      console.log("✅ Fetched sales persons (with performance fields):", salesPersons.length);
-      if (salesPersons.length > 0) {
-        console.log("📋 First sales person raw data:", JSON.stringify(salesPersons[0], null, 2));
-        console.log("📋 All sales persons raw data:", JSON.stringify(salesPersons, null, 2));
-      }
     }
 
     // If we still have an error after fallback, try admin client for sales users too
     if (salesPersonsError && crmUser.role === "sales" && crmUser.salesPersonId) {
-      console.warn("⚠️ Regular query failed for sales user. Trying with admin client...");
       const adminClient = supabaseAdmin();
       const adminResult = await adminClient
         .from("sales_persons")
@@ -173,7 +124,6 @@ export async function GET() {
         .eq("id", crmUser.salesPersonId);
       
       if (!adminResult.error && adminResult.data && adminResult.data.length > 0) {
-        console.log("✅ Admin client successfully fetched sales person:", adminResult.data.length);
         salesPersons = adminResult.data || [];
         salesPersonsError = null;
         queryClient = adminClient;
@@ -185,7 +135,6 @@ export async function GET() {
           .eq("id", crmUser.salesPersonId);
         
         if (!adminBasicResult.error && adminBasicResult.data && adminBasicResult.data.length > 0) {
-          console.log("✅ Admin client fetched sales person (basic):", adminBasicResult.data.length);
           salesPersons = adminBasicResult.data || [];
           salesPersonsError = null;
           queryClient = adminClient;
@@ -194,10 +143,8 @@ export async function GET() {
     }
 
     // If we still have an error after all fallbacks, return empty data instead of error
-    // This allows the dashboard to still load
     if (salesPersonsError) {
-      console.error("❌ Final error fetching sales persons after all fallbacks:", salesPersonsError);
-      // Return empty data instead of error to prevent dashboard from breaking
+      console.error("Error fetching sales persons:", salesPersonsError);
       return Response.json({
         calls: [],
         meetings: [],
@@ -206,14 +153,7 @@ export async function GET() {
       });
     }
 
-    console.log("🔍 After query - salesPersons array:", {
-      length: salesPersons?.length || 0,
-      isEmpty: !salesPersons || salesPersons.length === 0,
-      firstItem: salesPersons?.[0] || null
-    });
-
     if (!salesPersons || salesPersons.length === 0) {
-      console.warn("⚠️ No sales persons found in sales_persons table. Trying users table fallback...");
       
       // Fallback: Fetch from users table if sales_persons is empty
       let usersQueryBuilder;
@@ -233,7 +173,7 @@ export async function GET() {
       const usersResult = await usersQueryBuilder;
       
       if (usersResult.error) {
-        console.error("❌ Error fetching users as fallback:", usersResult.error);
+        console.error("Error fetching users as fallback:", usersResult.error);
         return Response.json({
           calls: [],
           meetings: [],
@@ -243,7 +183,6 @@ export async function GET() {
       }
       
       if (usersResult.data && usersResult.data.length > 0) {
-        console.log("✅ Using users table fallback:", usersResult.data.length, "users");
         // Map users to sales_persons format
         salesPersons = usersResult.data.map(user => ({
           id: user.id,
@@ -254,7 +193,6 @@ export async function GET() {
           total_conversion: 0
         }));
       } else {
-        console.warn("⚠️ No users found either");
         return Response.json({
           calls: [],
           meetings: [],
@@ -263,8 +201,6 @@ export async function GET() {
         });
       }
     }
-    
-    console.log("✅ Processing", salesPersons.length, "sales persons");
 
     // Fetch user names for sales persons
     const userIds = salesPersons.map(sp => sp.user_id).filter(Boolean);
@@ -293,8 +229,6 @@ export async function GET() {
     // Calculate metrics from other tables if sales_persons table doesn't have performance data
     let calculatedMetrics = {};
     if (!hasPerformanceData && salesPersons.length > 0) {
-      console.log("📊 Calculating performance metrics from tasks, appointments, and leads tables...");
-      
       const salesPersonIds = salesPersons.map(sp => sp.id).filter(Boolean);
       
       // Count completed calls (tasks with type='Call' and status='Completed')
@@ -327,20 +261,10 @@ export async function GET() {
           conversions: convertedLeads?.filter(l => l.assigned_to === spId).length || 0,
         };
       });
-      
-      console.log("✅ Calculated metrics:", calculatedMetrics);
     }
 
     // Map sales persons data to performance metrics
-    console.log("🔄 Mapping sales persons to performance data. Count:", salesPersons.length);
     if (salesPersons.length === 0) {
-      console.error("❌ CRITICAL: salesPersons array is EMPTY! Cannot create chart data.");
-      console.log("🔍 Debug info:", {
-        crmUserRole: crmUser.role,
-        crmUserSalesPersonId: crmUser.salesPersonId,
-        salesPersonsError: salesPersonsError,
-        queryClientType: queryClient === supabase ? "regular" : "admin"
-      });
       return Response.json({
         calls: [],
         meetings: [],
@@ -348,10 +272,8 @@ export async function GET() {
         salesPersons: []
       });
     }
-    console.log("📋 Raw sales persons data:", JSON.stringify(salesPersons, null, 2));
-    console.log("📊 Calculated metrics:", JSON.stringify(calculatedMetrics, null, 2));
     
-    const performanceData = salesPersons.map((salesPerson, index) => {
+    const performanceData = salesPersons.map((salesPerson) => {
       // Use full_name from sales_persons table, fallback to users table or id
       let salesPersonName = salesPerson.full_name;
       if (!salesPersonName && salesPerson.user_id) {
@@ -378,31 +300,12 @@ export async function GET() {
         ? parseInt(salesPerson.total_conversions) || 0 
         : (calculated.conversions !== undefined ? calculated.conversions : 0);
       
-      const personData = {
+      return {
         name: salesPersonName,
         calls,
         meetings,
         conversions,
       };
-      
-      console.log(`👤 Person ${index + 1}:`, {
-        id: salesPerson.id,
-        full_name: salesPerson.full_name,
-        name: salesPersonName,
-        raw_call_attended: salesPerson.call_attended,
-        raw_meetings_attended: salesPerson.meetings_attended,
-        raw_total_conversions: salesPerson.total_conversions,
-        call_attended_type: typeof salesPerson.call_attended,
-        meetings_attended_type: typeof salesPerson.meetings_attended,
-        total_conversions_type: typeof salesPerson.total_conversions,
-        calculated,
-        final_calls: calls,
-        final_meetings: meetings,
-        final_conversions: conversions,
-        final: personData
-      });
-      
-      return personData;
     });
 
     // Sort by total performance (calls + meetings + conversions) descending
@@ -413,49 +316,17 @@ export async function GET() {
     });
 
     // Extract arrays for chart - ensure all values are numbers
-    console.log("📈 Extracting arrays for chart from performanceData:", performanceData.length);
-    
-    const calls = performanceData.map((p) => {
-      const val = Number(p.calls) || 0;
-      console.log(`  Calls: ${p.name} = ${val}`);
-      return val;
-    });
-    const meetings = performanceData.map((p) => {
-      const val = Number(p.meetings) || 0;
-      console.log(`  Meetings: ${p.name} = ${val}`);
-      return val;
-    });
-    const conversions = performanceData.map((p) => {
-      const val = Number(p.conversions) || 0;
-      console.log(`  Conversions: ${p.name} = ${val}`);
-      return val;
-    });
-    const salesPersonsNames = performanceData.map((p) => {
-      const name = p.name || "Unknown";
-      console.log(`  Name: ${name}`);
-      return name;
-    });
+    const calls = performanceData.map((p) => Number(p.calls) || 0);
+    const meetings = performanceData.map((p) => Number(p.meetings) || 0);
+    const conversions = performanceData.map((p) => Number(p.conversions) || 0);
+    const salesPersonsNames = performanceData.map((p) => p.name || "Unknown");
 
-    const data = {
+    return Response.json({
       calls,
       meetings,
       conversions,
       salesPersons: salesPersonsNames,
-    };
-
-    console.log("✅ FINAL API RESPONSE DATA:", {
-      salesPersonsCount: salesPersonsNames.length,
-      salesPersons: salesPersonsNames,
-      calls: calls,
-      meetings: meetings,
-      conversions: conversions,
-      callsTotal: calls.reduce((a, b) => a + b, 0),
-      meetingsTotal: meetings.reduce((a, b) => a + b, 0),
-      conversionsTotal: conversions.reduce((a, b) => a + b, 0),
-      fullData: JSON.stringify(data, null, 2)
     });
-
-    return Response.json(data);
   } catch (error) {
     console.error("Sales Person Performance API Error:", error.message);
     return Response.json(

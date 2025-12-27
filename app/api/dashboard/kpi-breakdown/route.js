@@ -44,23 +44,16 @@ export async function GET() {
     const startDate = new Date(fiscalYear, 3, 1); // April 1
     const endDate = new Date(fiscalYear + 1, 2, 31, 23, 59, 59); // March 31 of next year
 
-    console.log("📊 KPI Breakdown - Fetching data for fiscal year:", fiscalYear);
-    console.log("📅 Date range:", {
-      start: startDate.toISOString(),
-      end: endDate.toISOString()
-    });
-
-    // Fetch all task_activities - we'll filter by type in JavaScript to handle case variations
+    // Fetch all tasks from tasks_table - filter by type field
     // within the current fiscal year
-    const { data: allActivities, error: fetchError } = await supabase
-      .from("task_activities")
+    const { data: allTasks, error: fetchError } = await supabase
+      .from("tasks_table")
       .select("type, created_at")
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString());
 
     if (fetchError) {
-      console.error("❌ Error fetching task_activities:", fetchError);
-      // Return empty data instead of error
+      console.error("Error fetching tasks:", fetchError);
       return Response.json({
         calls: [0, 0, 0, 0],
         meetings: [0, 0, 0, 0],
@@ -69,24 +62,14 @@ export async function GET() {
       });
     }
 
-    console.log("📊 Fetched all activities count:", allActivities?.length || 0);
-
-    // Filter activities by type (case-insensitive matching)
-    // Support both "Call"/"call", "Meetings"/"meetings"/"meeting", "Conversion"/"conversion"
-    const activities = (allActivities || []).filter(activity => {
-      if (!activity.type) return false;
-      const typeLower = activity.type.toLowerCase();
+    // Filter tasks by type field (case-insensitive)
+    const tasks = (allTasks || []).filter(task => {
+      const typeLower = (task.type || "").toLowerCase();
       return typeLower === "call" || 
              typeLower === "meetings" || 
              typeLower === "meeting" ||
              typeLower === "conversion";
     });
-
-    console.log("📊 Filtered activities count (Call/Meetings/Conversion):", activities.length);
-    
-    // Log unique types found for debugging
-    const uniqueTypes = [...new Set((allActivities || []).map(a => a.type))];
-    console.log("📊 Unique types found in database:", uniqueTypes);
 
     // Initialize quarter counters
     const quarterData = {
@@ -96,26 +79,25 @@ export async function GET() {
       4: { calls: 0, meetings: 0, conversions: 0 }, // Q4: January - March
     };
 
-    // Process each activity and group by quarter
-    if (activities && activities.length > 0) {
-      activities.forEach((activity) => {
-        if (!activity.created_at) return;
+    // Process each task and group by quarter
+    if (tasks && tasks.length > 0) {
+      tasks.forEach((task) => {
+        if (!task.created_at) return;
         
-        const activityDate = new Date(activity.created_at);
-        const quarter = getQuarter(activityDate);
-        const type = activity.type?.toLowerCase(); // Normalize to lowercase for comparison
+        const taskDate = new Date(task.created_at);
+        const quarter = getQuarter(taskDate);
+        const typeLower = (task.type || "").toLowerCase();
 
-        if (type === "call") {
+        // Count by type
+        if (typeLower === "call") {
           quarterData[quarter].calls++;
-        } else if (type === "meetings" || type === "meeting") {
+        } else if (typeLower === "meetings" || typeLower === "meeting") {
           quarterData[quarter].meetings++;
-        } else if (type === "conversion") {
+        } else if (typeLower === "conversion") {
           quarterData[quarter].conversions++;
         }
       });
     }
-
-    console.log("📊 Quarter data:", quarterData);
 
     // Format data for chart (Q1, Q2, Q3, Q4 order)
     const data = {
@@ -140,11 +122,14 @@ export async function GET() {
       categories: ["Q1", "Q2", "Q3", "Q4"],
     };
 
-    console.log("✅ Final KPI Breakdown data:", data);
+    // Ensure all arrays have exactly 4 elements
+    while (data.calls.length < 4) data.calls.push(0);
+    while (data.meetings.length < 4) data.meetings.push(0);
+    while (data.conversions.length < 4) data.conversions.push(0);
 
     return Response.json(data);
   } catch (error) {
-    console.error("❌ KPI Breakdown API Error:", error.message);
+    console.error("KPI Breakdown API Error:", error.message);
     return Response.json(
       {
         calls: [0, 0, 0, 0],

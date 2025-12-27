@@ -143,6 +143,25 @@ export default function KPICallBarChart() {
     [isDark]
   );
 
+  // Prepare chart data - ensure arrays are numbers and have correct length
+  const callsData = Array.isArray(data.calls) 
+    ? data.calls.map(val => Number(val) || 0).slice(0, 4) 
+    : [0, 0, 0, 0];
+  const meetingsData = Array.isArray(data.meetings) 
+    ? data.meetings.map(val => Number(val) || 0).slice(0, 4) 
+    : [0, 0, 0, 0];
+  const conversionsData = Array.isArray(data.conversions) 
+    ? data.conversions.map(val => Number(val) || 0).slice(0, 4) 
+    : [0, 0, 0, 0];
+  const categories = Array.isArray(data.categories) && data.categories.length === 4
+    ? data.categories
+    : ["Q1", "Q2", "Q3", "Q4"];
+
+  // Pad arrays to ensure 4 elements
+  while (callsData.length < 4) callsData.push(0);
+  while (meetingsData.length < 4) meetingsData.push(0);
+  while (conversionsData.length < 4) conversionsData.push(0);
+
   const chartCards = useMemo(
     () => [
       {
@@ -152,9 +171,9 @@ export default function KPICallBarChart() {
         type: "bar",
         height: 400,
         series: [
-          { name: "Calls", data: data.calls || [] },
-          { name: "Meetings", data: data.meetings || [] },
-          { name: "Conversions", data: data.conversions || [] },
+          { name: "Calls", data: callsData },
+          { name: "Meetings", data: meetingsData },
+          { name: "Conversions", data: conversionsData },
         ],
         options: {
           ...baseOptions,
@@ -166,7 +185,12 @@ export default function KPICallBarChart() {
 
           xaxis: {
             ...baseOptions.xaxis,
-            categories: data.categories || ["Q1", "Q2", "Q3", "Q4"],
+            categories: categories,
+          },
+
+          yaxis: {
+            ...baseOptions.yaxis,
+            min: 0,
           },
 
           tooltip: {
@@ -180,7 +204,7 @@ export default function KPICallBarChart() {
         },
       },
     ],
-    [baseOptions, isDark, data]
+    [baseOptions, isDark, callsData, meetingsData, conversionsData, categories]
   );
 
   if (error) {
