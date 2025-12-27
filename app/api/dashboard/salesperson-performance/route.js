@@ -40,12 +40,12 @@ export async function GET() {
       // Admin should see all sales persons
       queryBuilder = supabase
         .from("sales_persons")
-        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion");
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversions");
     } else if (crmUser.role === "sales" && crmUser.salesPersonId) {
       // Sales users see only their own record
       queryBuilder = supabase
         .from("sales_persons")
-        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion")
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversions")
         .eq("id", crmUser.salesPersonId);
     } else {
       // Sales user without salesPersonId - return empty
@@ -126,7 +126,7 @@ export async function GET() {
           const adminClient = supabaseAdmin();
           let adminQueryBuilder = adminClient
             .from("sales_persons")
-            .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion");
+            .select("id, user_id, full_name, call_attended, meetings_attended, total_conversions");
           
           const adminResult = await adminQueryBuilder;
           
@@ -169,7 +169,7 @@ export async function GET() {
       const adminClient = supabaseAdmin();
       const adminResult = await adminClient
         .from("sales_persons")
-        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion")
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversions")
         .eq("id", crmUser.salesPersonId);
       
       if (!adminResult.error && adminResult.data && adminResult.data.length > 0) {
@@ -287,7 +287,7 @@ export async function GET() {
     const hasPerformanceData = salesPersons.some(sp => 
       (sp.call_attended && parseInt(sp.call_attended) > 0) ||
       (sp.meetings_attended && parseInt(sp.meetings_attended) > 0) ||
-      (sp.total_conversion && parseInt(sp.total_conversion) > 0)
+      (sp.total_conversions && parseInt(sp.total_conversions) > 0)
     );
 
     // Calculate metrics from other tables if sales_persons table doesn't have performance data
@@ -364,24 +364,19 @@ export async function GET() {
       // Use calculated metrics if available, otherwise use table values
       const calculated = calculatedMetrics[salesPerson.id] || {};
       
-      // Get values from table fields: call_attended, meetings_attended, total_conversion
-      const calls = calculated.calls !== undefined 
-        ? calculated.calls
-        : (salesPerson.call_attended !== null && salesPerson.call_attended !== undefined 
-            ? parseInt(salesPerson.call_attended) || 0 
-            : 0);
+      // Get values from table fields: call_attended, meetings_attended, total_conversions
+      // Prioritize table values over calculated metrics
+      const calls = salesPerson.call_attended !== null && salesPerson.call_attended !== undefined 
+        ? parseInt(salesPerson.call_attended) || 0 
+        : (calculated.calls !== undefined ? calculated.calls : 0);
       
-      const meetings = calculated.meetings !== undefined
-        ? calculated.meetings
-        : (salesPerson.meetings_attended !== null && salesPerson.meetings_attended !== undefined 
-            ? parseInt(salesPerson.meetings_attended) || 0 
-            : 0);
+      const meetings = salesPerson.meetings_attended !== null && salesPerson.meetings_attended !== undefined 
+        ? parseInt(salesPerson.meetings_attended) || 0 
+        : (calculated.meetings !== undefined ? calculated.meetings : 0);
       
-      const conversions = calculated.conversions !== undefined
-        ? calculated.conversions
-        : (salesPerson.total_conversion !== null && salesPerson.total_conversion !== undefined 
-            ? parseInt(salesPerson.total_conversion) || 0 
-            : 0);
+      const conversions = salesPerson.total_conversions !== null && salesPerson.total_conversions !== undefined 
+        ? parseInt(salesPerson.total_conversions) || 0 
+        : (calculated.conversions !== undefined ? calculated.conversions : 0);
       
       const personData = {
         name: salesPersonName,
@@ -396,10 +391,10 @@ export async function GET() {
         name: salesPersonName,
         raw_call_attended: salesPerson.call_attended,
         raw_meetings_attended: salesPerson.meetings_attended,
-        raw_total_conversion: salesPerson.total_conversion,
+        raw_total_conversions: salesPerson.total_conversions,
         call_attended_type: typeof salesPerson.call_attended,
         meetings_attended_type: typeof salesPerson.meetings_attended,
-        total_conversion_type: typeof salesPerson.total_conversion,
+        total_conversions_type: typeof salesPerson.total_conversions,
         calculated,
         final_calls: calls,
         final_meetings: meetings,
