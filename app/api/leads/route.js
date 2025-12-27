@@ -10,56 +10,22 @@ export async function GET() {
   
   // If no CRM user found, return empty array instead of 403 to prevent loading loops
   if (!crmUser) {
-    console.warn("No CRM user found - returning empty leads array");
     return Response.json([]);
   }
 
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
-  console.log("🔍 Leads API: Fetching leads for user", { 
-    userId: crmUser.id, 
-    role: crmUser.role,
-    email: crmUser.email 
-  });
-  
-  // For debugging: Check what assigned_to values exist in the database
-  if (crmUser.role === "sales") {
-    const salesPersonId = crmUser.salesPersonId;
-    const { data: allLeads, error: debugError } = await supabase
-      .from("leads_table")
-      .select("id, lead_name, assigned_to");
-    
-    console.log("🔍 DEBUG: All leads in database:", {
-      totalLeads: allLeads?.length || 0,
-      leadsWithAssignedTo: allLeads?.filter(l => l.assigned_to).length || 0,
-      uniqueAssignedTo: [...new Set(allLeads?.map(l => l.assigned_to).filter(Boolean))],
-      userId: crmUser.id,
-      salesPersonId: salesPersonId,
-      lookingFor: salesPersonId,
-      matchingLeads: allLeads?.filter(l => l.assigned_to === salesPersonId).length || 0,
-      sampleLeads: allLeads?.slice(0, 5).map(l => ({ id: l.id, name: l.lead_name, assigned_to: l.assigned_to }))
-    });
-  }
-  
   // Order by id (descending to show newest leads first)
   const { data, error } = await query.order("id", { ascending: true });
-  
-  console.log("✅ Leads API: Query result", { 
-    dataCount: data?.length || 0, 
-    error: error?.message,
-    returnedLeadIds: data?.map(l => ({ id: l.id, name: l.lead_name, assigned_to: l.assigned_to })) || []
-  });
 
   if (error) {
-    console.error("Leads API Error:", error);
     // Return empty array instead of error to prevent loading loops
     return Response.json([]);
   }
 
   // Handle null or undefined data
   if (!data || !Array.isArray(data)) {
-    console.warn("Leads API: No data returned or data is not an array");
     return Response.json([]);
   }
 
@@ -145,7 +111,6 @@ export async function POST(request) {
     // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
     finalAssignedTo = crmUser.salesPersonId || null;
     if (!finalAssignedTo) {
-      console.warn("Leads POST: No sales_person_id found for user", crmUser.id);
       return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
     }
   } else if (crmUser.role === "admin") {
@@ -234,7 +199,6 @@ export async function PATCH(request) {
       .single();
 
     if (accessError || !existingLead) {
-      console.error("Lead access check failed:", { id, error: accessError, hasLead: !!existingLead });
       return Response.json({ error: "Lead not found or access denied" }, { status: 404 });
     }
 
@@ -254,7 +218,6 @@ export async function PATCH(request) {
     if (turnover !== undefined) updateData.turnover = turnover;
     if (industryType !== undefined) {
       updateData.industry_type = industryType;
-      console.log("📝 Updating industry_type:", industryType);
     }
     if (current_stage !== undefined) updateData.current_stage = current_stage;
     if (next_stage_notes !== undefined) updateData.next_stage_notes = next_stage_notes;
@@ -268,7 +231,6 @@ export async function PATCH(request) {
         // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
         finalAssignedTo = crmUser.salesPersonId || null;
         if (!finalAssignedTo) {
-          console.warn("Leads PATCH: No sales_person_id found for user", crmUser.id);
           return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
         }
       } else if (crmUser.role === "admin") {
@@ -281,8 +243,6 @@ export async function PATCH(request) {
     if (Object.keys(updateData).length === 0) {
       return Response.json({ error: "No fields to update" }, { status: 400 });
     }
-
-    console.log("🔄 Updating lead with data:", JSON.stringify(updateData, null, 2));
     
     const { data, error } = await supabase
       .from("leads_table")
@@ -291,14 +251,10 @@ export async function PATCH(request) {
       .select();
 
     if (error) {
-      console.error("❌ Leads PATCH Error:", error.message, "| ID:", id, "| Data:", updateData);
       return Response.json({ error: error.message }, { status: 500 });
     }
-    
-    console.log("✅ Lead updated successfully:", data?.[0]?.industry_type);
 
     if (!data || data.length === 0) {
-      console.error("Leads PATCH Error: No lead found with ID:", id);
       return Response.json({ error: "Lead not found" }, { status: 404 });
     }
 
@@ -351,7 +307,6 @@ export async function PATCH(request) {
             .single();
 
           if (taskError) {
-            console.error("Error creating task for status change:", taskError);
             // Don't fail the lead update if task creation fails
           } else if (statusTask && crmUser.id) {
             // Create corresponding task_activity record with assigned salesperson_id
@@ -368,12 +323,10 @@ export async function PATCH(request) {
               });
 
             if (activityError) {
-              console.error("Error creating task activity for status change:", activityError);
               // Don't fail if activity creation fails - it's optional
             }
           }
         } catch (err) {
-          console.error("Exception creating task/activity for status change:", err);
           // Don't fail the lead update if task/activity creation fails
         }
       }
@@ -425,7 +378,6 @@ export async function PATCH(request) {
 
     return Response.json({ success: true, data: formattedLead });
   } catch (error) {
-    console.error("Leads PATCH Exception:", error);
     return Response.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

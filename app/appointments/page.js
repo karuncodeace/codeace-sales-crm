@@ -30,19 +30,6 @@ export default function BookingsPage() {
   // Normalize bookings to array to avoid runtime errors
   const bookingsList = Array.isArray(bookings) ? bookings : [];
 
-  // Debug: Log bookings data
-  React.useEffect(() => {
-    if (bookings) {
-      console.log("📊 Bookings data received:", {
-        totalCount: bookingsList.length,
-        bookings: bookingsList.map(b => ({ 
-          id: b.id, 
-          status: b.status, 
-          invitee_name: b.invitee_name 
-        }))
-      });
-    }
-  }, [bookings, bookingsList]);
 
   // Map booking status to display status (bookings use "scheduled", appointments use "booked")
   // Check is_rescheduled flag to detect rescheduled bookings
@@ -159,7 +146,6 @@ export default function BookingsPage() {
       mutate();
       alert("Booking cancelled successfully!");
     } catch (error) {
-      console.error("Error cancelling booking:", error);
       alert(error.message || "Failed to cancel booking. Please try again.");
     } finally {
       setIsProcessing(false);
@@ -200,7 +186,6 @@ export default function BookingsPage() {
       setRescheduleModal({ isOpen: false, appointment: null });
       alert("Booking rescheduled successfully!");
     } catch (error) {
-      console.error("Error rescheduling booking:", error);
       alert(error.message || "Failed to reschedule booking. Please try again.");
     } finally {
       setIsProcessing(false);

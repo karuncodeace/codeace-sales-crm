@@ -52,7 +52,6 @@ export default function RevenuePage() {
           router.push("/dashboard");
         }
       } catch (error) {
-        console.error("Error checking user role:", error);
         router.push("/dashboard");
       } finally {
         setIsLoading(false);

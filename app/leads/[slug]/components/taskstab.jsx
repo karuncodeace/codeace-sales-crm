@@ -160,7 +160,6 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
       type: taskTypes[nextStage] || "Call",
     };
   } catch (error) {
-    console.error("Error generating task title:", error);
     return null;
   }
 }
@@ -259,7 +258,6 @@ export default function TasksTab({ leadId, leadName }) {
       if (!res.ok) throw new Error("Failed to update task");
       await mutate();
     } catch (err) {
-      console.error("Error updating task status:", err);
       await mutate(); // revert
     }
   };
@@ -300,7 +298,6 @@ export default function TasksTab({ leadId, leadName }) {
       if (!stageNotesRes.ok) {
         const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
         const errorMessage = errorData.error || errorData.details || "Failed to save stage notes";
-        console.error("Stage notes error:", errorData);
         throw new Error(errorMessage);
       }
       
@@ -404,7 +401,6 @@ export default function TasksTab({ leadId, leadName }) {
         window.location.reload();
       }
     } catch (error) {
-      console.error("Error completing task:", error);
       alert(error.message);
       setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -427,7 +423,6 @@ export default function TasksTab({ leadId, leadName }) {
 
   // Handle demo outcome confirmation
   const handleDemoOutcomeConfirm = async () => {
-    console.log("handleDemoOutcomeConfirm called", demoOutcomeModal);
     const { task, requiresSecondDemo } = demoOutcomeModal;
     
     if (requiresSecondDemo === null) {
@@ -435,12 +430,10 @@ export default function TasksTab({ leadId, leadName }) {
       return;
     }
 
-    console.log("requiresSecondDemo value:", requiresSecondDemo);
     setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
       if (requiresSecondDemo) {
-        console.log("YES branch - requires second demo");
         // YES: Stay in Contacted stage, redirect to leads page, scroll to demo section
         // Mark task as completed
         const taskRes = await fetch("/api/tasks", {
@@ -470,11 +463,8 @@ export default function TasksTab({ leadId, leadName }) {
         router.push(`/leads/${leadId}?scrollToDemo=true`);
       } else {
         // NO: Proceed with normal flow - EXACT COPY of handleConfirmTaskCompletion logic
-        console.log("Demo outcome: NO selected, starting flow");
         const currentLeadStatus = leadData?.status || "New";
-        console.log("Current lead status:", currentLeadStatus);
         const nextStage = getNextStage(currentLeadStatus);
-        console.log("Next stage:", nextStage);
         
         // Save to stage_notes table
         const stageNotesRes = await fetch("/api/stage-notes", {
@@ -491,14 +481,11 @@ export default function TasksTab({ leadId, leadName }) {
         if (!stageNotesRes.ok) {
           const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
           const errorMessage = errorData.error || errorData.details || "Failed to save stage notes";
-          console.error("Stage notes error:", errorData);
           throw new Error(errorMessage);
         }
 
         // Update lead status and stage notes
-        console.log("Checking if nextStage exists:", nextStage);
         if (nextStage) {
-          console.log("Updating lead status to:", nextStage);
           const leadUpdateRes = await fetch("/api/leads", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -513,12 +500,9 @@ export default function TasksTab({ leadId, leadName }) {
           if (!leadUpdateRes.ok) {
             throw new Error("Failed to update lead status");
           }
-          console.log("Lead status updated successfully");
           
           // Create task for next stage (only if not Won) - EXACT COPY
-          console.log("Checking canCreateTaskForStage:", nextStage, canCreateTaskForStage(nextStage));
           if (nextStage && canCreateTaskForStage(nextStage)) {
-            console.log("Getting task details for stage:", nextStage, "leadName:", leadName, "tasks count:", tasks.length);
             const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasks);
             if (taskDetails) {
               // Check for existing active tasks before creating
@@ -526,14 +510,6 @@ export default function TasksTab({ leadId, leadName }) {
               const activeTasks = tasks.filter(
                 (t) => String(t.status || "").toLowerCase() !== "completed" && t.id !== task.id
               );
-              
-              console.log("Demo outcome - Creating task:", {
-                nextStage,
-                taskDetails,
-                activeTasksCount: activeTasks.length,
-                allTasks: tasks.length,
-                currentTaskId: task.id
-              });
               
               // Only create if no active tasks exist (excluding current task)
               if (activeTasks.length === 0) {
@@ -555,18 +531,10 @@ export default function TasksTab({ leadId, leadName }) {
 
                 if (!createRes.ok) {
                   const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
-                  console.error("Failed to create task:", errorData);
                   throw new Error(errorData.error || "Failed to create next task");
                 }
-                console.log("Task created successfully");
-              } else {
-                console.log("Skipping task creation - active tasks exist:", activeTasks.length);
               }
-            } else {
-              console.log("No task details generated for stage:", nextStage);
             }
-          } else {
-            console.log("Cannot create task for stage:", nextStage);
           }
         }
         
@@ -613,7 +581,6 @@ export default function TasksTab({ leadId, leadName }) {
         }
       }
     } catch (error) {
-      console.error("Error handling demo outcome:", error);
       alert(error.message);
       setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -682,7 +649,6 @@ export default function TasksTab({ leadId, leadName }) {
       }
       taskTitle = generateTaskTitle(currentStage, leadName || leadData.lead_name || leadData.name, options);
     } catch (error) {
-      console.error("Error generating task title:", error);
       alert(error.message || "Failed to generate task title");
       return;
     }
@@ -716,7 +682,6 @@ export default function TasksTab({ leadId, leadName }) {
       setShowAddTask(false);
       await mutate();
     } catch (err) {
-      console.error("Error creating task:", err);
       alert(err.message || "Failed to create task");
     } finally {
       setIsSubmitting(false);

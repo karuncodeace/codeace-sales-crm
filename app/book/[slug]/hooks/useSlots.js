@@ -20,11 +20,6 @@ export function useSlots(eventType, selectedDate) {
                 const userTimeZone = getUserTimeZone();
                 const { startDateISO, endDateISO } = getDateRangeForNextDays(DAYS_TO_FETCH);
 
-                console.log(`✅ Fetching slots for next ${DAYS_TO_FETCH} days`, { 
-                    startDate: startDateISO, 
-                    endDate: endDateISO 
-                });
-
                 const slotsUrl =
                     `/api/slots?eventTypeId=${eventType.id}` +
                     `&startDate=${encodeURIComponent(startDateISO)}` +

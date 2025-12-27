@@ -146,7 +146,6 @@ export default function LeadDetailPage() {
             if (!res.ok) throw new Error("Failed to update priority");
             await mutate();
         } catch (err) {
-            console.error("Error updating priority:", err);
             await mutate(); // revert to server state
         }
     };
@@ -164,7 +163,6 @@ export default function LeadDetailPage() {
             if (!res.ok) throw new Error("Failed to update status");
             await mutate();
         } catch (err) {
-            console.error("Error updating status:", err);
             await mutate(); // revert to server state
         }
     };

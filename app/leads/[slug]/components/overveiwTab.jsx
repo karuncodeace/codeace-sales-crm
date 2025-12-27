@@ -327,7 +327,7 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                                         setCopiedEmail(true);
                                                         setTimeout(() => setCopiedEmail(false), 2000);
                                                     } catch (err) {
-                                                        console.error('Failed to copy:', err);
+                                                        // Silently handle copy error
                                                     }
                                                 }}
                                                 className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded  ${theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`}

@@ -119,7 +119,6 @@ export default function ActivityTab({ leadId }) {
             };
             return date.toLocaleString('en-IN', options);
         } catch (error) {
-            console.error('Error formatting date:', error);
             return dateString;
         }
     };
@@ -185,7 +184,7 @@ export default function ActivityTab({ leadId }) {
                 mutate(); // Refresh the activities list
             }
         } catch (error) {
-            console.error("Error adding activity:", error);
+            // Silently handle error
         } finally {
             setIsSubmitting(false);
         }

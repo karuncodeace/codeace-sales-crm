@@ -36,11 +36,6 @@ export async function POST(request) {
       .insert(insertData);
 
     if (error) {
-      console.error("Task Activities API Error:", error);
-      console.error("   - Code:", error.code);
-      console.error("   - Message:", error.message);
-      console.error("   - Details:", error.details);
-      
       // Check if error contains HTML (Cloudflare/proxy error)
       const errorMessage = error.message || String(error);
       if (errorMessage.includes('<html>') || errorMessage.includes('cloudflare')) {
@@ -58,7 +53,6 @@ export async function POST(request) {
 
     return Response.json({ success: true });
   } catch (err) {
-    console.error("Task Activities API Exception:", err);
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }
@@ -83,15 +77,9 @@ export async function GET(request) {
     const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Task Activities API Error:", error);
-      console.error("   - Code:", error.code);
-      console.error("   - Message:", error.message);
-      console.error("   - Details:", error.details);
-      
       // Check if error contains HTML (Cloudflare/proxy error)
       const errorMessage = error.message || String(error);
       if (errorMessage.includes('<html>') || errorMessage.includes('cloudflare')) {
-        console.error("⚠️ Detected HTML/Cloudflare error - Supabase connection issue");
         return Response.json([]); // Return empty array instead of error
       }
       
@@ -100,7 +88,6 @@ export async function GET(request) {
 
     return Response.json(data || []);
   } catch (err) {
-    console.error("Task Activities API Exception:", err);
     return Response.json([]); // Return empty array on exception
   }
 }
@@ -117,13 +104,11 @@ export async function DELETE(request) {
     const { error } = await supabase.from("task_activities").delete().eq("id", id);
 
     if (error) {
-      console.error("Task Activities DELETE Error:", error);
       return Response.json({ error: error.message || "Failed to delete task activity" }, { status: 500 });
     }
 
     return Response.json({ success: true });
   } catch (err) {
-    console.error("Task Activities DELETE Exception:", err);
     return Response.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }

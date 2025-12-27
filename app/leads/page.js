@@ -14,7 +14,6 @@ export default function LeadsPage() {
         open={openAddLead}
         onClose={() => setOpenAddLead(false)}
         onAdd={(newLead) => {
-          console.log("New lead added:", newLead);
           setOpenAddLead(false);
         }}
       />

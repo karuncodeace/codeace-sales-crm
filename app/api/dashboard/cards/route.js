@@ -16,12 +16,10 @@ export async function GET() {
       try {
         const result = await queryFn();
         if (result.error) {
-          console.error("Query error:", result.error);
           return defaultValue;
         }
         return result;
       } catch (error) {
-        console.error("Query exception:", error);
         return defaultValue;
       }
     };
@@ -105,11 +103,8 @@ export async function GET() {
       conversionRate: conversionRate
     };
 
-    console.log("✅ Dashboard Cards API Final Data:", data);
     return Response.json(data);
   } catch (error) {
-    console.error("Cards API Error:", error);
-    console.error("Error stack:", error.stack);
     return Response.json(
       { 
         error: "Failed to fetch cards data",

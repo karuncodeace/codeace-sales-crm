@@ -55,7 +55,7 @@ export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
             setShowAdd(false);
             await mutate();
         } catch (err) {
-            console.error("Error adding objection:", err);
+            // Silently handle error
         } finally {
             setIsSubmitting(false);
         }
@@ -69,7 +69,7 @@ export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
             if (!res.ok) throw new Error("Failed to delete objection");
             await mutate();
         } catch (err) {
-            console.error("Error deleting objection:", err);
+            // Silently handle error
         } finally {
             setDeletingId(null);
         }

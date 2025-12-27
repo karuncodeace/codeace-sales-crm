@@ -73,7 +73,6 @@ export async function GET() {
         const resultBasic = await basicQueryBuilder;
         
         if (resultBasic.error) {
-          console.error("Error fetching sales persons (basic):", resultBasic.error);
           salesPersonsError = resultBasic.error;
         } else {
           salesPersons = resultBasic.data || [];
@@ -144,7 +143,6 @@ export async function GET() {
 
     // If we still have an error after all fallbacks, return empty data instead of error
     if (salesPersonsError) {
-      console.error("Error fetching sales persons:", salesPersonsError);
       return Response.json({
         calls: [],
         meetings: [],
@@ -173,7 +171,6 @@ export async function GET() {
       const usersResult = await usersQueryBuilder;
       
       if (usersResult.error) {
-        console.error("Error fetching users as fallback:", usersResult.error);
         return Response.json({
           calls: [],
           meetings: [],
@@ -328,7 +325,6 @@ export async function GET() {
       salesPersons: salesPersonsNames,
     });
   } catch (error) {
-    console.error("Sales Person Performance API Error:", error.message);
     return Response.json(
       { error: "Failed to fetch sales person performance data" },
       { status: 500 }

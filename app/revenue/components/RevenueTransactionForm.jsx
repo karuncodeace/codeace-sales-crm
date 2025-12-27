@@ -40,7 +40,7 @@ export default function RevenueTransactionForm({ onSuccess, onCancel, leadId: in
           setSalesPersons(salesPersonsData || []);
         }
       } catch (err) {
-        console.error("Error loading data:", err);
+        // Silently handle error
       } finally {
         setIsLoadingData(false);
       }

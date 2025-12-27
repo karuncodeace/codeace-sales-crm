@@ -10,7 +10,6 @@ export async function GET() {
     
     // If no CRM user found, return empty data
     if (!crmUser) {
-      console.warn("No CRM user found - returning empty lead sources data");
       return Response.json({
         series: [],
         labels: [],
@@ -25,7 +24,6 @@ export async function GET() {
     const { data: leads, error } = await query.select("lead_source");
 
     if (error) {
-      console.error("Lead Sources API Error:", error);
       return Response.json(
         { error: "Failed to fetch lead sources data" },
         { status: 500 }
@@ -81,7 +79,6 @@ export async function GET() {
 
     return Response.json(data);
   } catch (error) {
-    console.error("Lead Sources API Error:", error.message);
     return Response.json(
       { error: "Failed to fetch lead sources data" },
       { status: 500 }

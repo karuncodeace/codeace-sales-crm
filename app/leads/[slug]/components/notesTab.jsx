@@ -157,7 +157,7 @@ function NotesTab({ theme, leadId, leadName }) {
                 mutate(); // Refresh the notes list
             }
         } catch (error) {
-            console.error("Error adding note:", error);
+            // Silently handle error
         } finally {
             setIsSubmitting(false);
         }
@@ -187,7 +187,7 @@ function NotesTab({ theme, leadId, leadName }) {
                 mutate();
             }
         } catch (error) {
-            console.error("Error updating note:", error);
+            // Silently handle error
         } finally {
             setIsSubmitting(false);
         }
@@ -207,7 +207,7 @@ function NotesTab({ theme, leadId, leadName }) {
             }
             await mutate();
         } catch (error) {
-            console.error("Error deleting note:", error);
+            // Silently handle error
         } finally {
             setDeletingNoteId(null);
         }

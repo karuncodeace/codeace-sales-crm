@@ -66,13 +66,12 @@ export default function DashboardPage() {
             mutate(endpoint, data, { revalidate: false });
             return data;
           } catch (error) {
-            console.error(`Failed to preload ${endpoint}:`, error);
             return null;
           }
         });
         await Promise.allSettled(promises);
       } catch (error) {
-        console.error("Error preloading dashboard data:", error);
+        // Silently handle preload errors
       }
     };
 

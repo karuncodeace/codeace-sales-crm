@@ -53,7 +53,6 @@ export async function GET() {
       .lte("created_at", endDate.toISOString());
 
     if (fetchError) {
-      console.error("Error fetching tasks:", fetchError);
       return Response.json({
         calls: [0, 0, 0, 0],
         meetings: [0, 0, 0, 0],
@@ -129,7 +128,6 @@ export async function GET() {
 
     return Response.json(data);
   } catch (error) {
-    console.error("KPI Breakdown API Error:", error.message);
     return Response.json(
       {
         calls: [0, 0, 0, 0],

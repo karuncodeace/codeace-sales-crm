@@ -10,7 +10,6 @@ export async function GET(request) {
   
   // If no CRM user found, return empty array instead of 403 to prevent loading loops
   if (!crmUser) {
-    console.warn("No CRM user found - returning empty tasks array");
     return Response.json([]);
   }
   
@@ -27,7 +26,6 @@ export async function GET(request) {
     const salesPersonId = crmUser.salesPersonId;
     
     if (!salesPersonId) {
-      console.warn("Tasks API: No sales_person_id found for user", crmUser.id);
       return Response.json([]);
     }
     
@@ -38,20 +36,7 @@ export async function GET(request) {
       .select("id")
       .eq("assigned_to", salesPersonId);
     
-    if (leadsError) {
-      console.error("Tasks API: Error fetching assigned leads:", leadsError);
-    }
-    
     const assignedLeadIds = assignedLeads?.map(lead => lead.id) || [];
-    
-    console.log("🔍 Tasks API: Fetching tasks for sales user", { 
-      userId: crmUser.id,
-      salesPersonId: salesPersonId,
-      email: crmUser.email,
-      assignedLeadIds: assignedLeadIds.length,
-      assignedLeadIds: assignedLeadIds,
-      leadId: leadId || "all"
-    });
     
     // Fetch tasks in two queries and combine:
     // 1. Tasks with sales_person_id = salesPersonId
@@ -66,7 +51,6 @@ export async function GET(request) {
     
     // If no tasks found, try with admin client to check if it's an RLS issue
     if ((!allTasks || allTasks.length === 0) && !allTasksError) {
-      console.log("⚠️ Tasks API: No tasks found with regular client, trying admin client to check RLS");
       const adminClient = supabaseAdmin();
       const { data: adminTasks, error: adminError } = await adminClient
         .from("tasks_table")
@@ -74,57 +58,11 @@ export async function GET(request) {
         .limit(10);
       
       if (adminTasks && adminTasks.length > 0) {
-        console.warn("⚠️ Tasks API: RLS may be blocking access! Admin client found tasks:", {
-          adminTaskCount: adminTasks.length,
-          sampleTasks: adminTasks.slice(0, 3)
-        });
         // Use admin tasks for debugging, but note this is a security issue
         allTasks = adminTasks;
-      } else if (adminError) {
-        console.error("Tasks API: Admin client also failed:", adminError);
       }
     }
     
-    if (allTasksError) {
-      console.error("Tasks API: Error fetching all tasks:", allTasksError);
-    }
-    
-    // First, let's get a sample of all tasks to debug format matching
-    const sampleTasks = allTasks?.slice(0, 10) || [];
-    
-    console.log("🔍 Tasks API: Sample tasks from DB", {
-      allTasksCount: allTasks?.length || 0,
-      allTasksError: allTasksError?.message,
-      sampleTasks: sampleTasks.map(t => ({ 
-        id: t.id, 
-        sales_person_id: t.sales_person_id, 
-        sales_person_id_type: typeof t.sales_person_id,
-        lead_id: t.lead_id,
-        status: t.status
-      })),
-      lookingForSalesPersonId: salesPersonId,
-      lookingForType: typeof salesPersonId
-    });
-    
-    // If we still have no tasks, try a direct count query to verify table access
-    if (!allTasks || allTasks.length === 0) {
-      const { count: totalCount, error: totalCountError } = await supabase
-        .from("tasks_table")
-        .select("*", { count: "exact", head: true });
-      
-      const { count: pendingCount, error: pendingCountError } = await supabase
-        .from("tasks_table")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "Pending");
-      
-      console.log("🔍 Tasks API: Direct count query", {
-        totalCount,
-        pendingCount,
-        totalCountError: totalCountError?.message,
-        pendingCountError: pendingCountError?.message,
-        hasRLSError: totalCountError?.code === "PGRST116" || totalCountError?.message?.includes("permission")
-      });
-    }
     
     // Check if RLS is blocking - if admin client can see tasks but regular client can't, use admin
     let queryClient = supabase;
@@ -137,8 +75,6 @@ export async function GET(request) {
     const isRLSBlocking = adminCheck && adminCheck.length > 0 && (!allTasks || allTasks.length === 0);
     
     if (isRLSBlocking) {
-      console.warn("⚠️ Tasks API: RLS is blocking access! Admin client found tasks but regular client didn't.");
-      console.warn("⚠️ Using admin client as temporary workaround. Please configure RLS policies to allow sales users to read their tasks!");
       queryClient = adminClient;
     }
     
@@ -168,50 +104,6 @@ export async function GET(request) {
       error: tasksByLeadsRaw.error
     };
     
-    console.log("🔍 Tasks API: Query results after RLS check", {
-      isRLSBlocking,
-      usingAdminClient: queryClient === adminClient,
-      tasksBySalespersonCount: tasksBySalesperson.data?.length || 0,
-      tasksBySalespersonError: tasksBySalesperson.error?.message,
-      tasksByLeadsCount: tasksByLeads.data?.length || 0,
-      tasksByLeadsError: tasksByLeads.error?.message
-    });
-    
-    // Log detailed results for debugging
-    if (tasksBySalesperson.error) {
-      console.error("Tasks API: Error fetching tasks by sales_person_id:", tasksBySalesperson.error);
-    }
-    if (tasksByLeads.error) {
-      console.error("Tasks API: Error fetching tasks by leads:", tasksByLeads.error);
-    }
-    
-    // If no tasks found and we have assigned leads, log a warning
-    if ((!tasksBySalesperson.data || tasksBySalesperson.data.length === 0) && 
-        (!tasksByLeads.data || tasksByLeads.data.length === 0)) {
-      if (assignedLeadIds.length > 0) {
-        console.warn("⚠️ Tasks API: No tasks found for sales person despite having assigned leads", {
-          salesPersonId,
-          assignedLeadIds,
-          assignedLeadCount: assignedLeadIds.length
-        });
-      } else {
-        console.warn("⚠️ Tasks API: No tasks found - sales person has no assigned leads", {
-          salesPersonId,
-          userId: crmUser.id
-        });
-      }
-    }
-    
-    // Log query results for debugging
-    console.log("🔍 Tasks API: Query results", {
-      tasksBySalespersonCount: tasksBySalesperson.data?.length || 0,
-      tasksBySalespersonError: tasksBySalesperson.error?.message,
-      tasksByLeadsCount: tasksByLeads.data?.length || 0,
-      tasksByLeadsError: tasksByLeads.error?.message,
-      sampleTasksBySalesperson: tasksBySalesperson.data?.slice(0, 3).map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id })),
-      sampleTasksByLeads: tasksByLeads.data?.slice(0, 3).map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id }))
-    });
-    
     // Combine results and remove duplicates
     const tasksById = new Map();
     
@@ -233,7 +125,6 @@ export async function GET(request) {
     // Fallback: If no tasks found but we have assigned leads, try a manual filter
     // This handles cases where there might be type mismatches in the database query
     if (combinedTasks.length === 0 && assignedLeadIds.length > 0 && allTasks) {
-      console.log("⚠️ Tasks API: No tasks found via queries, trying manual filter fallback");
       const manualFiltered = allTasks.filter(task => {
         const spMatch = task.sales_person_id === salesPersonId || 
                        String(task.sales_person_id) === String(salesPersonId);
@@ -242,7 +133,6 @@ export async function GET(request) {
       });
       
       if (manualFiltered.length > 0) {
-        console.log("✅ Tasks API: Found tasks via manual filter", { count: manualFiltered.length });
         // Get full task data for manually filtered tasks - only pending tasks
         // Use the same client we're using for main queries (admin if RLS blocking)
         const manualTaskIds = manualFiltered.map(t => t.id);
@@ -272,68 +162,9 @@ export async function GET(request) {
     
     data = combinedTasks;
     error = tasksBySalesperson.error || tasksByLeads.error;
-    
-    // For debugging - analyze all tasks to see what we're working with
-    if (allTasks) {
-      // Check for exact matches and type comparisons
-      const exactMatches = allTasks.filter(t => t.sales_person_id === salesPersonId);
-      const stringMatches = allTasks.filter(t => String(t.sales_person_id) === String(salesPersonId));
-      const leadMatches = allTasks.filter(t => assignedLeadIds.includes(t.lead_id));
-      
-      const pendingTasks = allTasks?.filter(t => t.status === "Pending") || [];
-      console.log("🔍 DEBUG: All tasks in database:", {
-        totalTasks: allTasks?.length || 0,
-        pendingTasks: pendingTasks.length,
-        tasksWithSalesPersonId: allTasks?.filter(t => t.sales_person_id).length || 0,
-        pendingTasksWithSalesPersonId: pendingTasks.filter(t => t.sales_person_id).length || 0,
-        tasksForAssignedLeads: allTasks?.filter(t => assignedLeadIds.includes(t.lead_id)).length || 0,
-        pendingTasksForAssignedLeads: pendingTasks.filter(t => assignedLeadIds.includes(t.lead_id)).length || 0,
-        uniqueStatuses: [...new Set(allTasks?.map(t => t.status).filter(Boolean))],
-        uniqueSalesPersonIds: [...new Set(allTasks?.map(t => t.sales_person_id).filter(Boolean))],
-        lookingForSalesPersonId: salesPersonId,
-        lookingForType: typeof salesPersonId,
-        exactMatches: exactMatches.length,
-        stringMatches: stringMatches.length,
-        leadMatches: leadMatches.length,
-        matchingPendingTasks: pendingTasks.filter(t => {
-          const spMatch = t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId);
-          const leadMatch = assignedLeadIds.includes(t.lead_id);
-          return spMatch || leadMatch;
-        }).length || 0,
-        matchingTasks: allTasks?.filter(t => {
-          const spMatch = t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId);
-          const leadMatch = assignedLeadIds.includes(t.lead_id);
-          return spMatch || leadMatch;
-        }).length || 0,
-        sampleTasks: allTasks?.slice(0, 10).map(t => ({ 
-          id: t.id, 
-          title: t.title, 
-          sales_person_id: t.sales_person_id, 
-          sales_person_id_type: typeof t.sales_person_id,
-          lead_id: t.lead_id,
-          status: t.status,
-          isPending: t.status === "Pending",
-          matchesSalesPerson: t.sales_person_id === salesPersonId || String(t.sales_person_id) === String(salesPersonId),
-          matchesLead: assignedLeadIds.includes(t.lead_id)
-        }))
-      });
-    }
-    
-    console.log("✅ Tasks API: Final result for sales user", { 
-      dataCount: data?.length || 0, 
-      returnedTaskIds: data?.map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id, lead_id: t.lead_id })) || [],
-      assignedLeadIdsCount: assignedLeadIds.length,
-      hasError: !!error
-    });
   } else {
     // Admin: use filtered query (which returns all tasks)
     let query = getFilteredQuery(supabase, "tasks_table", crmUser);
-    
-    console.log("🔍 Tasks API: Fetching tasks for admin", { 
-      userId: crmUser.id, 
-      email: crmUser.email,
-      leadId: leadId || "all"
-    });
     
     // Filter by status = 'Pending' to show only pending tasks
     query = query.eq("status", "Pending");
@@ -347,34 +178,16 @@ export async function GET(request) {
     const result = await query.order("created_at", { ascending: false });
     data = result.data;
     error = result.error;
-    
-    console.log("✅ Tasks API: Query result", { 
-      dataCount: data?.length || 0, 
-      returnedTaskIds: data?.map(t => ({ id: t.id, title: t.title, sales_person_id: t.sales_person_id })) || []
-    });
   }
 
   if (error) {
-    console.error("Tasks API Error:", error.message);
     return Response.json([]);
   }
 
   // Handle null or undefined data
   if (!data || !Array.isArray(data)) {
-    console.warn("Tasks API: No data returned or data is not an array");
     return Response.json([]);
   }
-
-  // Final logging before returning
-  console.log("✅ Tasks API: Returning response", {
-    dataCount: data.length,
-    firstFewTasks: data.slice(0, 3).map(t => ({ 
-      id: t.id, 
-      title: t.title, 
-      sales_person_id: t.sales_person_id,
-      lead_id: t.lead_id 
-    }))
-  });
 
   return Response.json(data || []);
 }
@@ -425,7 +238,6 @@ export async function POST(request) {
     // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
     finalSalesPersonId = crmUser.salesPersonId || null;
     if (!finalSalesPersonId) {
-      console.warn("Tasks POST: No sales_person_id found for user", crmUser.id);
       return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
     }
   } else if (crmUser.role === "admin") {
@@ -477,10 +289,7 @@ export async function POST(request) {
       .insert(activityData);
 
     if (activityError) {
-      console.error("Error creating task activity:", activityError);
       // Don't fail the task creation if activity creation fails
-    } else {
-      console.log("Task activity created successfully for task:", data.id);
     }
   }
 

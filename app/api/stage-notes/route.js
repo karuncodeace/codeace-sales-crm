@@ -66,7 +66,6 @@ export async function GET(request) {
   const { data, error } = await query;
   
   if (error) {
-    console.error("Error fetching stage notes:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
   
@@ -130,8 +129,6 @@ export async function POST(request) {
     .single();
   
   if (error) {
-    console.error("Error creating stage note:", error);
-    console.error("Insert data attempted:", insertData);
     return Response.json({ 
       error: error.message,
       details: error.details || error.hint || "Check database schema and column names"

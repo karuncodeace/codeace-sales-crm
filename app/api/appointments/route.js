@@ -13,35 +13,21 @@ export async function GET() {
     
     // If no CRM user found, return empty array instead of 403 to prevent loading loops
     if (!crmUser) {
-      console.warn("No CRM user found - returning empty appointments array");
       return NextResponse.json([]);
     }
     
     // Fetch ALL appointments from the table (no filtering)
-    console.log("🔍 Appointments API: Fetching ALL appointments", { 
-      userId: crmUser.id, 
-      role: crmUser.role,
-      email: crmUser.email 
-    });
-    
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
       .order("start_time", { ascending: true });
     
     if (error) {
-      console.error("Appointments GET error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
-    console.log("✅ Appointments API: Query result", { 
-      dataCount: data?.length || 0,
-      returnedAppointmentIds: data?.map(a => ({ id: a.id, title: a.title, salesperson_id: a.salesperson_id })) || []
-    });
-    
     return NextResponse.json(data || []);
   } catch (err) {
-    console.error("Appointments GET exception:", err);
     return NextResponse.json(
       { error: err.message || "Internal server error" },
       { status: 500 }
@@ -82,7 +68,6 @@ export async function POST(request) {
       // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
       finalSalespersonId = crmUser.salesPersonId || null;
       if (!finalSalespersonId) {
-        console.warn("Appointments POST: No sales_person_id found for user", crmUser.id);
         return NextResponse.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
       }
     } else if (crmUser.role === "admin") {
@@ -116,7 +101,6 @@ export async function POST(request) {
       .single();
 
     if (error) {
-      console.error("Appointments POST insert error:", error);
       return NextResponse.json(
         { error: error.message || "Failed to create appointment" },
         { status: 500 }
@@ -132,7 +116,6 @@ export async function POST(request) {
 
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
-    console.error("Appointments POST exception:", err);
     return NextResponse.json(
       { error: err.message || "Internal server error" },
       { status: 500 }

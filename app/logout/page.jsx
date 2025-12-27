@@ -38,7 +38,6 @@ export default function LogoutPage() {
         }, 1200);
         
       } catch (error) {
-        console.error("Logout error:", error);
         setStatus("error");
         setMessage("There was an issue signing you out");
         

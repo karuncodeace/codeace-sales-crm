@@ -107,7 +107,7 @@ export default function TargetSetupPanel({
         }
       }
     } catch (error) {
-      console.error("Error loading targets:", error);
+      // Silently handle error
     }
   };
 
@@ -208,7 +208,6 @@ export default function TargetSetupPanel({
         setSaveMessage({ type: "error", text: data.error || "Failed to save targets" });
       }
     } catch (error) {
-      console.error("Error saving targets:", error);
       setSaveMessage({ type: "error", text: "An error occurred while saving" });
     } finally {
       setIsSaving(false);
