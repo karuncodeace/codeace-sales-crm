@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
 import AddTaskModal from "../buttons/addTaskbtn";
@@ -190,6 +191,7 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
 
 export default function TasksPage() {
     const router = useRouter();
+    const { showAlert } = useAlert();
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState("all");
     const [openFilter, setOpenFilter] = useState(false);
@@ -269,7 +271,7 @@ export default function TasksPage() {
             mutate("/api/tasks");
             setOpenAddTask(false);
         } catch (error) {
-            alert(error.message);
+            showAlert(error.message, "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -523,14 +525,14 @@ export default function TasksPage() {
         const { task, leadId, leadName, currentStatus, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
         
         if (!comment.trim()) {
-            alert("Please add a comment before completing the task");
+            showAlert("Please add a comment before completing the task", "warning");
             return;
         }
         
         // Validate currentStatus
         const validStatus = currentStatus || "New";
         if (!validStatus || validStatus === "null" || validStatus === "undefined") {
-            alert("Cannot complete task: Lead status is invalid. Please refresh the page.");
+            showAlert("Cannot complete task: Lead status is invalid. Please refresh the page.", "error");
             return;
         }
         
@@ -620,7 +622,7 @@ export default function TasksPage() {
                         }
                     } catch (error) {
                         // Don't throw - still complete the current task even if next task creation fails
-                        alert(`Task completed, but failed to create next task: ${error.message}`);
+                        showAlert(`Task completed, but failed to create next task: ${error.message}`, "warning");
                     }
                 }
             }
@@ -672,7 +674,7 @@ export default function TasksPage() {
             mutate("/api/tasks");
             mutate("/api/leads");
         } catch (error) {
-            alert(error.message);
+            showAlert(error.message, "error");
             setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
         }
     };
@@ -700,7 +702,7 @@ export default function TasksPage() {
         const { task, leadId, leadName, requiresSecondDemo } = demoOutcomeModal;
         
         if (requiresSecondDemo === null) {
-            alert("Please select an option");
+            showAlert("Please select an option", "warning");
             return;
         }
 
@@ -856,7 +858,7 @@ export default function TasksPage() {
                 mutate("/api/leads");
             }
         } catch (error) {
-            alert(error.message);
+            showAlert(error.message, "error");
             setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
         }
     };

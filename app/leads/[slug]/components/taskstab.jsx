@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../../context/themeContext";
+import { useAlert } from "../../../context/alertContext";
 import { Phone, Clock, CheckCircle2, Calendar, Circle, Plus } from "lucide-react";
 import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../../lib/utils/taskTitleGenerator";
 
@@ -176,6 +177,7 @@ function isDemoSchedulingTask(task, leadStatus) {
 
 export default function TasksTab({ leadId, leadName }) {
   const { theme } = useTheme();
+  const { showAlert, showConfirm } = useAlert();
   const isDark = theme === "dark";
   const router = useRouter();
   const { data: tasksData, mutate } = useSWR(leadId ? `/api/tasks?lead_id=${leadId}` : null, fetcher);
@@ -267,14 +269,14 @@ export default function TasksTab({ leadId, leadName }) {
     const { task, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
     
     if (!comment.trim()) {
-      alert("Please add a comment before completing the task");
+      showAlert("Please add a comment before completing the task", "warning");
       return;
     }
     
     // Validate lead status
     const currentLeadStatus = leadData?.status || leadData?.current_stage || "New";
     if (!currentLeadStatus || currentLeadStatus === "null" || currentLeadStatus === "undefined") {
-      alert("Cannot complete task: Lead status is invalid. Please refresh the page.");
+      showAlert("Cannot complete task: Lead status is invalid. Please refresh the page.", "error");
       return;
     }
     
@@ -401,7 +403,7 @@ export default function TasksTab({ leadId, leadName }) {
         window.location.reload();
       }
     } catch (error) {
-      alert(error.message);
+      showAlert(error.message, "error");
       setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -426,7 +428,7 @@ export default function TasksTab({ leadId, leadName }) {
     const { task, requiresSecondDemo } = demoOutcomeModal;
     
     if (requiresSecondDemo === null) {
-      alert("Please select an option");
+      showAlert("Please select an option", "warning");
       return;
     }
 
@@ -581,7 +583,7 @@ export default function TasksTab({ leadId, leadName }) {
         }
       }
     } catch (error) {
-      alert(error.message);
+      showAlert(error.message, "error");
       setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -624,7 +626,7 @@ export default function TasksTab({ leadId, leadName }) {
     
     // Block task creation for Won stage
     if (!canCreateTaskForStage(currentStage)) {
-      alert("Cannot create tasks for leads in 'Won' stage");
+      showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
       return;
     }
     
@@ -635,10 +637,20 @@ export default function TasksTab({ leadId, leadName }) {
     
     if (activeTasks.length > 0) {
       const confirmMessage = `This lead already has ${activeTasks.length} active task(s). Do you want to create another task?`;
-      if (!confirm(confirmMessage)) {
-        return;
-      }
+      showConfirm(confirmMessage, () => {
+        // Continue with task creation
+        createTask();
+      }, "Confirm Task Creation");
+      return;
     }
+    
+    createTask();
+  };
+  
+  const createTask = async () => {
+    if (!leadId || !leadData) return;
+    
+    const currentStage = leadData.status || "New";
     
     // Generate task title based on current stage
     let taskTitle;
@@ -649,13 +661,13 @@ export default function TasksTab({ leadId, leadName }) {
       }
       taskTitle = generateTaskTitle(currentStage, leadName || leadData.lead_name || leadData.name, options);
     } catch (error) {
-      alert(error.message || "Failed to generate task title");
+      showAlert(error.message || "Failed to generate task title", "error");
       return;
     }
     
     // Validate currentStage before creating task
     if (!currentStage || typeof currentStage !== "string") {
-      alert("Cannot create task: Lead stage is invalid. Please refresh the page.");
+      showAlert("Cannot create task: Lead stage is invalid. Please refresh the page.", "error");
       return;
     }
     
@@ -682,7 +694,7 @@ export default function TasksTab({ leadId, leadName }) {
       setShowAddTask(false);
       await mutate();
     } catch (err) {
-      alert(err.message || "Failed to create task");
+      showAlert(err.message || "Failed to create task", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -705,7 +717,7 @@ export default function TasksTab({ leadId, leadName }) {
           onClick={() => {
             const currentStage = leadData?.status || "New";
             if (!canCreateTaskForStage(currentStage)) {
-              alert("Cannot create tasks for leads in 'Won' stage");
+              showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
               return;
             }
             setShowAddTask(true);

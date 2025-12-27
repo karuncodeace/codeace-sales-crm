@@ -8,6 +8,7 @@ import SearchBtn from "./components/buttons/searchBtn";
 
 import { ThemeProvider, useTheme } from "./context/themeContext";
 import { SidebarProvider, useSidebar } from "./context/sidebarContext";
+import { AlertProvider } from "./context/alertContext";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
 
 function MainContent({ children }) {
@@ -76,7 +77,9 @@ function LayoutStructure({ children, fonts }) {
 export default function LayoutClient({ children, fonts }) {
   return (
     <ThemeProvider>
-      <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+      <AlertProvider>
+        <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
+      </AlertProvider>
     </ThemeProvider>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
+import { useAlert } from "../context/alertContext";
 import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
@@ -11,6 +12,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function BookingsPage() {
   const { theme } = useTheme();
+  const { showAlert } = useAlert();
   const isDark = theme === "dark";
   const [statusFilter, setStatusFilter] = useState("all");
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
@@ -122,9 +124,16 @@ export default function BookingsPage() {
 
   // Handle cancel booking
   const handleCancel = async (booking) => {
-    if (!confirm(`Are you sure you want to cancel the meeting with ${booking.invitee_name || "this invitee"}?`)) {
-      return;
-    }
+    showConfirm(
+      `Are you sure you want to cancel the meeting with ${booking.invitee_name || "this invitee"}?`,
+      () => {
+        proceedWithCancel(booking);
+      },
+      "Confirm Cancellation"
+    );
+  };
+  
+  const proceedWithCancel = async (booking) => {
 
     setIsProcessing(true);
     try {
@@ -144,9 +153,9 @@ export default function BookingsPage() {
 
       // Refresh bookings list
       mutate();
-      alert("Booking cancelled successfully!");
+      showAlert("Booking cancelled successfully!", "success");
     } catch (error) {
-      alert(error.message || "Failed to cancel booking. Please try again.");
+      showAlert(error.message || "Failed to cancel booking. Please try again.", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -155,7 +164,7 @@ export default function BookingsPage() {
   // Handle reschedule booking
   const handleReschedule = async (booking, newStartTime, newEndTime) => {
     if (!newStartTime || !newEndTime) {
-      alert("Please select both start and end times");
+      showAlert("Please select both start and end times", "warning");
       return;
     }
 
@@ -184,9 +193,9 @@ export default function BookingsPage() {
       // Refresh bookings list
       mutate();
       setRescheduleModal({ isOpen: false, appointment: null });
-      alert("Booking rescheduled successfully!");
+      showAlert("Booking rescheduled successfully!", "success");
     } catch (error) {
-      alert(error.message || "Failed to reschedule booking. Please try again.");
+      showAlert(error.message || "Failed to reschedule booking. Please try again.", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -526,7 +535,7 @@ function RescheduleModal({ appointment, onClose, onReschedule, isDark, isProcess
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!newStartTime || !newEndTime) {
-      alert("Please select both start and end times");
+      showAlert("Please select both start and end times", "warning");
       return;
     }
     // Convert to ISO string

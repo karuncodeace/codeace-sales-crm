@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 import { fetcher } from "../../../lib/swr/fetcher";
 import {
@@ -32,6 +33,7 @@ import {
 export default function ViewProfile() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { showAlert } = useAlert();
   const isDark = theme === "dark";
   const [copied, setCopied] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -221,12 +223,12 @@ export default function ViewProfile() {
     if (file) {
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        alert("Please select an image file");
+        showAlert("Please select an image file", "warning");
         return;
       }
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        showAlert("Image size should be less than 5MB", "warning");
         return;
       }
       setSelectedPhoto(file);
@@ -243,7 +245,7 @@ export default function ViewProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userData?.salesPersonId) {
-      alert("Unable to update profile. Please try again later.");
+      showAlert("Unable to update profile. Please try again later.", "error");
       return;
     }
 
@@ -296,9 +298,9 @@ export default function ViewProfile() {
       setPhotoPreview(null);
       
       // Show success message
-      alert("Profile updated successfully!");
+      showAlert("Profile updated successfully!", "success");
     } catch (error) {
-      alert(error.message || "Failed to update profile. Please try again.");
+      showAlert(error.message || "Failed to update profile. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }

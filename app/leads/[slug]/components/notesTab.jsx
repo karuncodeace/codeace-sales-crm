@@ -7,6 +7,7 @@ import { Loader2, StickyNote, Plus, Edit2, Trash2 } from "lucide-react";
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 function NotesTab({ theme, leadId, leadName }) {
+    const { showConfirm } = useAlert();
     const [showAddNote, setShowAddNote] = useState(false);
     const [newNote, setNewNote] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -195,8 +196,12 @@ function NotesTab({ theme, leadId, leadName }) {
 
     // Handle delete note
     const handleDeleteNote = async (noteId) => {
-        if (!confirm("Are you sure you want to delete this note?")) return;
-        
+        showConfirm("Are you sure you want to delete this note?", () => {
+            proceedWithDeleteNote(noteId);
+        }, "Confirm Deletion");
+    };
+    
+    const proceedWithDeleteNote = async (noteId) => {
         setDeletingNoteId(noteId);
         try {
             const response = await fetch(`/api/task-activities?id=${noteId}`, {

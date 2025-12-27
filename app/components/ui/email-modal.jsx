@@ -166,11 +166,11 @@ export default function EmailModal({ open, onClose, recipientEmail = "", recipie
       });
       onClose();
       
-      // Show success message (you can replace with a toast notification)
-      alert("Email sent successfully!");
+      // Show success message
+      showAlert("Email sent successfully!", "success");
       
     } catch (error) {
-      alert(error.message || "Failed to send email. Please try again.");
+      showAlert(error.message || "Failed to send email. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }

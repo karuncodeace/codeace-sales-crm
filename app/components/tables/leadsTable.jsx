@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 import { Copy, Check, Mail } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 import { generateTaskTitle, canCreateTaskForStage } from "../../../lib/utils/taskTitleGenerator";
@@ -377,7 +378,7 @@ export default function LeadsTable() {
     const { leadId, newStatus, comment, nextStageComments, connectThrough, dueDate, outcome } = statusChangeModal;
     
     if (!comment.trim()) {
-      alert("Please add a comment before changing status");
+      showAlert("Please add a comment before changing status", "warning");
       return;
     }
 
@@ -473,7 +474,7 @@ export default function LeadsTable() {
         showCalendar: false,
       });
     } catch (error) {
-      alert(error.message);
+      showAlert(error.message, "error");
       setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };

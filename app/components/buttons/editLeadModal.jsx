@@ -1,11 +1,13 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 
 export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
   const { theme } = useTheme();
+  const { showAlert } = useAlert();
   const isDark = theme === "dark";
 
   const [formData, setFormData] = useState({
@@ -96,7 +98,7 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
       setNewIndustryName("");
       setShowCreateIndustry(false);
     } catch (error) {
-      alert(error.message);
+      showAlert(error.message, "error");
     } finally {
       setIsCreatingIndustry(false);
     }

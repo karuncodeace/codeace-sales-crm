@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { Phone } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 
 export default function CallBtn({ leadId, phone, name, email }) {
   const { theme } = useTheme();
+  const { showAlert } = useAlert();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
     if (!leadId || !phone || !name || !email) {
-      alert("Missing required information: lead ID, phone, name, or email");
+      showAlert("Missing required information: lead ID, phone, name, or email", "error");
       return;
     }
 
@@ -30,12 +32,12 @@ export default function CallBtn({ leadId, phone, name, email }) {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to initiate call. Please try again.");
+        showAlert(data.error || "Failed to initiate call. Please try again.", "error");
       } else {
-        alert(`Call initiated successfully! Calling ${name} at ${phone}`);
+        showAlert(`Call initiated successfully! Calling ${name} at ${phone}`, "success");
       }
     } catch (err) {
-      alert("Error initiating call. Please try again.");
+      showAlert("Error initiating call. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }

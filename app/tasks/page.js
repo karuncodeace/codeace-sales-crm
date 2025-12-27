@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../context/themeContext";
+import { useAlert } from "../context/alertContext";
 import PriorityDropdown from "../components/buttons/priorityTooglebtn";
 import FilterBtn from "../components/buttons/filterbtn";
 import AddTaskModal from "../components/buttons/addTaskbtn";
@@ -75,8 +76,7 @@ export default function TasksPage() {
             mutate("/api/tasks");
             setOpenAddTask(false);
         } catch (error) {
-            console.error("Error adding task:", error);
-            alert(error.message);
+            showAlert(error.message, "error");
         } finally {
             setIsSubmitting(false);
         }

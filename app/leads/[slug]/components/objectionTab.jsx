@@ -4,11 +4,13 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "../../../context/themeContext";
+import { useAlert } from "../../../context/alertContext";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
     const { theme: ctxTheme } = useTheme();
+    const { showConfirm } = useAlert();
     const theme = themeProp || ctxTheme;
 
     const [showAdd, setShowAdd] = useState(false);
@@ -62,7 +64,12 @@ export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Delete this objection?")) return;
+        showConfirm("Delete this objection?", () => {
+            proceedWithDelete(id);
+        }, "Confirm Deletion");
+    };
+    
+    const proceedWithDelete = async (id) => {
         setDeletingId(id);
         try {
             const res = await fetch(`/api/objections?id=${id}`, { method: "DELETE" });

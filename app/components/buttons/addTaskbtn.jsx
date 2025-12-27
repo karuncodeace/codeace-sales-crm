@@ -1,11 +1,13 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
+import { useAlert } from "../../context/alertContext";
 import { useState, useEffect, useMemo } from "react";
 import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../lib/utils/taskTitleGenerator";
 
 export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPersons = [], isSubmitting = false }) {
   const { theme } = useTheme();
+  const { showAlert, showConfirm } = useAlert();
   const isDark = theme === "dark";
 
   const [formData, setFormData] = useState({
@@ -92,29 +94,35 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
     if (!formData.due_datetime) newErrors.due_datetime = "Due date and time is required";
     if (!formData.priority) newErrors.priority = "Priority is required";
     
-    // Check for existing active tasks
-    const activeTasks = existingTasks.filter(
-      (t) => String(t.status || "").toLowerCase() !== "completed"
-    );
-    if (activeTasks.length > 0) {
-      const confirmMessage = `This lead already has ${activeTasks.length} active task(s). Do you want to create another task?`;
-      if (!confirm(confirmMessage)) {
-        return false;
-      }
-    }
-    
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return { isValid: Object.keys(newErrors).length === 0, activeTasks: existingTasks.filter(
+      (t) => String(t.status || "").toLowerCase() !== "completed"
+    ) };
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    const validation = validateForm();
+    if (!validation.isValid) return;
+    
+    // Check for existing active tasks and show confirmation if needed
+    if (validation.activeTasks.length > 0) {
+      const confirmMessage = `This lead already has ${validation.activeTasks.length} active task(s). Do you want to create another task?`;
+      showConfirm(confirmMessage, () => {
+        proceedWithSubmit();
+      }, "Confirm Task Creation");
+      return;
+    }
+    
+    proceedWithSubmit();
+  };
+  
+  const proceedWithSubmit = async () => {
 
     // Use generated title instead of formData.title
     const finalTitle = generatedTitle || formData.title;
     
     if (!finalTitle) {
-      alert("Task title could not be generated. Please check lead selection.");
+      showAlert("Task title could not be generated. Please check lead selection.", "warning");
       return;
     }
 
@@ -172,7 +180,7 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
     if (lead) {
       const currentStage = lead.status || "New";
       if (!canCreateTaskForStage(currentStage)) {
-        alert("Cannot create tasks for leads in 'Won' stage");
+        showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
         return;
       }
     }
