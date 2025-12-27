@@ -3,16 +3,15 @@
 import { useState } from "react";
 import { Phone } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
-import { useAlert } from "../../context/alertContext";
+import toast from "react-hot-toast";
 
 export default function CallBtn({ leadId, phone, name, email }) {
   const { theme } = useTheme();
-  const { showAlert } = useAlert();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
     if (!leadId || !phone || !name || !email) {
-      showAlert("Missing required information: lead ID, phone, name, or email", "error");
+      toast.error("Missing required information: lead ID, phone, name, or email");
       return;
     }
 
@@ -32,12 +31,12 @@ export default function CallBtn({ leadId, phone, name, email }) {
       const data = await res.json();
 
       if (!res.ok) {
-        showAlert(data.error || "Failed to initiate call. Please try again.", "error");
+        toast.error(data.error || "Failed to initiate call. Please try again.");
       } else {
-        showAlert(`Call initiated successfully! Calling ${name} at ${phone}`, "success");
+        toast.success(`Call initiated successfully! Calling ${name} at ${phone}`);
       }
     } catch (err) {
-      showAlert("Error initiating call. Please try again.", "error");
+      toast.error("Error initiating call. Please try again.");
     } finally {
       setIsLoading(false);
     }

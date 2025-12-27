@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useTheme } from "../../../context/themeContext";
-import { useAlert } from "../../../context/alertContext";
+import toast from "react-hot-toast";
 import { Phone, Clock, CheckCircle2, Calendar, Circle, Plus } from "lucide-react";
 import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../../lib/utils/taskTitleGenerator";
 
@@ -177,7 +177,6 @@ function isDemoSchedulingTask(task, leadStatus) {
 
 export default function TasksTab({ leadId, leadName }) {
   const { theme } = useTheme();
-  const { showAlert, showConfirm } = useAlert();
   const isDark = theme === "dark";
   const router = useRouter();
   const { data: tasksData, mutate } = useSWR(leadId ? `/api/tasks?lead_id=${leadId}` : null, fetcher);
@@ -269,14 +268,14 @@ export default function TasksTab({ leadId, leadName }) {
     const { task, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
     
     if (!comment.trim()) {
-      showAlert("Please add a comment before completing the task", "warning");
+      toast.error("Please add a comment before completing the task");
       return;
     }
     
     // Validate lead status
     const currentLeadStatus = leadData?.status || leadData?.current_stage || "New";
     if (!currentLeadStatus || currentLeadStatus === "null" || currentLeadStatus === "undefined") {
-      showAlert("Cannot complete task: Lead status is invalid. Please refresh the page.", "error");
+      toast.error("Cannot complete task: Lead status is invalid. Please refresh the page.");
       return;
     }
     
@@ -403,7 +402,7 @@ export default function TasksTab({ leadId, leadName }) {
         window.location.reload();
       }
     } catch (error) {
-      showAlert(error.message, "error");
+      toast.error(error.message);
       setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -428,7 +427,7 @@ export default function TasksTab({ leadId, leadName }) {
     const { task, requiresSecondDemo } = demoOutcomeModal;
     
     if (requiresSecondDemo === null) {
-      showAlert("Please select an option", "warning");
+      toast.error("Please select an option");
       return;
     }
 
@@ -583,7 +582,7 @@ export default function TasksTab({ leadId, leadName }) {
         }
       }
     } catch (error) {
-      showAlert(error.message, "error");
+      toast.error(error.message);
       setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -626,7 +625,7 @@ export default function TasksTab({ leadId, leadName }) {
     
     // Block task creation for Won stage
     if (!canCreateTaskForStage(currentStage)) {
-      showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
+      toast.error("Cannot create tasks for leads in 'Won' stage");
       return;
     }
     
@@ -637,10 +636,34 @@ export default function TasksTab({ leadId, leadName }) {
     
     if (activeTasks.length > 0) {
       const confirmMessage = `This lead already has ${activeTasks.length} active task(s). Do you want to create another task?`;
-      showConfirm(confirmMessage, () => {
-        // Continue with task creation
-        createTask();
-      }, "Confirm Task Creation");
+      toast(
+        (t) => (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">{confirmMessage}</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  createTask();
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        ),
+        {
+          duration: Infinity,
+          position: "top-center",
+        }
+      );
       return;
     }
     
@@ -661,13 +684,13 @@ export default function TasksTab({ leadId, leadName }) {
       }
       taskTitle = generateTaskTitle(currentStage, leadName || leadData.lead_name || leadData.name, options);
     } catch (error) {
-      showAlert(error.message || "Failed to generate task title", "error");
+      toast.error(error.message || "Failed to generate task title");
       return;
     }
     
     // Validate currentStage before creating task
     if (!currentStage || typeof currentStage !== "string") {
-      showAlert("Cannot create task: Lead stage is invalid. Please refresh the page.", "error");
+      toast.error("Cannot create task: Lead stage is invalid. Please refresh the page.");
       return;
     }
     
@@ -694,7 +717,7 @@ export default function TasksTab({ leadId, leadName }) {
       setShowAddTask(false);
       await mutate();
     } catch (err) {
-      showAlert(err.message || "Failed to create task", "error");
+      toast.error(err.message || "Failed to create task");
     } finally {
       setIsSubmitting(false);
     }
@@ -717,7 +740,7 @@ export default function TasksTab({ leadId, leadName }) {
           onClick={() => {
             const currentStage = leadData?.status || "New";
             if (!canCreateTaskForStage(currentStage)) {
-              showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
+              toast.error("Cannot create tasks for leads in 'Won' stage");
               return;
             }
             setShowAddTask(true);

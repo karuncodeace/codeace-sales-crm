@@ -4,13 +4,12 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "../../../context/themeContext";
-import { useAlert } from "../../../context/alertContext";
+import toast from "react-hot-toast";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
     const { theme: ctxTheme } = useTheme();
-    const { showConfirm } = useAlert();
     const theme = themeProp || ctxTheme;
 
     const [showAdd, setShowAdd] = useState(false);
@@ -64,22 +63,45 @@ export default function ObjectionTab({ leadId, leadName, theme: themeProp }) {
     };
 
     const handleDelete = async (id) => {
-        showConfirm("Delete this objection?", () => {
-            proceedWithDelete(id);
-        }, "Confirm Deletion");
+        toast(
+            (t) => (
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">Delete this objection?</p>
+                    <div className="flex gap-2 justify-end">
+                        <button
+                            onClick={() => toast.dismiss(t.id)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                toast.dismiss(t.id);
+                                setDeletingId(id);
+                                try {
+                                    const res = await fetch(`/api/objections?id=${id}`, { method: "DELETE" });
+                                    if (!res.ok) throw new Error("Failed to delete objection");
+                                    await mutate();
+                                    toast.success("Objection deleted successfully");
+                                } catch (err) {
+                                    toast.error("Failed to delete objection");
+                                } finally {
+                                    setDeletingId(null);
+                                }
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            ),
+            {
+                duration: Infinity,
+                position: "top-center",
+            }
+        );
     };
-    
-    const proceedWithDelete = async (id) => {
-        setDeletingId(id);
-        try {
-            const res = await fetch(`/api/objections?id=${id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Failed to delete objection");
-            await mutate();
-        } catch (err) {
-            // Silently handle error
-        } finally {
-            setDeletingId(null);
-        }
     };
 
     if (isLoading) {

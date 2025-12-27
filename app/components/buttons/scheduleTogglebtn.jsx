@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import DatePicker from "react-datepicker";
-import { useAlert } from "../../context/alertContext";
+import toast from "react-hot-toast";
 
 export default function ScheduleMeeting({ lead }) {
-  const { showAlert } = useAlert();
   const [open, setOpen] = useState(false);
 
   // Default date & time from JSON
@@ -16,7 +15,7 @@ export default function ScheduleMeeting({ lead }) {
   const [selectedDate, setSelectedDate] = useState(defaultDateTime);
 
   const handleSave = () => {
-    showAlert(`Meeting rescheduled to: ${selectedDate.toString()}`, "success");
+    toast.success(`Meeting rescheduled to: ${selectedDate.toString()}`);
     setOpen(false);
   };
 

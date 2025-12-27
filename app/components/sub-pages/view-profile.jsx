@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
-import { useAlert } from "../../context/alertContext";
+import toast from "react-hot-toast";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
 import { fetcher } from "../../../lib/swr/fetcher";
 import {
@@ -33,7 +33,6 @@ import {
 export default function ViewProfile() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { showAlert } = useAlert();
   const isDark = theme === "dark";
   const [copied, setCopied] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -223,12 +222,12 @@ export default function ViewProfile() {
     if (file) {
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        showAlert("Please select an image file", "warning");
+        toast.error("Please select an image file");
         return;
       }
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        showAlert("Image size should be less than 5MB", "warning");
+        toast.error("Image size should be less than 5MB");
         return;
       }
       setSelectedPhoto(file);
@@ -245,7 +244,7 @@ export default function ViewProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userData?.salesPersonId) {
-      showAlert("Unable to update profile. Please try again later.", "error");
+      toast.error("Unable to update profile. Please try again later.");
       return;
     }
 
@@ -298,9 +297,9 @@ export default function ViewProfile() {
       setPhotoPreview(null);
       
       // Show success message
-      showAlert("Profile updated successfully!", "success");
+      toast.success("Profile updated successfully!");
     } catch (error) {
-      showAlert(error.message || "Failed to update profile. Please try again.", "error");
+      toast.error(error.message || "Failed to update profile. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

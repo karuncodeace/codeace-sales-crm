@@ -8,7 +8,7 @@ import SearchBtn from "./components/buttons/searchBtn";
 
 import { ThemeProvider, useTheme } from "./context/themeContext";
 import { SidebarProvider, useSidebar } from "./context/sidebarContext";
-import { AlertProvider } from "./context/alertContext";
+import { Toaster } from "react-hot-toast";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
 
 function MainContent({ children }) {
@@ -58,6 +58,29 @@ function LayoutStructure({ children, fonts }) {
         className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
         suppressHydrationWarning
       >
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: theme === "dark" ? "#1f1f1f" : "#fff",
+              color: theme === "dark" ? "#e5e7eb" : "#111827",
+              border: theme === "dark" ? "1px solid #374151" : "1px solid #e5e7eb",
+            },
+            success: {
+              iconTheme: {
+                primary: "#10b981",
+                secondary: "#fff",
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: "#ef4444",
+                secondary: "#fff",
+              },
+            },
+          }}
+        />
         {isLoginPage || isLogoutPage || isAuthCallbackPage ? (
           children
         ) : (
@@ -77,9 +100,7 @@ function LayoutStructure({ children, fonts }) {
 export default function LayoutClient({ children, fonts }) {
   return (
     <ThemeProvider>
-      <AlertProvider>
-        <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
-      </AlertProvider>
+      <LayoutStructure fonts={fonts}>{children}</LayoutStructure>
     </ThemeProvider>
   );
 }

@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "../../context/themeContext";
-import { useAlert } from "../../context/alertContext";
+import toast from "react-hot-toast";
 import { X, Target, MessageSquare, Zap, TrendingUp, Save, Loader2 } from "lucide-react";
 
 export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSave }) {
     const { theme } = useTheme();
-    const { showAlert } = useAlert();
     const isDark = theme === "dark";
     
     const [scores, setScores] = useState({
@@ -70,10 +69,10 @@ export default function EditLeadScoreModal({ isOpen, onClose, lead, leadId, onSa
                 onSave();
             }
 
-            showAlert("Scores saved successfully!", "success");
+            toast.success("Scores saved successfully!");
             onClose();
         } catch (error) {
-            showAlert(error.message || "Failed to save scores. Please try again.", "error");
+            toast.error(error.message || "Failed to save scores. Please try again.");
         } finally {
             setIsSaving(false);
         }

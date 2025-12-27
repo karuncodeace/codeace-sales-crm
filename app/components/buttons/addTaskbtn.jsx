@@ -1,13 +1,12 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
-import { useAlert } from "../../context/alertContext";
+import toast from "react-hot-toast";
 import { useState, useEffect, useMemo } from "react";
 import { generateTaskTitle, canCreateTaskForStage, getDemoCount } from "../../../lib/utils/taskTitleGenerator";
 
 export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPersons = [], isSubmitting = false }) {
   const { theme } = useTheme();
-  const { showAlert, showConfirm } = useAlert();
   const isDark = theme === "dark";
 
   const [formData, setFormData] = useState({
@@ -107,9 +106,34 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
     // Check for existing active tasks and show confirmation if needed
     if (validation.activeTasks.length > 0) {
       const confirmMessage = `This lead already has ${validation.activeTasks.length} active task(s). Do you want to create another task?`;
-      showConfirm(confirmMessage, () => {
-        proceedWithSubmit();
-      }, "Confirm Task Creation");
+      toast(
+        (t) => (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">{confirmMessage}</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  proceedWithSubmit();
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        ),
+        {
+          duration: Infinity,
+          position: "top-center",
+        }
+      );
       return;
     }
     
@@ -117,12 +141,11 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
   };
   
   const proceedWithSubmit = async () => {
-
     // Use generated title instead of formData.title
     const finalTitle = generatedTitle || formData.title;
     
     if (!finalTitle) {
-      showAlert("Task title could not be generated. Please check lead selection.", "warning");
+      toast.error("Task title could not be generated. Please check lead selection.");
       return;
     }
 
@@ -180,7 +203,7 @@ export default function AddTaskModal({ open, onClose, onAdd, leads = [], salesPe
     if (lead) {
       const currentStage = lead.status || "New";
       if (!canCreateTaskForStage(currentStage)) {
-        showAlert("Cannot create tasks for leads in 'Won' stage", "warning");
+        toast.error("Cannot create tasks for leads in 'Won' stage");
         return;
       }
     }

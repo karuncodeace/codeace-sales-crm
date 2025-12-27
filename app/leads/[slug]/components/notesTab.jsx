@@ -3,11 +3,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, StickyNote, Plus, Edit2, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 function NotesTab({ theme, leadId, leadName }) {
-    const { showConfirm } = useAlert();
     const [showAddNote, setShowAddNote] = useState(false);
     const [newNote, setNewNote] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,26 +196,48 @@ function NotesTab({ theme, leadId, leadName }) {
 
     // Handle delete note
     const handleDeleteNote = async (noteId) => {
-        showConfirm("Are you sure you want to delete this note?", () => {
-            proceedWithDeleteNote(noteId);
-        }, "Confirm Deletion");
-    };
-    
-    const proceedWithDeleteNote = async (noteId) => {
-        setDeletingNoteId(noteId);
-        try {
-            const response = await fetch(`/api/task-activities?id=${noteId}`, {
-                method: "DELETE",
-            });
-            if (!response.ok) {
-                throw new Error("Failed to delete note");
+        toast(
+            (t) => (
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">Are you sure you want to delete this note?</p>
+                    <div className="flex gap-2 justify-end">
+                        <button
+                            onClick={() => toast.dismiss(t.id)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                toast.dismiss(t.id);
+                                setDeletingNoteId(noteId);
+                                try {
+                                    const response = await fetch(`/api/task-activities?id=${noteId}`, {
+                                        method: "DELETE",
+                                    });
+                                    if (!response.ok) {
+                                        throw new Error("Failed to delete note");
+                                    }
+                                    await mutate();
+                                    toast.success("Note deleted successfully");
+                                } catch (error) {
+                                    toast.error("Failed to delete note");
+                                } finally {
+                                    setDeletingNoteId(null);
+                                }
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            ),
+            {
+                duration: Infinity,
+                position: "top-center",
             }
-            await mutate();
-        } catch (error) {
-            // Silently handle error
-        } finally {
-            setDeletingNoteId(null);
-        }
+        );
     };
 
     if (isLoading) {

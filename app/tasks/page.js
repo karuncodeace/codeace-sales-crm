@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../context/themeContext";
-import { useAlert } from "../context/alertContext";
+import toast from "react-hot-toast";
 import PriorityDropdown from "../components/buttons/priorityTooglebtn";
 import FilterBtn from "../components/buttons/filterbtn";
 import AddTaskModal from "../components/buttons/addTaskbtn";
@@ -76,7 +76,7 @@ export default function TasksPage() {
             mutate("/api/tasks");
             setOpenAddTask(false);
         } catch (error) {
-            showAlert(error.message, "error");
+            toast.error(error.message);
         } finally {
             setIsSubmitting(false);
         }

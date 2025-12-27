@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
-import { useAlert } from "../context/alertContext";
+import toast from "react-hot-toast";
 import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
@@ -12,7 +12,6 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function BookingsPage() {
   const { theme } = useTheme();
-  const { showAlert } = useAlert();
   const isDark = theme === "dark";
   const [statusFilter, setStatusFilter] = useState("all");
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, appointment: null });
@@ -124,47 +123,67 @@ export default function BookingsPage() {
 
   // Handle cancel booking
   const handleCancel = async (booking) => {
-    showConfirm(
-      `Are you sure you want to cancel the meeting with ${booking.invitee_name || "this invitee"}?`,
-      () => {
-        proceedWithCancel(booking);
-      },
-      "Confirm Cancellation"
-    );
-  };
-  
-  const proceedWithCancel = async (booking) => {
+    toast(
+      (t) => (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium">
+            Are you sure you want to cancel the meeting with {booking.invitee_name || "this invitee"}?
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                setIsProcessing(true);
+                try {
+                  const response = await fetch(`/api/bookings/cancel`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                      bookingId: booking.id
+                    }),
+                  });
 
-    setIsProcessing(true);
-    try {
-      const response = await fetch(`/api/bookings/cancel`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          bookingId: booking.id
-        }),
-      });
+                  const result = await response.json();
 
-      const result = await response.json();
+                  if (!response.ok) {
+                    throw new Error(result.error || "Failed to cancel booking");
+                  }
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to cancel booking");
+                  // Refresh bookings list
+                  mutate();
+                  toast.success("Booking cancelled successfully!");
+                } catch (error) {
+                  toast.error(error.message || "Failed to cancel booking. Please try again.");
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: Infinity,
+        position: "top-center",
       }
-
-      // Refresh bookings list
-      mutate();
-      showAlert("Booking cancelled successfully!", "success");
-    } catch (error) {
-      showAlert(error.message || "Failed to cancel booking. Please try again.", "error");
-    } finally {
-      setIsProcessing(false);
-    }
+    );
   };
 
   // Handle reschedule booking
   const handleReschedule = async (booking, newStartTime, newEndTime) => {
     if (!newStartTime || !newEndTime) {
-      showAlert("Please select both start and end times", "warning");
+      toast.error("Please select both start and end times");
       return;
     }
 
@@ -193,9 +212,9 @@ export default function BookingsPage() {
       // Refresh bookings list
       mutate();
       setRescheduleModal({ isOpen: false, appointment: null });
-      showAlert("Booking rescheduled successfully!", "success");
+      toast.success("Booking rescheduled successfully!");
     } catch (error) {
-      showAlert(error.message || "Failed to reschedule booking. Please try again.", "error");
+      toast.error(error.message || "Failed to reschedule booking. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -535,7 +554,7 @@ function RescheduleModal({ appointment, onClose, onReschedule, isDark, isProcess
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!newStartTime || !newEndTime) {
-      showAlert("Please select both start and end times", "warning");
+      toast.error("Please select both start and end times");
       return;
     }
     // Convert to ISO string
