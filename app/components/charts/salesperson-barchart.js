@@ -136,46 +136,84 @@ export default function SalesPersonComparisonChart() {
     [isDark]
   );
 
-  const chartCards = useMemo(
-    () => [
-      {
-        id: "sales-person-performance",
-        title: "Sales Person Performance",
-        subtitle: "Activity and results by sales person",
-        type: "bar",
-        height: 400,
+  // Prepare chart data
+  console.log("🎯 CHART COMPONENT - Raw data received:", data);
+  console.log("🎯 CHART COMPONENT - Data type check:", {
+    isDataObject: typeof data === 'object',
+    hasCalls: 'calls' in data,
+    hasMeetings: 'meetings' in data,
+    hasConversions: 'conversions' in data,
+    hasSalesPersons: 'salesPersons' in data,
+    callsType: Array.isArray(data.calls),
+    meetingsType: Array.isArray(data.meetings),
+    conversionsType: Array.isArray(data.conversions),
+    salesPersonsType: Array.isArray(data.salesPersons)
+  });
 
-        series: [
-          { name: "Calls", data: data.calls || [] },
-          { name: "Meetings", data: data.meetings || [] },
-          { name: "Conversions", data: data.conversions || [] },
-        ],
+  const callsData = Array.isArray(data.calls) ? data.calls.map(val => Number(val) || 0) : [];
+  const meetingsData = Array.isArray(data.meetings) ? data.meetings.map(val => Number(val) || 0) : [];
+  const conversionsData = Array.isArray(data.conversions) ? data.conversions.map(val => Number(val) || 0) : [];
+  const categories = Array.isArray(data.salesPersons) ? data.salesPersons : [];
 
-        options: {
-          ...baseOptions,
+  console.log("📊 CHART COMPONENT - Processed data:", {
+    callsData,
+    meetingsData,
+    conversionsData,
+    categories,
+    callsLength: callsData.length,
+    meetingsLength: meetingsData.length,
+    conversionsLength: conversionsData.length,
+    categoriesLength: categories.length
+  });
 
-          // Color theme depends on mode
-          colors: isDark
-            ? ["#60a5fa", "#34d399", "#fbbf24"] // brighter in dark
-            : ["#3B82F6", "#10B981", "#F59E0B"], // original palette
+  const chartSeries = [
+    { name: "Calls", data: callsData },
+    { name: "Meetings", data: meetingsData },
+    { name: "Conversions", data: conversionsData },
+  ];
 
-          xaxis: {
-            ...baseOptions.xaxis,
-            categories: data.salesPersons || ["Sarah", "John", "Emily"],
-          },
+  console.log("📈 CHART COMPONENT - Chart series:", JSON.stringify(chartSeries, null, 2));
 
-          tooltip: {
-            ...baseOptions.tooltip,
-            y: {
-              formatter(value) {
-                return value >= 1000 ? `${value / 1000}k` : value;
-              },
+  const chartOptions = useMemo(
+    () => {
+      const options = {
+        ...baseOptions,
+
+        // Color theme depends on mode
+        colors: isDark
+          ? ["#60a5fa", "#34d399", "#fbbf24"] // brighter in dark
+          : ["#3B82F6", "#10B981", "#F59E0B"], // original palette
+
+        xaxis: {
+          ...baseOptions.xaxis,
+          categories: categories,
+        },
+
+        yaxis: {
+          ...baseOptions.yaxis,
+          min: 0,
+        },
+
+        tooltip: {
+          ...baseOptions.tooltip,
+          y: {
+            formatter(value) {
+              return value >= 1000 ? `${value / 1000}k` : value;
             },
           },
         },
-      },
-    ],
-    [baseOptions, isDark, data]
+      };
+      
+      console.log("⚙️ CHART COMPONENT - Chart options:", {
+        categories: options.xaxis.categories,
+        categoriesLength: options.xaxis.categories?.length,
+        colors: options.colors,
+        yaxisMin: options.yaxis.min
+      });
+      
+      return options;
+    },
+    [baseOptions, isDark, categories]
   );
 
   if (error) {
@@ -237,35 +275,45 @@ export default function SalesPersonComparisonChart() {
           : "bg-white border-gray-200"
       }`}
     >
-      {chartCards.map((card) => (
-        <div key={card.id}>
-          <div className="mb-4">
-            <h3
-              className={`text-lg font-semibold ${
-                isDark ? "text-gray-200" : "text-gray-900"
-              }`}
-            >
-              {card.title}
-            </h3>
-            <p
-              className={`text-sm ${
-                isDark ? "text-gray-400" : "text-gray-500/70"
-              }`}
-            >
-              {card.subtitle}
-            </p>
-          </div>
+      <div className="mb-4">
+        <h3
+          className={`text-lg font-semibold ${
+            isDark ? "text-gray-200" : "text-gray-900"
+          }`}
+        >
+          Sales Person Performance
+        </h3>
+        <p
+          className={`text-sm ${
+            isDark ? "text-gray-400" : "text-gray-500/70"
+          }`}
+        >
+          Activity and results by sales person
+        </p>
+      </div>
 
-          {/* 🔄 re-render when mode changes */}
+      {categories.length > 0 ? (
+        <>
+          {console.log("🎨 CHART COMPONENT - Rendering chart with:", {
+            seriesCount: chartSeries.length,
+            categoriesCount: categories.length,
+            firstSeriesData: chartSeries[0]?.data,
+            firstCategory: categories[0]
+          })}
           <ApexChart
-            key={theme}
-            options={card.options}
-            series={card.series}
-            type={card.type}
-            height={card.height}
+            options={chartOptions}
+            series={chartSeries}
+            type="bar"
+            height={400}
           />
+        </>
+      ) : (
+        <div className="h-[400px] flex items-center justify-center">
+          <p className={`${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            No categories available (length: {categories.length})
+          </p>
         </div>
-      ))}
+      )}
     </div>
   );
 }

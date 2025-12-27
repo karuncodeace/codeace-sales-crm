@@ -40,12 +40,12 @@ export async function GET() {
       // Admin should see all sales persons
       queryBuilder = supabase
         .from("sales_persons")
-        .select("id, sales_person_id, user_id, name, call_attended, meetings_attended, total_conversions");
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion");
     } else if (crmUser.role === "sales" && crmUser.salesPersonId) {
       // Sales users see only their own record
       queryBuilder = supabase
         .from("sales_persons")
-        .select("id, sales_person_id, user_id, name, call_attended, meetings_attended, total_conversions")
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion")
         .eq("id", crmUser.salesPersonId);
     } else {
       // Sales user without salesPersonId - return empty
@@ -85,11 +85,11 @@ export async function GET() {
         if (crmUser.role === "admin") {
           basicQueryBuilder = supabase
             .from("sales_persons")
-            .select("id, sales_person_id, user_id, name");
+            .select("id, user_id, full_name");
         } else {
           basicQueryBuilder = supabase
             .from("sales_persons")
-            .select("id, sales_person_id, user_id, name")
+            .select("id, user_id, full_name")
             .eq("id", crmUser.salesPersonId);
         }
         const resultBasic = await basicQueryBuilder;
@@ -126,7 +126,7 @@ export async function GET() {
           const adminClient = supabaseAdmin();
           let adminQueryBuilder = adminClient
             .from("sales_persons")
-            .select("id, sales_person_id, user_id, name, call_attended, meetings_attended, total_conversions");
+            .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion");
           
           const adminResult = await adminQueryBuilder;
           
@@ -139,7 +139,7 @@ export async function GET() {
             // Try basic fields with admin client
             const adminBasicResult = await adminClient
               .from("sales_persons")
-              .select("id, sales_person_id, user_id, name");
+              .select("id, user_id, full_name");
             
             if (!adminBasicResult.error && adminBasicResult.data) {
               console.log("✅ Admin client fetched sales persons (basic):", adminBasicResult.data.length);
@@ -157,12 +157,46 @@ export async function GET() {
     } else {
       salesPersons = resultWithFields.data || [];
       console.log("✅ Fetched sales persons (with performance fields):", salesPersons.length);
+      if (salesPersons.length > 0) {
+        console.log("📋 First sales person raw data:", JSON.stringify(salesPersons[0], null, 2));
+        console.log("📋 All sales persons raw data:", JSON.stringify(salesPersons, null, 2));
+      }
     }
 
-    // If we still have an error after fallback, return empty data instead of error
+    // If we still have an error after fallback, try admin client for sales users too
+    if (salesPersonsError && crmUser.role === "sales" && crmUser.salesPersonId) {
+      console.warn("⚠️ Regular query failed for sales user. Trying with admin client...");
+      const adminClient = supabaseAdmin();
+      const adminResult = await adminClient
+        .from("sales_persons")
+        .select("id, user_id, full_name, call_attended, meetings_attended, total_conversion")
+        .eq("id", crmUser.salesPersonId);
+      
+      if (!adminResult.error && adminResult.data && adminResult.data.length > 0) {
+        console.log("✅ Admin client successfully fetched sales person:", adminResult.data.length);
+        salesPersons = adminResult.data || [];
+        salesPersonsError = null;
+        queryClient = adminClient;
+      } else {
+        // Try basic fields
+        const adminBasicResult = await adminClient
+          .from("sales_persons")
+          .select("id, user_id, full_name")
+          .eq("id", crmUser.salesPersonId);
+        
+        if (!adminBasicResult.error && adminBasicResult.data && adminBasicResult.data.length > 0) {
+          console.log("✅ Admin client fetched sales person (basic):", adminBasicResult.data.length);
+          salesPersons = adminBasicResult.data || [];
+          salesPersonsError = null;
+          queryClient = adminClient;
+        }
+      }
+    }
+
+    // If we still have an error after all fallbacks, return empty data instead of error
     // This allows the dashboard to still load
     if (salesPersonsError) {
-      console.error("❌ Final error fetching sales persons:", salesPersonsError);
+      console.error("❌ Final error fetching sales persons after all fallbacks:", salesPersonsError);
       // Return empty data instead of error to prevent dashboard from breaking
       return Response.json({
         calls: [],
@@ -171,6 +205,12 @@ export async function GET() {
         salesPersons: []
       });
     }
+
+    console.log("🔍 After query - salesPersons array:", {
+      length: salesPersons?.length || 0,
+      isEmpty: !salesPersons || salesPersons.length === 0,
+      firstItem: salesPersons?.[0] || null
+    });
 
     if (!salesPersons || salesPersons.length === 0) {
       console.warn("⚠️ No sales persons found in sales_persons table. Trying users table fallback...");
@@ -207,12 +247,11 @@ export async function GET() {
         // Map users to sales_persons format
         salesPersons = usersResult.data.map(user => ({
           id: user.id,
-          sales_person_id: user.id,
           user_id: user.id,
-          name: user.name || user.email?.split("@")[0] || "Unknown",
+          full_name: user.name || user.email?.split("@")[0] || "Unknown",
           call_attended: 0, // Default to 0 since we don't have this data
           meetings_attended: 0,
-          total_conversions: 0
+          total_conversion: 0
         }));
       } else {
         console.warn("⚠️ No users found either");
@@ -244,29 +283,131 @@ export async function GET() {
       }
     }
 
+    // If performance metrics are all zero, try to calculate from other tables
+    const hasPerformanceData = salesPersons.some(sp => 
+      (sp.call_attended && parseInt(sp.call_attended) > 0) ||
+      (sp.meetings_attended && parseInt(sp.meetings_attended) > 0) ||
+      (sp.total_conversion && parseInt(sp.total_conversion) > 0)
+    );
+
+    // Calculate metrics from other tables if sales_persons table doesn't have performance data
+    let calculatedMetrics = {};
+    if (!hasPerformanceData && salesPersons.length > 0) {
+      console.log("📊 Calculating performance metrics from tasks, appointments, and leads tables...");
+      
+      const salesPersonIds = salesPersons.map(sp => sp.id).filter(Boolean);
+      
+      // Count completed calls (tasks with type='Call' and status='Completed')
+      const { data: completedCalls } = await queryClient
+        .from("tasks_table")
+        .select("sales_person_id")
+        .eq("type", "Call")
+        .eq("status", "Completed")
+        .in("sales_person_id", salesPersonIds);
+      
+      // Count completed meetings (appointments with status='completed')
+      const { data: completedMeetings } = await queryClient
+        .from("appointments")
+        .select("salesperson_id")
+        .eq("status", "completed")
+        .in("salesperson_id", salesPersonIds);
+      
+      // Count converted leads (leads with status='Converted' or 'Closed Won')
+      const { data: convertedLeads } = await queryClient
+        .from("leads_table")
+        .select("assigned_to")
+        .in("status", ["Converted", "Closed Won", "Won"])
+        .in("assigned_to", salesPersonIds);
+      
+      // Aggregate by sales_person_id
+      salesPersonIds.forEach(spId => {
+        calculatedMetrics[spId] = {
+          calls: completedCalls?.filter(t => t.sales_person_id === spId).length || 0,
+          meetings: completedMeetings?.filter(a => a.salesperson_id === spId).length || 0,
+          conversions: convertedLeads?.filter(l => l.assigned_to === spId).length || 0,
+        };
+      });
+      
+      console.log("✅ Calculated metrics:", calculatedMetrics);
+    }
+
     // Map sales persons data to performance metrics
-    const performanceData = salesPersons.map((salesPerson) => {
-      // Get name from sales_persons.name, or from users table, or use sales_person_id
-      let salesPersonName = salesPerson.name;
+    console.log("🔄 Mapping sales persons to performance data. Count:", salesPersons.length);
+    if (salesPersons.length === 0) {
+      console.error("❌ CRITICAL: salesPersons array is EMPTY! Cannot create chart data.");
+      console.log("🔍 Debug info:", {
+        crmUserRole: crmUser.role,
+        crmUserSalesPersonId: crmUser.salesPersonId,
+        salesPersonsError: salesPersonsError,
+        queryClientType: queryClient === supabase ? "regular" : "admin"
+      });
+      return Response.json({
+        calls: [],
+        meetings: [],
+        conversions: [],
+        salesPersons: []
+      });
+    }
+    console.log("📋 Raw sales persons data:", JSON.stringify(salesPersons, null, 2));
+    console.log("📊 Calculated metrics:", JSON.stringify(calculatedMetrics, null, 2));
+    
+    const performanceData = salesPersons.map((salesPerson, index) => {
+      // Use full_name from sales_persons table, fallback to users table or id
+      let salesPersonName = salesPerson.full_name;
       if (!salesPersonName && salesPerson.user_id) {
         salesPersonName = userNamesMap[salesPerson.user_id];
       }
       if (!salesPersonName) {
-        salesPersonName = salesPerson.sales_person_id || "Unknown";
+        salesPersonName = salesPerson.id || "Unknown";
       }
 
-      return {
+      // Use calculated metrics if available, otherwise use table values
+      const calculated = calculatedMetrics[salesPerson.id] || {};
+      
+      // Get values from table fields: call_attended, meetings_attended, total_conversion
+      const calls = calculated.calls !== undefined 
+        ? calculated.calls
+        : (salesPerson.call_attended !== null && salesPerson.call_attended !== undefined 
+            ? parseInt(salesPerson.call_attended) || 0 
+            : 0);
+      
+      const meetings = calculated.meetings !== undefined
+        ? calculated.meetings
+        : (salesPerson.meetings_attended !== null && salesPerson.meetings_attended !== undefined 
+            ? parseInt(salesPerson.meetings_attended) || 0 
+            : 0);
+      
+      const conversions = calculated.conversions !== undefined
+        ? calculated.conversions
+        : (salesPerson.total_conversion !== null && salesPerson.total_conversion !== undefined 
+            ? parseInt(salesPerson.total_conversion) || 0 
+            : 0);
+      
+      const personData = {
         name: salesPersonName,
-        calls: salesPerson.call_attended !== null && salesPerson.call_attended !== undefined 
-          ? parseInt(salesPerson.call_attended) || 0 
-          : 0,
-        meetings: salesPerson.meetings_attended !== null && salesPerson.meetings_attended !== undefined 
-          ? parseInt(salesPerson.meetings_attended) || 0 
-          : 0,
-        conversions: salesPerson.total_conversions !== null && salesPerson.total_conversions !== undefined 
-          ? parseInt(salesPerson.total_conversions) || 0 
-          : 0,
+        calls,
+        meetings,
+        conversions,
       };
+      
+      console.log(`👤 Person ${index + 1}:`, {
+        id: salesPerson.id,
+        full_name: salesPerson.full_name,
+        name: salesPersonName,
+        raw_call_attended: salesPerson.call_attended,
+        raw_meetings_attended: salesPerson.meetings_attended,
+        raw_total_conversion: salesPerson.total_conversion,
+        call_attended_type: typeof salesPerson.call_attended,
+        meetings_attended_type: typeof salesPerson.meetings_attended,
+        total_conversion_type: typeof salesPerson.total_conversion,
+        calculated,
+        final_calls: calls,
+        final_meetings: meetings,
+        final_conversions: conversions,
+        final: personData
+      });
+      
+      return personData;
     });
 
     // Sort by total performance (calls + meetings + conversions) descending
@@ -276,11 +417,29 @@ export async function GET() {
       return totalB - totalA;
     });
 
-    // Extract arrays for chart
-    const calls = performanceData.map((p) => p.calls);
-    const meetings = performanceData.map((p) => p.meetings);
-    const conversions = performanceData.map((p) => p.conversions);
-    const salesPersonsNames = performanceData.map((p) => p.name);
+    // Extract arrays for chart - ensure all values are numbers
+    console.log("📈 Extracting arrays for chart from performanceData:", performanceData.length);
+    
+    const calls = performanceData.map((p) => {
+      const val = Number(p.calls) || 0;
+      console.log(`  Calls: ${p.name} = ${val}`);
+      return val;
+    });
+    const meetings = performanceData.map((p) => {
+      const val = Number(p.meetings) || 0;
+      console.log(`  Meetings: ${p.name} = ${val}`);
+      return val;
+    });
+    const conversions = performanceData.map((p) => {
+      const val = Number(p.conversions) || 0;
+      console.log(`  Conversions: ${p.name} = ${val}`);
+      return val;
+    });
+    const salesPersonsNames = performanceData.map((p) => {
+      const name = p.name || "Unknown";
+      console.log(`  Name: ${name}`);
+      return name;
+    });
 
     const data = {
       calls,
@@ -288,6 +447,18 @@ export async function GET() {
       conversions,
       salesPersons: salesPersonsNames,
     };
+
+    console.log("✅ FINAL API RESPONSE DATA:", {
+      salesPersonsCount: salesPersonsNames.length,
+      salesPersons: salesPersonsNames,
+      calls: calls,
+      meetings: meetings,
+      conversions: conversions,
+      callsTotal: calls.reduce((a, b) => a + b, 0),
+      meetingsTotal: meetings.reduce((a, b) => a + b, 0),
+      conversionsTotal: conversions.reduce((a, b) => a + b, 0),
+      fullData: JSON.stringify(data, null, 2)
+    });
 
     return Response.json(data);
   } catch (error) {
