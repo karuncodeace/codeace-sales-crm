@@ -455,7 +455,7 @@ export default function BookingsPage() {
 
                       {/* Action Buttons */}
                       {booking.status === "scheduled" && (
-                        <div className={`mt-4 pt-4 flex justify-end ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                        <div className={`mt-4 pt-4 flex justify-end border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
                           <div className="flex  gap-2">
                             <button
                               type="button"

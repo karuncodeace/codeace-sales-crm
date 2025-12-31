@@ -269,7 +269,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           type="submit"
           disabled={isDisabled}
           className={`
-            w-[25%] py-3 px-4 flex items-center justify-center rounded-md font-medium ${theme === "light" ? "text-white" : "text-white"} transition-all cursor-pointer
+             py-3 px-4 flex items-center justify-center rounded-md font-medium ${theme === "light" ? "text-white" : "text-white"} transition-all cursor-pointer
             ${
               isDisabled
                 ? `${theme === "light" ? "bg-gray-400 cursor-not-allowed text-white" : "bg-orange-500 cursor-not-allowed text-white"}`
