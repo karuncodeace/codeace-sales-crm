@@ -1,5 +1,6 @@
-import { supabaseServer, supabaseAdmin } from "../../../lib/supabase/serverClient";
+import { supabaseServer } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
+import { updateDailyMetrics } from "../../../lib/sales-metrics/updateMetrics";
 
 /* ---------------- GET ---------------- */
 export async function GET(request) {
@@ -16,9 +17,6 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("lead_id");
 
-  // For sales, we need to show tasks that either:
-  // 1. Have sales_person_id = crmUser.id, OR
-  // 2. Belong to leads where assigned_to = crmUser.id (even if task doesn't have sales_person_id)
   let data, error;
   
   if (crmUser.role === "sales") {
@@ -26,141 +24,35 @@ export async function GET(request) {
     const salesPersonId = crmUser.salesPersonId;
     
     if (!salesPersonId) {
+      console.warn("Tasks API: Sales user has no salesPersonId", {
+        userId: crmUser.id,
+        email: crmUser.email,
+        role: crmUser.role
+      });
       return Response.json([]);
     }
     
-    // First, get all lead IDs assigned to this sales person
-    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id -> leads_table.assigned_to
-    const { data: assignedLeads, error: leadsError } = await supabase
-      .from("leads_table")
-      .select("id")
-      .eq("assigned_to", salesPersonId);
-    
-    const assignedLeadIds = assignedLeads?.map(lead => lead.id) || [];
-    
-    // Fetch tasks in two queries and combine:
-    // 1. Tasks with sales_person_id = salesPersonId
-    // 2. Tasks for leads assigned to this salesperson (even if task doesn't have sales_person_id)
-    // This ensures we get all tasks for the sales person, even if some tasks don't have sales_person_id set
-    
-    // Get all tasks for debugging and fallback filtering
-    // Try with regular client first - include status to verify pending tasks exist
-    let { data: allTasks, error: allTasksError } = await supabase
+    // Directly query tasks_table for the current logged-in user's sales_person_id
+    // Note: Only sales_person_id exists (salesperson_id column doesn't exist based on diagnostics)
+    let query = supabase
       .from("tasks_table")
-      .select("id, title, sales_person_id, lead_id, status");
-    
-    // If no tasks found, try with admin client to check if it's an RLS issue
-    if ((!allTasks || allTasks.length === 0) && !allTasksError) {
-      const adminClient = supabaseAdmin();
-      const { data: adminTasks, error: adminError } = await adminClient
-        .from("tasks_table")
-        .select("id, title, sales_person_id, lead_id, status")
-        .limit(10);
-      
-      if (adminTasks && adminTasks.length > 0) {
-        // Use admin tasks for debugging, but note this is a security issue
-        allTasks = adminTasks;
-      }
-    }
-    
-    
-    // Check if RLS is blocking - if admin client can see tasks but regular client can't, use admin
-    let queryClient = supabase;
-    const adminClient = supabaseAdmin();
-    const { data: adminCheck } = await adminClient
-      .from("tasks_table")
-      .select("id")
-      .limit(1);
-    
-    const isRLSBlocking = adminCheck && adminCheck.length > 0 && (!allTasks || allTasks.length === 0);
-    
-    if (isRLSBlocking) {
-      queryClient = adminClient;
-    }
-    
-    // Query tasks - use the appropriate client (admin if RLS blocking)
-    // Fetch all tasks first, then filter by status in JavaScript to avoid potential query issues
-    const [tasksBySalespersonRaw, tasksByLeadsRaw] = await Promise.all([
-      queryClient
-        .from("tasks_table")
-        .select("*")
-        .eq("sales_person_id", salesPersonId),
-      assignedLeadIds.length > 0
-        ? queryClient
-            .from("tasks_table")
-            .select("*")
-            .in("lead_id", assignedLeadIds)
-        : { data: [], error: null }
-    ]);
-    
-    // Return all tasks (both pending and completed) - frontend will filter them
-    const tasksBySalesperson = {
-      data: tasksBySalespersonRaw.data || [],
-      error: tasksBySalespersonRaw.error
-    };
-    
-    const tasksByLeads = {
-      data: tasksByLeadsRaw.data || [],
-      error: tasksByLeadsRaw.error
-    };
-    
-    // Combine results and remove duplicates
-    const tasksById = new Map();
-    
-    if (tasksBySalesperson.data) {
-      tasksBySalesperson.data.forEach(task => {
-        tasksById.set(task.id, task);
-      });
-    }
-    
-    if (tasksByLeads.data) {
-      tasksByLeads.data.forEach(task => {
-        tasksById.set(task.id, task);
-      });
-    }
-    
-    // Convert map to array
-    let combinedTasks = Array.from(tasksById.values());
-    
-    // Fallback: If no tasks found but we have assigned leads, try a manual filter
-    // This handles cases where there might be type mismatches in the database query
-    if (combinedTasks.length === 0 && assignedLeadIds.length > 0 && allTasks) {
-      const manualFiltered = allTasks.filter(task => {
-        const spMatch = task.sales_person_id === salesPersonId || 
-                       String(task.sales_person_id) === String(salesPersonId);
-        const leadMatch = assignedLeadIds.includes(task.lead_id);
-        return spMatch || leadMatch;
-      });
-      
-      if (manualFiltered.length > 0) {
-        // Get full task data for manually filtered tasks - include all statuses
-        // Use the same client we're using for main queries (admin if RLS blocking)
-        const manualTaskIds = manualFiltered.map(t => t.id);
-        const { data: fullManualTasks } = await queryClient
-          .from("tasks_table")
-          .select("*")
-          .in("id", manualTaskIds);
-        
-        if (fullManualTasks && fullManualTasks.length > 0) {
-          combinedTasks = fullManualTasks;
-        }
-      }
-    }
+      .select("*")
+      .eq("sales_person_id", salesPersonId);
     
     // Filter by lead_id if provided
     if (leadId) {
-      combinedTasks = combinedTasks.filter(task => task.lead_id === leadId);
+      query = query.eq("lead_id", leadId);
     }
     
-    // Sort by created_at (newest first)
-    combinedTasks.sort((a, b) => {
-      const dateA = new Date(a.created_at || 0);
-      const dateB = new Date(b.created_at || 0);
-      return dateB - dateA;
-    });
+    // Order by created_at (newest first)
+    const result = await query.order("created_at", { ascending: false });
     
-    data = combinedTasks;
-    error = tasksBySalesperson.error || tasksByLeads.error;
+    data = result.data || [];
+    error = result.error;
+    
+    if (error) {
+      console.error("Tasks API: Query error", error.message);
+    }
   } else {
     // Admin: use filtered query (which returns all tasks)
     let query = getFilteredQuery(supabase, "tasks_table", crmUser);
@@ -359,25 +251,44 @@ export async function PATCH(request) {
 
   const { data, error } = await query.select();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Tasks API PATCH: Update error", {
+      error: error.message,
+      code: error.code,
+      details: error.details,
+      taskId: id,
+      leadId: lead_id,
+    });
+    return Response.json({ error: error.message }, { status: 500 });
+  }
 
-  // Update daily metrics: Task completed → increment calls or meetings based on type
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    console.error("Tasks API PATCH: No data returned after update", { taskId: id, leadId: lead_id });
+    return Response.json({ error: "Task not found or update failed" }, { status: 404 });
+  }
+
+  const updatedTask = Array.isArray(data) ? data[0] : data;
+
+  // Update daily metrics when task is completed (don't fail if this fails)
   if (status !== undefined && String(status).toLowerCase() === "completed") {
     const previousStatus = existingTask?.status;
     // Only increment if transitioning TO completed (not from completed)
     if (previousStatus && String(previousStatus).toLowerCase() !== "completed") {
-      const taskType = (type || existingTask?.type || "").toLowerCase();
-      if (taskType === "call" || taskType === "follow-up") {
-        // Call completed: increment calls
-        await updateDailyMetrics({ calls: 1 });
-      } else if (taskType === "meeting") {
-        // Meeting completed: increment meetings
-        await updateDailyMetrics({ meetings: 1 });
+      try {
+        const taskType = (type || updatedTask?.type || existingTask?.type || "").toLowerCase();
+        if (taskType === "call" || taskType === "follow-up") {
+          await updateDailyMetrics({ calls: 1 });
+        } else if (taskType === "meeting") {
+          await updateDailyMetrics({ meetings: 1 });
+        }
+      } catch (metricsError) {
+        // Don't fail the task update if metrics update fails
+        console.warn("Tasks API PATCH: Failed to update daily metrics", metricsError);
       }
     }
   }
 
-  return Response.json({ success: true, task: data?.[0] || data });
+  return Response.json({ success: true, task: updatedTask });
 }
 
 /* ---------------- DELETE ---------------- */

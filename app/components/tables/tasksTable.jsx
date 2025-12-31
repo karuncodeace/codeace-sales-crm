@@ -637,10 +637,18 @@ export default function TasksPage() {
             });
             
             if (!taskRes.ok) {
-                throw new Error("Failed to complete task");
+                let errorMessage = "Failed to complete task";
+                try {
+                    const errorData = await taskRes.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } catch (parseError) {
+                    // If JSON parsing fails, use status text
+                    errorMessage = taskRes.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
             
-            // Save activity
+            // Create activity record with task details and user comments
             await fetch("/api/task-activities", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -648,13 +656,13 @@ export default function TasksPage() {
                     lead_id: leadId,
                     activity: `Task completed: ${task.title}`,
                     type: "task",
-                    comments: comment,
-                    connect_through: connectThrough,
+                    comments: comment || `Task "${task.title}" has been completed`,
+                    connect_through: connectThrough || null,
                     due_date: dueDate || null,
                 }),
             });
             
-            // Close modal and refresh
+            // Close modal
             setTaskCompletionModal({
                 isOpen: false,
                 task: null,
@@ -670,10 +678,15 @@ export default function TasksPage() {
                 showCalendar: false,
             });
             
+            // Show success message
+            toast.success("Task completed successfully");
+            
+            // Force refresh of tasks data - this will filter out completed tasks
             mutate("/api/tasks");
             mutate("/api/leads");
         } catch (error) {
-            toast.error(error.message);
+            console.error("Task completion error:", error);
+            toast.error(error.message || "Failed to complete task. Please try again.");
             setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: false }));
         }
     };
@@ -721,11 +734,21 @@ export default function TasksPage() {
                 });
 
                 if (!taskRes.ok) {
-                    throw new Error("Failed to complete task");
+                    const errorData = await taskRes.json().catch(() => ({ error: "Unknown error" }));
+                    throw new Error(errorData.error || "Failed to complete task");
                 }
 
-                mutate("/api/tasks");
-                mutate("/api/leads");
+                // Create activity record
+                await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: `Task completed: ${task.title}`,
+                        type: "task",
+                        comments: "Demo completed - scheduling second demo",
+                    }),
+                });
                 
                 // Close modal
                 setDemoOutcomeModal({
@@ -736,6 +759,12 @@ export default function TasksPage() {
                     requiresSecondDemo: null,
                     isSubmitting: false,
                 });
+
+                toast.success("Task completed successfully");
+
+                // Refresh data
+                mutate("/api/tasks");
+                mutate("/api/leads");
 
                 // Redirect to leads page with scroll to demo section
                 router.push(`/leads/${leadId}?scrollToDemo=true`);
@@ -817,7 +846,7 @@ export default function TasksPage() {
                     }
                 }
 
-                // Mark task as completed (after creating new task, same as normal flow)
+                // Mark task as completed
                 const taskRes = await fetch("/api/tasks", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -828,10 +857,11 @@ export default function TasksPage() {
                 });
 
                 if (!taskRes.ok) {
-                    throw new Error("Failed to complete task");
+                    const errorData = await taskRes.json().catch(() => ({ error: "Unknown error" }));
+                    throw new Error(errorData.error || "Failed to complete task");
                 }
 
-                // Save activity
+                // Create activity record
                 await fetch("/api/task-activities", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -843,7 +873,7 @@ export default function TasksPage() {
                     }),
                 });
 
-                // Close modal and refresh
+                // Close modal
                 setDemoOutcomeModal({
                     isOpen: false,
                     task: null,
@@ -853,11 +883,15 @@ export default function TasksPage() {
                     isSubmitting: false,
                 });
 
+                toast.success("Task completed successfully");
+
+                // Refresh data - this will filter out completed tasks
                 mutate("/api/tasks");
                 mutate("/api/leads");
             }
         } catch (error) {
-            toast.error(error.message);
+            console.error("Demo outcome error:", error);
+            toast.error(error.message || "Failed to complete task. Please try again.");
             setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
         }
     };
@@ -1098,9 +1132,15 @@ export default function TasksPage() {
                             <tr>
                                 <td
                                     colSpan={12}
-                                    className={`px-6 py-10 text-center text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                                    className={`px-6 py-10 text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                                 >
-                                    No tasks found. Try a different search or filter.
+                                    <div className="flex flex-col items-center gap-2">
+                                        <p className="text-sm">
+                                            {tasksData?.length === 0 
+                                              ? "No tasks assigned to you yet. Tasks are created automatically when leads are added or when lead status changes. Contact an admin if you need tasks assigned to you."
+                                              : "No tasks found matching your filters. Try adjusting your search or filters."}
+                                        </p>
+                                    </div>
                                 </td>
                             </tr>
                         ) : (

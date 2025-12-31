@@ -10,7 +10,17 @@ export async function GET() {
   
   // If no CRM user found, return empty array instead of 403 to prevent loading loops
   if (!crmUser) {
+    console.warn("Leads API: No CRM user found");
     return Response.json([]);
+  }
+
+  // Log user info for debugging
+  if (crmUser.role === "sales" && !crmUser.salesPersonId) {
+    console.warn("Leads API: Sales user has no salesPersonId", {
+      userId: crmUser.id,
+      email: crmUser.email,
+      role: crmUser.role
+    });
   }
 
   // Get filtered query based on role
@@ -20,6 +30,7 @@ export async function GET() {
   const { data, error } = await query.order("id", { ascending: true });
 
   if (error) {
+    console.error("Leads API: Query error", error.message);
     // Return empty array instead of error to prevent loading loops
     return Response.json([]);
   }

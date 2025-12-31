@@ -827,10 +827,24 @@ export default function LeadsTable() {
                   ) : filteredLeads.length === 0 ? (
                     <tr className="h-[600px]">
                       <td colSpan={9} className="px-6 text-center">
-                        <div className="flex flex-col items-center justify-center h-full">
+                        <div className="flex flex-col items-center justify-center h-full gap-3">
                           <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                            No leads found
+                            {leadData.length === 0 
+                              ? "No leads assigned to you yet. Click 'Add Lead' to create your first lead, or contact an admin to assign existing leads to you."
+                              : "No leads found matching your filters. Try adjusting your search or filters."}
                           </p>
+                          {leadData.length === 0 && (
+                            <button
+                              onClick={() => setOpenAddLead(true)}
+                              className={`mt-2 px-4 py-2 text-sm font-medium rounded-lg ${
+                                theme === "dark"
+                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
+                                  : "bg-orange-500 hover:bg-orange-600 text-white"
+                              }`}
+                            >
+                              Add Your First Lead
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1254,12 +1268,28 @@ export default function LeadsTable() {
                           </div>
                         ))
                       ) : (
-                        <p className={`rounded-lg border border-dashed p-3 text-center text-sm ${theme === "dark"
+                        <div className={`rounded-lg border border-dashed p-4 text-center ${theme === "dark"
                             ? "border-gray-600 bg-gray-800/10 text-gray-400"
                             : "border-gray-300 bg-white text-gray-500"
                           }`}>
-                          No leads yet
-                        </p>
+                          <p className="text-sm mb-2">
+                            {leadData.length === 0 
+                              ? "No leads assigned to you yet"
+                              : "No leads in this status"}
+                          </p>
+                          {leadData.length === 0 && (
+                            <button
+                              onClick={() => setOpenAddLead(true)}
+                              className={`mt-2 px-3 py-1.5 text-xs font-medium rounded-lg ${
+                                theme === "dark"
+                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
+                                  : "bg-orange-500 hover:bg-orange-600 text-white"
+                              }`}
+                            >
+                              Add Your First Lead
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
