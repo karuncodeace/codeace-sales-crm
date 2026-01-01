@@ -377,11 +377,11 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
               >
                 <option value="">Select size</option>
                 <option value="1-10">1-10 employees</option>
-                <option value="11-50">11-50 employees</option>
-                <option value="51-200">51-200 employees</option>
-                <option value="201-500">201-500 employees</option>
-                <option value="501-1000">501-1000 employees</option>
-                <option value="1000+">1000+ employees</option>
+                <option value="11-50">11-30 employees</option>
+                <option value="51-200">31-50 employees</option>
+                <option value="201-500">51-100 employees</option>
+                <option value="501-1000">101-150 employees</option>
+                <option value="1000+">200+ employees</option>
               </select>
             </div>
 

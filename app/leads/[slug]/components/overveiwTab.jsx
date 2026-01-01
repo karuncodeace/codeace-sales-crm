@@ -70,6 +70,10 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
             light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
             dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
         },
+        Disqualified: {
+            light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-100",
+            dark: "text-red-500 bg-red-900/40 ring-1 ring-inset ring-red-700",
+        },
     };
 
     if (!lead) {
