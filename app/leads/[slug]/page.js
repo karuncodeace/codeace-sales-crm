@@ -261,7 +261,7 @@ export default function LeadDetailPage() {
                             isConnectMenuOpen ? "bg-orange-600" : ""
                         }`}
                     >
-                        <span>Reach Out</span>
+                        <span>Connect</span>
                         <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isConnectMenuOpen ? "rotate-180" : ""}`} />
                     </button>
 
