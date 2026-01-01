@@ -14,8 +14,8 @@ function NotesTab({ theme, leadId, leadName }) {
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editNoteText, setEditNoteText] = useState("");
     const [deletingNoteId, setDeletingNoteId] = useState(null);
-    const [newNoteType, setNewNoteType] = useState("all");
-    const [activeTab, setActiveTab] = useState("all");
+    const [newNoteType, setNewNoteType] = useState("general");
+    const [activeTab, setActiveTab] = useState("general");
 
     // Fetch notes from API (filter activities by type "note")
     const { data: activitiesData, error, isLoading, mutate } = useSWR(
@@ -111,7 +111,6 @@ function NotesTab({ theme, leadId, leadName }) {
         });
 
     const noteTabs = [
-        { id: "all", label: "All Notes" },
         { id: "general", label: "General Notes" },
         { id: "call", label: "Call Notes" },
         { id: "meeting", label: "Meeting Notes" },
@@ -119,7 +118,7 @@ function NotesTab({ theme, leadId, leadName }) {
     ];
 
     const filteredNotes = notes.filter((note) => {
-        if (activeTab === "all") return true;
+        if (activeTab === "general") return true;
         return note.notesType === activeTab;
     });
 
@@ -130,7 +129,7 @@ function NotesTab({ theme, leadId, leadName }) {
         },
         { call: 0, meeting: 0, general: 0 }
     );
-    typeCounts.all = notes.length;
+    typeCounts.general = notes.length;
 
     // Handle add note
     const handleAddNote = async () => {

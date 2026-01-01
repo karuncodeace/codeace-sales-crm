@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { useTheme } from "../../context/themeContext";
+import toast from "react-hot-toast";
 import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
 import FilterBtn from "../buttons/filterbtn";
@@ -285,7 +286,7 @@ export default function ProspectsTable() {
                                     >
                                         {searchTerm.trim()
                                             ? `No prospects match "${searchTerm.trim()}". Try a different search.`
-                                            : "No prospects found with score > 20."
+                                            : "No prospects found."
                                         }
                                     </td>
                                 </tr>
@@ -478,20 +479,25 @@ export default function ProspectsTable() {
                                                     </button>
 
                                                     {openActions === prospect.id && (
-                                                        <div className={`absolute right-0 z-10 mt-2 w-36 rounded-lg border text-sm font-medium shadow-xl ${theme === "dark"
+                                                        <div className={`absolute right-0 z-10 mt-2 w-48 rounded-lg border text-sm font-medium shadow-xl ${theme === "dark"
                                                             ? "bg-gray-800 text-gray-200 border-gray-700"
                                                             : "bg-white text-gray-700 border-gray-200"
                                                             }`}>
-                                                            {["View", "Edit"].map((action) => (
-                                                                <button
-                                                                    key={action}
-                                                                    type="button"
-                                                                    className={`flex w-full items-center px-4 py-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                                                                        }`}
-                                                                >
-                                                                    {action}
-                                                                </button>
-                                                            ))}
+                                                            
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    handleRemoveFromProspects(prospect.id);
+                                                                }}
+                                                                className={`flex w-full items-center gap-2 px-4 py-2 transition-colors text-red-600
+                                                                ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
+                                                                `}
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                                Remove from Prospects
+                                                            </button>
                                                         </div>
                                                     )}
                                                 </div>
@@ -571,6 +577,8 @@ export default function ProspectsTable() {
                 </div>
                 {/* End Footer */}
             </div>
+
+           
         </div>
     );
 }

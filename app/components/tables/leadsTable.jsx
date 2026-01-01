@@ -1054,7 +1054,7 @@ export default function LeadsTable() {
                               </button>
 
                               {openActions === lead.id && (
-                                <div className={`absolute right-0 z-10 mt-2 w-40 rounded-lg border text-sm font-medium shadow-xl
+                                <div className={`absolute right-0 z-10 mt-2 w-48 rounded-lg border text-sm font-medium shadow-xl
                                 ${theme === "dark" ? "bg-gray-800 text-gray-200 border-gray-700" : "bg-white text-gray-700 border-gray-200"}
                                 `}>
                                   <button
@@ -1076,6 +1076,55 @@ export default function LeadsTable() {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      setEditLeadModal({
+                                        isOpen: true,
+                                        lead: lead,
+                                      });
+                                      setOpenActions(null);
+                                    }}
+                                    className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
+                                    ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
+                                  `}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch("/api/prospects", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            lead_id: lead.id,
+                                          }),
+                                        });
+                                        if (!res.ok) {
+                                          const errorData = await res.json().catch(() => ({}));
+                                          throw new Error(errorData.error || "Failed to move to prospects");
+                                        }
+                                        toast.success("Lead moved to prospects successfully");
+                                        setOpenActions(null);
+                                        mutate(); // Refresh leads list
+                                      } catch (error) {
+                                        toast.error(error.message || "Failed to move to prospects");
+                                      }
+                                    }}
+                                    className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
+                                    ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
+                                  `}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    Move to Prospects
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
                                       setEmailModal({
                                         isOpen: true,
                                         recipientEmail: lead.email,
@@ -1092,25 +1141,7 @@ export default function LeadsTable() {
                                   `}
                                   >
                                     <Mail className="w-4 h-4" />
-                                    Send Email
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditLeadModal({
-                                        isOpen: true,
-                                        lead: lead,
-                                      });
-                                      setOpenActions(null);
-                                    }}
-                                    className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
-                                    ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
-                                  `}
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit
+                                    Email
                                   </button>
                                 </div>
                               )}
