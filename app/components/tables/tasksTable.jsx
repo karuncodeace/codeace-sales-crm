@@ -139,6 +139,35 @@ function isDemoSchedulingTask(task, leadStatus) {
   return title.includes("schedule") && title.includes("demo");
 }
 
+// Helper function to check if task is the first task (Initial call from New stage)
+function isFirstTask(task, leadStatus) {
+  if (!task || !task.title) return false;
+  
+  // Check task stage if available (more reliable than lead status)
+  const taskStage = task.stage || task.lead_stage;
+  if (taskStage) {
+    const normalizedTaskStage = String(taskStage).trim().toLowerCase();
+    if (normalizedTaskStage !== "new") return false;
+  } else {
+    // Fallback to lead status check
+    const normalizedStatus = String(leadStatus || "").trim();
+    if (normalizedStatus.toLowerCase() !== "new") return false;
+  }
+  
+  const title = task.title.toLowerCase();
+  // Match various first task patterns:
+  // - "First Call" or "First Call –"
+  // - "Initial call" or "Initial call to"
+  // - "Initial Contact Call" (handles "initial" + "call" with words in between)
+  // - Any combination of "first" or "initial" with "call"
+  const hasFirstOrInitial = title.includes("first") || title.includes("initial");
+  const hasCall = title.includes("call");
+  
+  return (title.includes("first call") || 
+          title.includes("initial call") || 
+          (hasFirstOrInitial && hasCall));
+}
+
 // Helper function to get next stage
 function getNextStage(currentStage) {
   if (!currentStage || currentStage === "null" || currentStage === "undefined") {
@@ -231,6 +260,17 @@ export default function TasksPage() {
         leadId: null,
         leadName: "",
         requiresSecondDemo: null, // null = not selected, true = yes, false = no
+        isSubmitting: false,
+    });
+
+    // Qualification modal state
+    const [qualificationModal, setQualificationModal] = useState({
+        isOpen: false,
+        task: null,
+        leadId: null,
+        leadName: "",
+        isQualified: null, // null = not selected, true = qualified, false = not qualified, "notConnected" = not connected
+        disqualificationNote: "",
         isSubmitting: false,
     });
 
@@ -488,6 +528,34 @@ export default function TasksPage() {
         }
         
         const leadName = lead?.name || task.leadName || "Lead";
+
+        // Check if this is the first task (Initial call from New stage)
+        // Try both lead status and task stage
+        const taskStage = task.stage || task.lead_stage;
+        const statusToCheck = taskStage || currentStatus;
+        
+        // Debug: Log to help diagnose issues (remove in production if needed)
+        console.log("Task completion check:", {
+            taskTitle: task.title,
+            taskStage: taskStage,
+            leadStatus: currentStatus,
+            statusToCheck: statusToCheck,
+            isFirstTask: isFirstTask(task, statusToCheck)
+        });
+
+        if (isFirstTask(task, statusToCheck)) {
+            console.log("Showing qualification modal");
+            setQualificationModal({
+                isOpen: true,
+                task: task,
+                leadId: task.lead_id,
+                leadName: leadName,
+                isQualified: null,
+                disqualificationNote: "",
+                isSubmitting: false,
+            });
+            return;
+        }
 
         // Check if this is the special demo scenario
         if (isDemoSchedulingTask(task, currentStatus)) {
@@ -908,6 +976,193 @@ export default function TasksPage() {
         });
     };
 
+    // Handle qualification confirmation
+    const handleQualificationConfirm = async () => {
+        const { task, leadId, leadName, isQualified, disqualificationNote } = qualificationModal;
+        
+        if (isQualified === null) {
+            toast.error("Please select an option");
+            return;
+        }
+
+        setQualificationModal((prev) => ({ ...prev, isSubmitting: true }));
+
+        try {
+            if (isQualified === "notConnected") {
+                // NOT CONNECTED: Keep task as Pending (don't mark as completed), keep lead in same stage, don't show next modal
+                // Don't update task status - just save activity note so task remains visible
+
+                // Save activity with not connected note
+                await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: `Task attempted: ${task.title} - Client did not attend the call`,
+                        type: "task",
+                        comments: disqualificationNote || "Client did not attend the call - Task remains pending for retry",
+                        connect_through: "",
+                        due_date: null,
+                    }),
+                });
+
+                // Save to stage_notes table
+                await fetch("/api/stage-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        current_stage_notes: disqualificationNote || "Client did not attend the call",
+                        next_stage_notes: null,
+                        outcome: "Not Connected",
+                    }),
+                });
+
+                // Close modal and refresh
+                setQualificationModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    isQualified: null,
+                    disqualificationNote: "",
+                    isSubmitting: false,
+                });
+                
+                toast.success("Task updated. Lead remains in current stage. Task is still pending for retry.");
+                
+                // Refresh data
+                mutate("/api/tasks");
+                mutate("/api/leads");
+            } else if (isQualified) {
+                // YES: Qualified - proceed with normal flow
+                // Close qualification modal and show normal completion modal
+                setQualificationModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    isQualified: null,
+                    disqualificationNote: "",
+                    isSubmitting: false,
+                });
+                
+                // Get lead data to determine current status
+                const lead = leadsMap[leadId];
+                let currentStatus = lead?.status || lead?.current_stage || "New";
+                if (!currentStatus || currentStatus === "null" || currentStatus === "undefined" || currentStatus === null) {
+                    currentStatus = "New";
+                }
+                
+                // Show normal completion modal
+                setTaskCompletionModal({
+                    isOpen: true,
+                    task: task,
+                    leadId: leadId,
+                    leadName: leadName,
+                    currentStatus: currentStatus,
+                    comment: "",
+                    nextStageComments: "",
+                    connectThrough: "",
+                    dueDate: "",
+                    outcome: "Success",
+                    isSubmitting: false,
+                    showCalendar: false,
+                });
+            } else {
+                // NO: Not Qualified - mark lead as Disqualified, complete task, but don't move stage
+                // Mark task as completed
+                const taskRes = await fetch("/api/tasks", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: task.id,
+                        status: "Completed",
+                    }),
+                });
+
+                if (!taskRes.ok) {
+                    throw new Error("Failed to complete task");
+                }
+
+                // Update lead status to Disqualified
+                const leadUpdateRes = await fetch("/api/leads", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: leadId,
+                        status: "Disqualified",
+                        current_stage: "Disqualified",
+                    }),
+                });
+                
+                if (!leadUpdateRes.ok) {
+                    throw new Error("Failed to update lead status");
+                }
+
+                // Save activity with disqualification note
+                await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: `Task completed: ${task.title} - Lead marked as Disqualified`,
+                        type: "task",
+                        comments: disqualificationNote || "Lead not qualified",
+                        connect_through: "",
+                        due_date: null,
+                    }),
+                });
+
+                // Save to stage_notes table
+                await fetch("/api/stage-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        current_stage_notes: disqualificationNote || "Lead not qualified",
+                        next_stage_notes: null,
+                        outcome: "Disqualified",
+                    }),
+                });
+
+                // Close modal and refresh
+                setQualificationModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    isQualified: null,
+                    disqualificationNote: "",
+                    isSubmitting: false,
+                });
+                
+                toast.success("Task completed. Lead marked as Disqualified.");
+                
+                // Refresh data
+                mutate("/api/tasks");
+                mutate("/api/leads");
+            }
+        } catch (error) {
+            console.error("Qualification error:", error);
+            toast.error(error.message || "Failed to process qualification. Please try again.");
+            setQualificationModal((prev) => ({ ...prev, isSubmitting: false }));
+        }
+    };
+
+    // Cancel qualification modal
+    const handleCancelQualification = () => {
+        setQualificationModal({
+            isOpen: false,
+            task: null,
+            leadId: null,
+            leadName: "",
+            isQualified: null,
+            disqualificationNote: "",
+            isSubmitting: false,
+        });
+    };
+
     const handleReschedule = async (taskId, rescheduleData) => {
         try {
             const response = await fetch("/api/tasks", {
@@ -1056,7 +1311,7 @@ export default function TasksPage() {
                                 }
                             }}
                             disabled={isRefreshing}
-                            className={`inline-flex items-center justify-center rounded-lg border p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
+                            className={`inline-flex items-center justify-center rounded-lg  p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
                                 theme === "dark"
                                     ? "border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                                     : "border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -1067,8 +1322,8 @@ export default function TasksPage() {
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 viewBox="0 0 24 24"
-                                width="20"
-                                height="20"
+                                width="15"
+                                height="15"
                                 color="currentColor"
                                 fill="none"
                                 stroke="currentColor"
@@ -1165,12 +1420,20 @@ export default function TasksPage() {
                                             </label>
                                         </div>
                                     </td>
-                                    <td className="size-px whitespace-nowrap">
+                                    <td className="size-px">
                                         <div className="px-6 py-2">
                                             <div className="flex flex-col">
-                                                <span className={`text-sm font-medium ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                                    {task.title}
+                                                <span className={`text-sm font-medium block truncate max-w-md ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`} title={task.title} style={{ maxWidth: '400px' }}>
+                                                    {(() => {
+                                                        if (!task.title) return '';
+                                                        const words = task.title.trim().split(/\s+/);
+                                                        if (words.length > 5) {
+                                                            return words.slice(0, 5).join(' ') + '...';
+                                                        }
+                                                        return task.title;
+                                                    })()}
                                                 </span>
+                                                
                                                 <div className="flex items-center gap-1">
                                                     <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
                                                         {task.id}
@@ -1655,6 +1918,186 @@ export default function TasksPage() {
                                     <>
                                         <CheckCircle2 className="w-4 h-4" />
                                         Confirm
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Lead Qualification Modal */}
+            {qualificationModal.isOpen && qualificationModal.task && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div
+                        className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+                            theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-orange-500/10">
+                                    <CheckCircle2 className="w-5 h-5 text-orange-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-semibold">Lead Qualification Check</h2>
+                                    <p className={`text-xs mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                                        Is this lead qualified?
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleCancelQualification}
+                                className={`p-2 rounded-lg transition-colors ${
+                                    theme === "dark" ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                                }`}
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-6 py-5 space-y-5">
+                            {/* Radio Options */}
+                            <div className="space-y-3">
+                                <label
+                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        qualificationModal.isQualified === true
+                                            ? theme === "dark"
+                                                ? "border-orange-500 bg-orange-500/10"
+                                                : "border-orange-500 bg-orange-50"
+                                            : theme === "dark"
+                                                ? "border-gray-700 hover:border-gray-600"
+                                                : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="qualification"
+                                        checked={qualificationModal.isQualified === true}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: true }))}
+                                        className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                                    />
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        Yes (Qualified)
+                                    </span>
+                                </label>
+
+                                <label
+                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        qualificationModal.isQualified === false
+                                            ? theme === "dark"
+                                                ? "border-orange-500 bg-orange-500/10"
+                                                : "border-orange-500 bg-orange-50"
+                                            : theme === "dark"
+                                                ? "border-gray-700 hover:border-gray-600"
+                                                : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="qualification"
+                                        checked={qualificationModal.isQualified === false}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: false }))}
+                                        className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                                    />
+                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        No (Not Qualified)
+                                    </span>
+                                </label>
+
+                                <label
+                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        qualificationModal.isQualified === "notConnected"
+                                            ? theme === "dark"
+                                                ? "border-orange-500 bg-orange-500/10"
+                                                : "border-orange-500 bg-orange-50"
+                                            : theme === "dark"
+                                                ? "border-gray-700 hover:border-gray-600"
+                                                : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="qualification"
+                                        checked={qualificationModal.isQualified === "notConnected"}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: "notConnected" }))}
+                                        className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                                    />
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        Not Connected (Client did not attend)
+                                    </span>
+                                </label>
+                            </div>
+
+                            {/* Note field (show if Not Qualified or Not Connected is selected) */}
+                            {(qualificationModal.isQualified === false || qualificationModal.isQualified === "notConnected") && (
+                                <div>
+                                    <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                                        {qualificationModal.isQualified === "notConnected" ? "Note" : "Disqualification Note"} <span className="text-gray-500">(Optional)</span>
+                                    </label>
+                                    <textarea
+                                        placeholder={qualificationModal.isQualified === "notConnected" 
+                                            ? "Add a note about the call attempt..." 
+                                            : "Add a note about why this lead is not qualified..."}
+                                        className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                                            theme === "dark"
+                                                ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                                                : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                                        }`}
+                                        rows={3}
+                                        value={qualificationModal.disqualificationNote}
+                                        onChange={(e) => setQualificationModal((prev) => ({ ...prev, disqualificationNote: e.target.value }))}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                            <button
+                                onClick={handleCancelQualification}
+                                disabled={qualificationModal.isSubmitting}
+                                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                                    theme === "dark"
+                                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                } disabled:opacity-50`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleQualificationConfirm}
+                                disabled={qualificationModal.isSubmitting || qualificationModal.isQualified === null}
+                                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {qualificationModal.isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Continue
                                     </>
                                 )}
                             </button>
