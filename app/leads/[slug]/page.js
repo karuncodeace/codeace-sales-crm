@@ -231,7 +231,7 @@ export default function LeadDetailPage() {
             </button>
 
             {/* TOP HEADER */}
-            <div className="flex items-center justify-between">
+            <div className="flex justify-between">
                 <div>
                    <div className="flex items-center gap-2 ">
                    <h1 className={`text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>

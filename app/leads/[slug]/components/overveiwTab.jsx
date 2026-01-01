@@ -295,7 +295,16 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                         </div>
                                         <div>
                                             <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Company</p>
-                                            <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.company}</p>
+                                            <p className={`font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`} title={lead.company}>
+                                                {(() => {
+                                                    if (!lead.company) return '—';
+                                                    const words = lead.company.trim().split(/\s+/);
+                                                    if (words.length > 1) {
+                                                        return words.slice(0, 2).join(' ') + '...';
+                                                    }
+                                                    return lead.company;
+                                                })()}
+                                            </p>
                                         </div>
                                     </div>
                                 )}
@@ -317,8 +326,15 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                     <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Email</p>
                                     {lead.email ? (
                                         <div className="flex items-center gap-2 group">
-                                            <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                                                {lead.email}
+                                            <span className={`font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`} title={lead.email}>
+                                                {(() => {
+                                                    if (!lead.email) return '';
+                                                    // For email, truncate by characters (emails can be long)
+                                                    if (lead.email.length > 30) {
+                                                        return lead.email.substring(0, 30) + '...';
+                                                    }
+                                                    return lead.email;
+                                                })()}
                                             </span>
                                             <button
                                                 onClick={async (e) => {

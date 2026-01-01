@@ -74,6 +74,10 @@ const statusStyles = {
     light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-200",
     dark: "text-gray-300 bg-gray-900/40 ring-1 ring-inset ring-gray-700",
   },
+  Disqualified: {
+    light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-200",
+    dark: "text-red-400 bg-red-900/40 ring-1 ring-inset ring-red-700",
+  },
 };
 
 const priorityStyles = {
@@ -894,8 +898,15 @@ export default function LeadsTable() {
                                 className="flex flex-col cursor-pointer"
                                 
                               >
-                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                                  {lead.name || "—"}
+                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors truncate max-w-xs ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`} title={lead.name || "—"}>
+                                  {(() => {
+                                    if (!lead.name) return '—';
+                                    const words = lead.name.trim().split(/\s+/);
+                                    if (words.length > 5) {
+                                      return words.slice(0, 4).join(' ') + '...';
+                                    }
+                                    return lead.name;
+                                  })()}
                                 </span>
                                 <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
                                   {lead.id || "—"}
@@ -922,8 +933,15 @@ export default function LeadsTable() {
                               )}
                               {lead.email ? (
                                 <div className="flex items-center gap-2 group">
-                                  <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                    {lead.email}
+                                  <span className={`text-xs font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`} title={lead.email}>
+                                    {(() => {
+                                      if (!lead.email) return '';
+                                      // For email, truncate by characters (emails can be long)
+                                      if (lead.email.length > 12) {
+                                        return lead.email.substring(0, 50) + '...';
+                                      }
+                                      return lead.email;
+                                    })()}
                                   </span>
                                   <button
                                     onClick={async (e) => {

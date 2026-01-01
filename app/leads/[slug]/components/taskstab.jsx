@@ -722,6 +722,16 @@ export default function TasksTab({ leadId, leadName }) {
         }
       } else if (isQualified) {
         // YES: Qualified - proceed with normal flow
+        // Update lead qualification field
+        await fetch("/api/leads", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: leadId,
+            lead_qualification: "Lead is Qualified",
+          }),
+        });
+        
         // Close qualification modal and show normal completion modal
         setQualificationModal({
           isOpen: false,
@@ -759,7 +769,7 @@ export default function TasksTab({ leadId, leadName }) {
           throw new Error("Failed to complete task");
         }
 
-        // Update lead status to Disqualified
+        // Update lead status to Disqualified and set qualification
         const leadUpdateRes = await fetch("/api/leads", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -767,6 +777,7 @@ export default function TasksTab({ leadId, leadName }) {
             id: leadId,
             status: "Disqualified",
             current_stage: "Disqualified",
+            lead_qualification: "This lead is not qualified",
           }),
         });
         

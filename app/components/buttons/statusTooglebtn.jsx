@@ -32,7 +32,10 @@ const StatusDropdown = ({ value = "New", onChange = () => { }, theme: themeProp 
       light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
       dark: "text-emerald-500 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
     },
-
+    Disqualified: {
+      light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-200",
+      dark: "text-red-400 bg-red-900/40 ring-1 ring-inset ring-red-700",
+    },
   };
 
   const [open, setOpen] = useState(false);
