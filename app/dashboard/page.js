@@ -11,6 +11,7 @@ import SalesPersonComparisonChart from "../components/charts/salesperson-barchar
 import RevenueAreaChart from "../components/charts/areachart";
 import Header from "../components/ui/header";
 import { fetcher } from "../../lib/swr/fetcher";
+import DashboardHeader from "../components/ui/dashboardHeader";
 
 // Dashboard API endpoints to pre-fetch
 const dashboardEndpoints = [
@@ -54,13 +55,9 @@ export default function DashboardPage() {
   return (
     <>
       <div className="w-full">
-        <div className="  flex flex-col sm:flex-row justify-between items-start sm:items-center  p-4 px-0 mt-2">
-          <Header />
-        </div>
-
-        <div>
-          <Cards/>
-        </div>
+         <div className="mt-8">
+          <DashboardHeader />
+         </div>
         <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-2 xl:mt-2">
           <div className="">
             <WeeklyLineChart />
