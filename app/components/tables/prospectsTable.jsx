@@ -152,18 +152,23 @@ export default function ProspectsTable() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [openActions]);
 
+    const handleRemoveFromProspects = async (prospectId) => {
+        try {
+            const response = await fetch(`/api/prospects?lead_id=${prospectId}`, {
+                method: "DELETE",
+            });
 
+            if (!response.ok) {
+                throw new Error("Failed to remove from prospects");
+            }
 
-    if (prospectsError) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className={`text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                    <p className="text-lg">Failed to load prospects</p>
-                    <p className="text-sm mt-2">Please try refreshing the page</p>
-                </div>
-            </div>
-        );
-    }
+            toast.success("Removed from prospects");
+            mutate("/api/prospects");
+            setOpenActions(null);
+        } catch (error) {
+            toast.error(error.message || "Failed to remove from prospects");
+        }
+    };
 
     return (
         <div className="">
@@ -278,7 +283,32 @@ export default function ProspectsTable() {
                         </thead>
 
                         <tbody className={`divide-y overflow-y-auto ${theme === "dark" ? "divide-[#3f3f3f]" : "divide-gray-200"}`}>
-                            {filteredProspects.length === 0 ? (
+                            {isLoading ? (
+                                <tr className="h-[600px]">
+                                    <td colSpan={9} className="px-6 text-center">
+                                        <div className="flex flex-col items-center justify-center h-full">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce"></div>
+                                                <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                                                <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                                            </div>
+                                            <p className={`mt-3 text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                                Loading prospects…
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : prospectsError ? (
+                                <tr className="h-[600px]">
+                                    <td colSpan={9} className="px-6 text-center">
+                                        <div className="flex flex-col items-center justify-center h-full">
+                                            <p className={`text-sm ${theme === "dark" ? "text-red-400" : "text-red-600"}`}>
+                                                Error loading prospects. Please refresh the page.
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredProspects.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan={12}

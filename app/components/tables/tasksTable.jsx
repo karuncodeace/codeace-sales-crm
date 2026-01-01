@@ -1209,25 +1209,6 @@ export default function TasksPage() {
         }
     };
 
-    if (tasksLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <LoaderIcon className={`w-8 h-8 ${theme === "dark" ? "text-orange-400" : "text-orange-500"}`} />
-            </div>
-        );
-    }
-
-    if (tasksError) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className={`text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                    <p className="text-lg">Failed to load tasks</p>
-                    <p className="text-sm mt-2">Please try refreshing the page</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className={`h-[calc(100vh-180px)] mt-4 mb-5 rounded-xl shadow-2xs overflow-hidden flex flex-col ${theme === "dark" ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
             {/* Header */}
@@ -1394,7 +1375,32 @@ export default function TasksPage() {
                     </thead>
 
                     <tbody className={`divide-y overflow-y-auto ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
-                        {filteredTasks.length === 0 ? (
+                        {tasksLoading ? (
+                            <tr className="h-[600px]">
+                                <td colSpan={8} className="px-6 text-center">
+                                    <div className="flex flex-col items-center justify-center h-full">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce"></div>
+                                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                                            <div className="h-2.5 w-2.5 bg-orange-500/50 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                                        </div>
+                                        <p className={`mt-3 text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                            Loading tasks…
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : tasksError ? (
+                            <tr className="h-[600px]">
+                                <td colSpan={8} className="px-6 text-center">
+                                    <div className="flex flex-col items-center justify-center h-full">
+                                        <p className={`text-sm ${theme === "dark" ? "text-red-400" : "text-red-600"}`}>
+                                            Error loading tasks. Please refresh the page.
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : filteredTasks.length === 0 ? (
                             <tr>
                                 <td
                                     colSpan={12}
