@@ -158,6 +158,19 @@ export default function LeadsTable() {
     isSubmitting: false,
     showCalendar: false,
   });
+
+  // Revenue transaction modal state (for Won stage)
+  const [revenueModal, setRevenueModal] = useState({
+    isOpen: false,
+    leadId: null,
+    salesPersonId: null,
+    leadName: "",
+    amount: "",
+    closedDate: "",
+    status: "Won",
+    isSubmitting: false,
+    showCalendar: false,
+  });
   
 
   const handleApplyFilters = (filters) => {
@@ -336,6 +349,36 @@ export default function LeadsTable() {
 
   // Open status change modal - requires comment
   const handleStatusUpdate = (leadId, newStatus) => {
+    // If changing to "Won", show revenue transaction modal first
+    if (newStatus === "Won") {
+      const lead = leadData.find((l) => l.id === leadId);
+      if (!lead) {
+        toast.error("Lead not found");
+        return;
+      }
+      
+      // Get sales person ID from lead's assigned_to
+      const salesPersonId = lead.assignedTo || lead.assigned_to;
+      if (!salesPersonId) {
+        toast.error("Lead is not assigned to a sales person");
+        return;
+      }
+
+      setRevenueModal({
+        isOpen: true,
+        leadId: leadId,
+        salesPersonId: salesPersonId,
+        leadName: lead.name || lead.lead_name || "Lead",
+        amount: "",
+        closedDate: new Date().toISOString().split('T')[0], // Default to today
+        status: "Won",
+        isSubmitting: false,
+        showCalendar: false,
+      });
+      return;
+    }
+
+    // For all other statuses, show normal status change modal
     setStatusChangeModal({
       isOpen: true,
       leadId,
@@ -348,6 +391,94 @@ export default function LeadsTable() {
       isSubmitting: false,
       showCalendar: false,
     });
+  };
+
+  // Handle revenue transaction modal confirmation
+  const handleConfirmRevenueTransaction = async () => {
+    const { leadId, salesPersonId, amount, closedDate, status } = revenueModal;
+    
+    // Validate required fields
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    if (!closedDate) {
+      toast.error("Please select a closed date");
+      return;
+    }
+
+    setRevenueModal((prev) => ({ ...prev, isSubmitting: true }));
+
+    try {
+      // Convert closedDate to ISO format (YYYY-MM-DD -> ISO string)
+      const closedDateISO = new Date(closedDate + 'T00:00:00').toISOString();
+
+      // Insert revenue transaction
+      const revenueRes = await fetch("/api/revenue-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          sales_person_id: salesPersonId,
+          amount: parseFloat(amount),
+          status: status,
+          closed_date: closedDateISO,
+        }),
+      });
+
+      if (!revenueRes.ok) {
+        const errorData = await revenueRes.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to save revenue transaction");
+      }
+
+      // Close revenue modal
+      setRevenueModal({
+        isOpen: false,
+        leadId: null,
+        salesPersonId: null,
+        leadName: "",
+        amount: "",
+        closedDate: "",
+        status: "Won",
+        isSubmitting: false,
+        showCalendar: false,
+      });
+
+      // Now proceed with normal status change to "Won"
+      // Open the status change modal with "Won" status
+      setStatusChangeModal({
+        isOpen: true,
+        leadId: leadId,
+        newStatus: "Won",
+        comment: "",
+        nextStageComments: "",
+        connectThrough: "",
+        dueDate: "",
+        outcome: "Success",
+        isSubmitting: false,
+        showCalendar: false,
+      });
+    } catch (error) {
+      console.error("Revenue transaction error:", error);
+      toast.error(error.message || "Failed to save revenue transaction. Please try again.");
+      setRevenueModal((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  // Handle revenue transaction modal cancellation
+  const handleCancelRevenueTransaction = () => {
+    setRevenueModal({
+      isOpen: false,
+      leadId: null,
+      salesPersonId: null,
+      leadName: "",
+      amount: "",
+      closedDate: "",
+      status: "Won",
+      isSubmitting: false,
+      showCalendar: false,
+    });
+    // Do NOT update status - user cancelled
   };
 
   // Get task title and type based on status (for updating existing tasks)
@@ -611,9 +742,9 @@ export default function LeadsTable() {
           </div>
 
           {/* RIGHT SIDE — Buttons */}
-          <div className="flex flex-wrap items-center gap-3 pt-1 md:pt-0">
+          <div className="flex flex-wrap items-center pt-1 md:pt-0">
             {/* View Toggle */}
-            <div className={`inline-flex items-center border rounded-[10px] p-1 ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-100 border-gray-200"
+            <div className={`inline-flex items-center  rounded-[10px] p-1 ${theme === "dark" ? "bg-gray-800 border-gray-700" : " border-gray-200"
               }`}>
               <button
                 type="button"
@@ -621,7 +752,7 @@ export default function LeadsTable() {
                 className={`px-3 py-1.5 text-sm rounded-lg focus:outline-hidden transition ${viewMode === "table"
                     ? theme === "dark"
                       ? "bg-gray-700 text-white shadow-sm"
-                      : "bg-white text-gray-900 shadow-sm"
+                      : "bg-gray-100 text-gray-900 shadow-sm"
                     : theme === "dark"
                       ? "text-gray-400 hover:text-gray-200"
                       : "text-gray-600 hover:text-gray-900"
@@ -667,7 +798,7 @@ export default function LeadsTable() {
                 className={`px-3 py-1.5 text-sm rounded-lg focus:outline-hidden transition ${viewMode === "kanban"
                     ? theme === "dark"
                       ? "bg-gray-700 text-white shadow-sm"
-                      : "bg-white text-gray-900 shadow-sm"
+                      : "bg-gray-100 text-gray-900 shadow-sm"
                     : theme === "dark"
                       ? "text-gray-400 hover:text-gray-200"
                       : "text-gray-600 hover:text-gray-900"
@@ -725,7 +856,7 @@ export default function LeadsTable() {
                   }
                 }}
                 disabled={isRefreshing}
-                className={`inline-flex items-center justify-center rounded-lg border p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
+                className={`inline-flex items-center justify-center rounded-lg  p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
                   theme === "dark"
                     ? "border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                     : "border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -736,8 +867,8 @@ export default function LeadsTable() {
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
+                  width="15"
+                  height="15"
                   color="currentColor"
                   fill="none"
                   stroke="currentColor"
@@ -1348,6 +1479,177 @@ export default function LeadsTable() {
           </div>
         )}
       </div>
+
+      {/* Revenue Transaction Modal (for Won stage) */}
+      {revenueModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div
+            className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+              theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-emerald-500"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Deal Closing Details</h2>
+                  <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Lead: <span className="font-medium text-emerald-500">{revenueModal.leadName}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCancelRevenueTransaction}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === "dark" ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Amount */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                  Amount (₹) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-lg font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter amount"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 ${
+                      theme === "dark"
+                        ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
+                        : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+                    }`}
+                    value={revenueModal.amount}
+                    onChange={(e) => setRevenueModal((prev) => ({ ...prev, amount: e.target.value }))}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Closed Date */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                  Closed Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  className={`w-full px-4 py-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 ${
+                    theme === "dark"
+                      ? "bg-[#262626] border-gray-700 text-gray-200"
+                      : "bg-white border-gray-200 text-gray-900"
+                  }`}
+                  value={revenueModal.closedDate}
+                  onChange={(e) => setRevenueModal((prev) => ({ ...prev, closedDate: e.target.value }))}
+                />
+              </div>
+
+              {/* Status (Readonly) */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                  Status
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={revenueModal.status}
+                  className={`w-full px-4 py-3 rounded-xl border-2 text-sm ${
+                    theme === "dark"
+                      ? "bg-gray-800/50 border-gray-700 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <button
+                onClick={handleCancelRevenueTransaction}
+                disabled={revenueModal.isSubmitting}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  theme === "dark"
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                } disabled:opacity-50`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRevenueTransaction}
+                disabled={revenueModal.isSubmitting || !revenueModal.amount || !revenueModal.closedDate}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {revenueModal.isSubmitting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Continue
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Change Comment Modal */}
       {statusChangeModal.isOpen && (

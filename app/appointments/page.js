@@ -52,6 +52,11 @@ export default function BookingsPage() {
   const filteredBookings = React.useMemo(() => {
     let filtered = bookingsList;
     
+    // Filter out completed bookings (meeting_completion_status = "Completed")
+    filtered = filtered.filter((booking) => {
+      return booking.meeting_completion_status !== "Completed";
+    });
+    
     // Filter by status if not "all"
     if (statusFilter !== "all") {
       filtered = filtered.filter((booking) => {
@@ -178,6 +183,35 @@ export default function BookingsPage() {
         position: "top-center",
       }
     );
+  };
+
+  // Handle mark as completed
+  const handleMarkCompleted = async (booking) => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch(`/api/bookings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          meeting_completion_status: "Completed",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to mark booking as completed");
+      }
+
+      // Refresh bookings list
+      mutate();
+      toast.success("Meeting marked as completed!");
+    } catch (error) {
+      toast.error(error.message || "Failed to mark booking as completed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Handle reschedule booking
@@ -377,9 +411,26 @@ export default function BookingsPage() {
                               </h3>
                             </div>
                           </div>
-                          {/* Status Badge */}
+                          {/* Status Badge and Mark Complete Button */}
                           <div className="flex items-center gap-2">
-                            
+                            {/* Mark as Completed Button (Top Right) */}
+                            <button
+                              onClick={() => handleMarkCompleted(booking)}
+                              disabled={isProcessing}
+                              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                                isDark
+                                  ? "border-gray-600 bg-gray-800 hover:bg-gray-700"
+                                  : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              title="Mark as completed"
+                            >
+                              <CheckCircle2
+                                className={`w-4 h-4 ${
+                                  isDark ? "text-gray-400" : "text-gray-500"
+                                }`}
+                                strokeWidth={2}
+                              />
+                            </button>
                             <span className={getStatusBadge(displayStatus)}>
                               {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1) || "Unknown"}
                             </span>

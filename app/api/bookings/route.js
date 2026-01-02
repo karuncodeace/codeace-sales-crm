@@ -94,3 +94,48 @@ export async function POST(request) {
   }
 }
 
+// PATCH: Update meeting completion status
+export async function PATCH(request) {
+  try {
+    const crmUser = await getCrmUser();
+    
+    if (!crmUser) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { bookingId, meeting_completion_status } = body;
+
+    if (!bookingId) {
+      return NextResponse.json({ error: "bookingId is required" }, { status: 400 });
+    }
+
+    if (!meeting_completion_status) {
+      return NextResponse.json({ error: "meeting_completion_status is required" }, { status: 400 });
+    }
+
+    // Use admin client to update booking
+    const supabase = supabaseAdmin();
+    
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ meeting_completion_status: meeting_completion_status })
+      .eq("id", bookingId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Bookings PATCH error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data }, { status: 200 });
+  } catch (err) {
+    console.error("Bookings PATCH exception:", err);
+    return NextResponse.json(
+      { error: err.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+

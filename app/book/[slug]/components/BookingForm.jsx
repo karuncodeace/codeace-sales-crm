@@ -2,14 +2,21 @@
 
 import { useState } from "react";
 import { useTheme } from "../../../context/themeContext";
+import useSWR from "swr";
+
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function BookingForm({ eventType, selectedSlot, onBookingSuccess, slug }) {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     phone: "",
+    lead_id: "",
   });
+
+  // Fetch leads for dropdown
+  const { data: leadsData, error: leadsError, isLoading: leadsLoading } = useSWR("/api/leads", fetcher);
+  const leads = Array.isArray(leadsData) ? leadsData : [];
 
   // Convert slug to title (e.g., "discovery-call" -> "Discovery Call")
   const slugToTitle = (slug) => {
@@ -36,7 +43,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value || "" }));
     
     // Clear error for this field
     if (errors[name]) {
@@ -48,10 +55,6 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
-    }
-
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!validateEmail(formData.email)) {
@@ -60,6 +63,10 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
     if (formData.phone && !validatePhone(formData.phone)) {
       newErrors.phone = "Please enter a valid phone number";
+    }
+
+    if (!formData.lead_id || !formData.lead_id.trim()) {
+      newErrors.lead_id = "Lead selection is required";
     }
 
     setErrors(newErrors);
@@ -84,6 +91,14 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+      // Get the selected lead's name and contact name
+      const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+      if (!selectedLead) {
+        throw new Error("Selected lead not found");
+      }
+      const leadName = selectedLead.name || selectedLead.lead_name || "Guest";
+      const contactName = selectedLead.contactName || selectedLead.contact_name || null;
+
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: {
@@ -95,10 +110,13 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           end: selectedSlot.end,
           timezone: timezone,
           invitee: {
-            name: formData.name.trim(),
+            name: leadName,
             email: formData.email.trim(),
             phone: formData.phone.trim() || null,
           },
+          lead_id: formData.lead_id || null,
+          invitiee_contact_name: contactName,
+          event_title: title,
         }),
       });
 
@@ -108,6 +126,16 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       }
 
       const bookingData = await response.json();
+      
+      // Reset form after successful booking
+      setFormData({
+        email: "",
+        phone: "",
+        lead_id: "",
+      });
+      setErrors({});
+      setSubmitError(null);
+      
       onBookingSuccess(bookingData);
     } catch (err) {
       setSubmitError(err.message);
@@ -131,7 +159,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     }).format(new Date(isoString));
   };
 
-  const isFormValid = formData.name.trim() && formData.email.trim() && validateEmail(formData.email);
+  const isFormValid = formData.email.trim() && validateEmail(formData.email) && formData.lead_id && formData.lead_id.trim();
   const isDisabled = !selectedSlot || !isFormValid || loading;
 
   return (
@@ -170,36 +198,6 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
-            htmlFor="name"
-            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
-          >
-            Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            disabled={!selectedSlot}
-            className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none  ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
-              ${
-                errors.name
-                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
-                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
-              }
-              ${!selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
-            `}
-            placeholder="Your full name"
-          />
-          {errors.name && (
-            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.name}</p>
-          )}
-        </div>
-
-        <div>
-          <label
             htmlFor="email"
             className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
@@ -209,7 +207,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
             type="email"
             id="email"
             name="email"
-            value={formData.email}
+            value={formData.email || ""}
             onChange={handleChange}
             disabled={!selectedSlot}
             className={`
@@ -239,7 +237,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
             type="tel"
             id="phone"
             name="phone"
-            value={formData.phone}
+            value={formData.phone || ""}
             onChange={handleChange}
             disabled={!selectedSlot}
             className={`
@@ -255,6 +253,57 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           />
           {errors.phone && (
             <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.phone}</p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor="lead_id"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
+          >
+            Lead <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="lead_id"
+            name="lead_id"
+            value={formData.lead_id || ""}
+            onChange={handleChange}
+            disabled={leadsLoading}
+            className={`
+              w-full px-4 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
+              ${
+                errors.lead_id
+                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
+              }
+              ${leadsLoading ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
+              ${theme === "light" ? "text-gray-900" : "text-white"}
+            `}
+          >
+            <option value="">
+              {leadsLoading ? "Loading leads..." : "Select a lead"}
+            </option>
+            {leads.length === 0 && !leadsLoading && (
+              <option value="" disabled>No leads available</option>
+            )}
+            {leads.map((lead) => (
+              <option key={lead.id} value={lead.id}>
+                {lead.id} - {lead.name || lead.lead_name || "Unnamed Lead"}
+              </option>
+            ))}
+          </select>
+          {errors.lead_id && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.lead_id}</p>
+          )}
+          {leadsError && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>
+              Unable to load leads. Please refresh the page.
+            </p>
+          )}
+          {!leadsLoading && leads.length === 0 && !leadsError && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
+              No leads found. Please create a lead first.
+            </p>
           )}
         </div>
 
