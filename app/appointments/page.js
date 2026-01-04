@@ -139,7 +139,7 @@ export default function BookingsPage() {
               onClick={() => {
                 toast.dismiss(t.id);
               }}
-              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className={`px-3 py-1.5 text-xs font-medium rounded-md ${isDark ? "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-colors`}
             >
               Cancel
             </button>

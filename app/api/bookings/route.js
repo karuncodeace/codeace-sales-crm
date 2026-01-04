@@ -117,6 +117,19 @@ export async function PATCH(request) {
     // Use admin client to update booking
     const supabase = supabaseAdmin();
     
+    // First, get the booking to find the lead_id
+    const { data: existingBooking, error: fetchError } = await supabase
+      .from("bookings")
+      .select("id, lead_id, meeting_completion_status")
+      .eq("id", bookingId)
+      .single();
+
+    if (fetchError) {
+      console.error("Bookings PATCH error - fetch:", fetchError);
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
+
+    // Update the booking
     const { data, error } = await supabase
       .from("bookings")
       .update({ meeting_completion_status: meeting_completion_status })
@@ -127,6 +140,29 @@ export async function PATCH(request) {
     if (error) {
       console.error("Bookings PATCH error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // If meeting is marked as "Completed", update the lead's meeting_status
+    if (meeting_completion_status === "Completed" && existingBooking?.lead_id) {
+      try {
+        const { error: leadUpdateError } = await supabase
+          .from("leads_table")
+          .update({
+            meeting_status: "Completed",
+            last_attempted_at: new Date().toISOString()
+          })
+          .eq("id", existingBooking.lead_id);
+
+        if (leadUpdateError) {
+          console.error("Failed to update lead meeting_status:", leadUpdateError);
+          // Don't fail the booking update if lead update fails, just log it
+        } else {
+          console.log(`✅ Updated lead ${existingBooking.lead_id} meeting_status to "Completed"`);
+        }
+      } catch (leadUpdateErr) {
+        console.error("Exception updating lead meeting_status:", leadUpdateErr);
+        // Don't fail the booking update if lead update fails
+      }
     }
 
     return NextResponse.json({ success: true, data }, { status: 200 });

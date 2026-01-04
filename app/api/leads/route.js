@@ -196,7 +196,7 @@ export async function PATCH(request) {
     }
     
     const body = await request.json();
-    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes } = body;
+    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes, first_call_done, lead_qualification, meeting_status } = body;
 
     if (!id) {
       return Response.json({ error: "Lead ID is required" }, { status: 400 });
@@ -205,7 +205,7 @@ export async function PATCH(request) {
     // Check if user has access to this lead
     let query = getFilteredQuery(supabase, "leads_table", crmUser);
     const { data: existingLead, error: accessError } = await query
-      .select("id, lead_name, status, assigned_to")
+      .select("id, lead_name, status, assigned_to, first_call_done, lead_qualification, meeting_status")
       .eq("id", id)
       .single();
 
@@ -215,6 +215,9 @@ export async function PATCH(request) {
 
     const previousStatus = existingLead?.status;
     const previousAssignedTo = existingLead?.assigned_to;
+    const previousFirstCallDone = existingLead?.first_call_done;
+    const previousLeadQualification = existingLead?.lead_qualification;
+    const previousMeetingStatus = existingLead?.meeting_status;
     const leadName = existingLead?.lead_name || "";
 
     const updateData = {};
@@ -232,6 +235,21 @@ export async function PATCH(request) {
     }
     if (current_stage !== undefined) updateData.current_stage = current_stage;
     if (next_stage_notes !== undefined) updateData.next_stage_notes = next_stage_notes;
+    if (first_call_done !== undefined) updateData.first_call_done = first_call_done;
+    if (lead_qualification !== undefined) updateData.lead_qualification = lead_qualification;
+    if (meeting_status !== undefined) updateData.meeting_status = meeting_status;
+    
+    // Track when specific fields are updated for dashboard metrics
+    // Update last_attempted_at when these fields change
+    const shouldUpdateLastAttempted = 
+      (first_call_done !== undefined && first_call_done !== previousFirstCallDone) ||
+      (lead_qualification !== undefined && lead_qualification !== previousLeadQualification) ||
+      (meeting_status !== undefined && meeting_status !== previousMeetingStatus) ||
+      (status !== undefined && status !== previousStatus && String(status).toLowerCase() === "follow up");
+    
+    if (shouldUpdateLastAttempted) {
+      updateData.last_attempted_at = new Date().toISOString();
+    }
     
     // Handle assigned_to update
     // assigned_to in leads_table references sales_persons.id

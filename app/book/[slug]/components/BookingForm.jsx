@@ -116,7 +116,6 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           },
           lead_id: formData.lead_id || null,
           invitiee_contact_name: contactName,
-          event_title: title,
         }),
       });
 
