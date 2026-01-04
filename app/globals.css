@@ -202,3 +202,88 @@ body.dark ::-webkit-scrollbar-corner {
 .ProseMirror u {
   text-decoration: underline;
 }
+
+/* Autofill/Autocomplete Styling - Remove gray background and add proper colors */
+/* Light mode - white background inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  background-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Light mode - inputs with bg-[#262626] or similar dark backgrounds */
+input[class*="bg-\\[\\#262626\\]"]:-webkit-autofill,
+input[class*="bg-\\[\\#262626\\]"]:-webkit-autofill:hover,
+input[class*="bg-\\[\\#262626\\]"]:-webkit-autofill:focus,
+input[class*="bg-\\[\\#262626\\]"]:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #262626 inset !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  background-color: #262626 !important;
+}
+
+/* Dark mode autofill */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active,
+.dark select:-webkit-autofill,
+.dark select:-webkit-autofill:hover,
+.dark select:-webkit-autofill:focus,
+.dark select:-webkit-autofill:active,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill:active,
+body.dark input:-webkit-autofill,
+body.dark input:-webkit-autofill:hover,
+body.dark input:-webkit-autofill:focus,
+body.dark input:-webkit-autofill:active,
+body.dark select:-webkit-autofill,
+body.dark select:-webkit-autofill:hover,
+body.dark select:-webkit-autofill:focus,
+body.dark select:-webkit-autofill:active,
+body.dark textarea:-webkit-autofill,
+body.dark textarea:-webkit-autofill:hover,
+body.dark textarea:-webkit-autofill:focus,
+body.dark textarea:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #262626 inset !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  background-color: #262626 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Text Selection Color - Light mode */
+::selection {
+  background-color: #fb923c;
+  color: white;
+}
+
+::-moz-selection {
+  background-color: #fb923c;
+  color: white;
+}
+
+/* Text Selection Color - Dark mode */
+.dark ::selection,
+body.dark ::selection {
+  background-color: #f97316;
+  color: white;
+}
+
+.dark ::-moz-selection,
+body.dark ::-moz-selection {
+  background-color: #f97316;
+  color: white;
+}

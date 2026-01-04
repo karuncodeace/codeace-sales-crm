@@ -790,7 +790,7 @@ export default function TasksPage() {
 
         try {
             if (requiresSecondDemo) {
-                // YES: Stay in Contacted stage, redirect to leads page, scroll to demo section
+                // YES: Stay in Contacted stage, mark task as completed, and create Second Demo task
                 // Mark task as completed
                 const taskRes = await fetch("/api/tasks", {
                     method: "PATCH",
@@ -804,6 +804,32 @@ export default function TasksPage() {
                 if (!taskRes.ok) {
                     const errorData = await taskRes.json().catch(() => ({ error: "Unknown error" }));
                     throw new Error(errorData.error || "Failed to complete task");
+                }
+
+                // Get existing tasks for this lead to calculate demo count
+                const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
+                const existingTasksData = existingTasksRes.ok ? await existingTasksRes.json() : [];
+                const existingTasks = Array.isArray(existingTasksData) ? existingTasksData : [];
+                
+                // Create Second Demo task
+                // Calculate demo count (should be 2 for second demo)
+                const demoCount = getDemoCount(existingTasks);
+                const secondDemoTitle = generateTaskTitle("Demo", leadName || "Client", { demoCount });
+                
+                const createSecondDemoRes = await fetch("/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        stage: "Demo", // Stage is Demo for the task
+                        title: secondDemoTitle,
+                        type: "Meeting",
+                    }),
+                });
+
+                if (!createSecondDemoRes.ok) {
+                    const errorData = await createSecondDemoRes.json().catch(() => ({ error: "Unknown error" }));
+                    throw new Error(errorData.error || "Failed to create second demo task");
                 }
 
                 // Create activity record
@@ -828,14 +854,11 @@ export default function TasksPage() {
                     isSubmitting: false,
                 });
 
-                toast.success("Task completed successfully");
+                toast.success("Task completed and second demo scheduled");
 
                 // Refresh data
                 mutate("/api/tasks");
                 mutate("/api/leads");
-
-                // Redirect to leads page with scroll to demo section
-                router.push(`/leads/${leadId}?scrollToDemo=true`);
             } else {
                 // NO: Proceed with normal flow - update to Demo stage and create next task
                 // Get lead data to determine current status

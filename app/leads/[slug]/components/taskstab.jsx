@@ -500,7 +500,7 @@ export default function TasksTab({ leadId, leadName }) {
 
     try {
       if (requiresSecondDemo) {
-        // YES: Stay in Contacted stage, redirect to leads page, scroll to demo section
+        // YES: Stay in Contacted stage, mark task as completed, and create Second Demo task
         // Mark task as completed
         const taskRes = await fetch("/api/tasks", {
           method: "PATCH",
@@ -515,6 +515,32 @@ export default function TasksTab({ leadId, leadName }) {
           throw new Error("Failed to complete task");
         }
 
+        // Get existing tasks for this lead to calculate demo count
+        const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
+        const existingTasksData = existingTasksRes.ok ? await existingTasksRes.json() : [];
+        const existingTasks = Array.isArray(existingTasksData) ? existingTasksData : [];
+        
+        // Create Second Demo task
+        // Calculate demo count (should be 2 for second demo)
+        const demoCount = getDemoCount(existingTasks);
+        const secondDemoTitle = generateTaskTitle("Demo", leadName || leadData?.lead_name || leadData?.name || "Client", { demoCount });
+        
+        const createSecondDemoRes = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            stage: "Demo", // Stage is Demo for the task
+            title: secondDemoTitle,
+            type: "Meeting",
+          }),
+        });
+
+        if (!createSecondDemoRes.ok) {
+          const errorData = await createSecondDemoRes.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(errorData.error || "Failed to create second demo task");
+        }
+
         await mutate();
         
         // Close modal
@@ -525,8 +551,7 @@ export default function TasksTab({ leadId, leadName }) {
           isSubmitting: false,
         });
 
-        // Redirect to leads page with scroll to demo section
-        router.push(`/leads/${leadId}?scrollToDemo=true`);
+        toast.success("Task completed and second demo scheduled");
       } else {
         // NO: Proceed with normal flow - EXACT COPY of handleConfirmTaskCompletion logic
         const currentLeadStatus = leadData?.status || "New";

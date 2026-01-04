@@ -213,7 +213,7 @@ export default function ProspectsTable() {
                                 }
                             }}
                             disabled={isRefreshing}
-                            className={`inline-flex items-center justify-center rounded-lg border p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
+                            className={`inline-flex items-center justify-center rounded-lg  p-2 text-sm font-medium transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none ${
                                 theme === "dark"
                                     ? "border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                                     : "border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -224,8 +224,8 @@ export default function ProspectsTable() {
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 viewBox="0 0 24 24"
-                                width="20"
-                                height="20"
+                                width="15"
+                                height="15"
                                 color="currentColor"
                                 fill="none"
                                 stroke="currentColor"
