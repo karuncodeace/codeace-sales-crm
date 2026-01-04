@@ -521,8 +521,14 @@ export default function TasksTab({ leadId, leadName }) {
         const existingTasks = Array.isArray(existingTasksData) ? existingTasksData : [];
         
         // Create Second Demo task
-        // Calculate demo count (should be 2 for second demo)
-        const demoCount = getDemoCount(existingTasks);
+        // When "YES" is selected, we're creating a second demo after "Schedule Demo"
+        // Count all demo-related tasks (including "Schedule Demo") to determine it's the second demo
+        const allDemoRelatedTasks = existingTasks.filter(t => {
+            const title = (t.title || "").toLowerCase();
+            return title.includes("demo");
+        });
+        // demoCount should be 2 for "Second Demo" (1 for Schedule Demo + 1 for the new one)
+        const demoCount = allDemoRelatedTasks.length + 1;
         const secondDemoTitle = generateTaskTitle("Demo", leadName || leadData?.lead_name || leadData?.name || "Client", { demoCount });
         
         const createSecondDemoRes = await fetch("/api/tasks", {
@@ -594,7 +600,18 @@ export default function TasksTab({ leadId, leadName }) {
           
           // Create task for next stage (only if not Won) - EXACT COPY
           if (nextStage && canCreateTaskForStage(nextStage)) {
-            const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasks);
+            // For Demo stage, exclude "Schedule Demo" tasks when calculating demo count
+            // Only count actual demo tasks ("Demo with" or "Second Demo")
+            let tasksForDemoCount = tasks || [];
+            if (nextStage === "Demo") {
+              tasksForDemoCount = tasksForDemoCount.filter(t => {
+                const title = (t.title || "").toLowerCase();
+                // Exclude "Schedule Demo" tasks - only count actual demo tasks
+                return title.includes("demo") && !title.includes("schedule");
+              });
+            }
+            
+            const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasksForDemoCount);
             if (taskDetails) {
               // Check for existing active tasks before creating
               // Exclude the current task being completed
