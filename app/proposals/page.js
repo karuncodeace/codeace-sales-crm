@@ -2185,8 +2185,15 @@ export default function ProposalPage() {
                         <div className="flex items-center gap-3 flex-1">
                           <FileText className={`w-5 h-5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${isDark ? "text-white" : "text-gray-900"}`}>
-                              {pdf.name}
+                            <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`} title={pdf.name}>
+                              {(() => {
+                                // Remove .pdf extension for display
+                                const nameWithoutExt = pdf.name.replace(/\.pdf$/i, '');
+                                // Split by spaces, underscores, or hyphens to get words
+                                const words = nameWithoutExt.split(/[\s_\-]+/).filter(word => word.length > 0);
+                                const truncated = words.slice(0, 10).join(' ');
+                                return words.length > 10 ? truncated + '...' : truncated;
+                              })()}
                             </p>
                             {pdf.created_at && (
                               <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
