@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../../lib/supabase/serverClient";
+import { supabaseServer, supabaseAdmin } from "../../../../lib/supabase/serverClient";
 import { getCrmUser } from "../../../../lib/crm/auth";
 
 /**
@@ -30,7 +30,8 @@ function getCurrentFiscalYear() {
 
 export async function GET() {
   try {
-    const supabase = await supabaseServer();
+    // Use admin client to bypass RLS for dashboard metrics
+    const supabase = supabaseAdmin();
     const crmUser = await getCrmUser();
     
     if (!crmUser) {
@@ -44,32 +45,6 @@ export async function GET() {
     const startDate = new Date(fiscalYear, 3, 1); // April 1
     const endDate = new Date(fiscalYear + 1, 2, 31, 23, 59, 59); // March 31 of next year
 
-    // Fetch all tasks from tasks_table - filter by type field
-    // within the current fiscal year
-    const { data: allTasks, error: fetchError } = await supabase
-      .from("tasks_table")
-      .select("type, created_at")
-      .gte("created_at", startDate.toISOString())
-      .lte("created_at", endDate.toISOString());
-
-    if (fetchError) {
-      return Response.json({
-        calls: [0, 0, 0, 0],
-        meetings: [0, 0, 0, 0],
-        conversions: [0, 0, 0, 0],
-        categories: ["Q1", "Q2", "Q3", "Q4"]
-      });
-    }
-
-    // Filter tasks by type field (case-insensitive)
-    const tasks = (allTasks || []).filter(task => {
-      const typeLower = (task.type || "").toLowerCase();
-      return typeLower === "call" || 
-             typeLower === "meetings" || 
-             typeLower === "meeting" ||
-             typeLower === "conversion";
-    });
-
     // Initialize quarter counters
     const quarterData = {
       1: { calls: 0, meetings: 0, conversions: 0 }, // Q1: April - June
@@ -78,22 +53,69 @@ export async function GET() {
       4: { calls: 0, meetings: 0, conversions: 0 }, // Q4: January - March
     };
 
-    // Process each task and group by quarter
-    if (tasks && tasks.length > 0) {
-      tasks.forEach((task) => {
-        if (!task.created_at) return;
-        
-        const taskDate = new Date(task.created_at);
-        const quarter = getQuarter(taskDate);
-        const typeLower = (task.type || "").toLowerCase();
+    // Fetch calls: leads with first_call_done = "Done"
+    // Get all leads with first_call_done = "Done" and filter by date for quarter grouping
+    const { data: callsData, error: callsError } = await supabase
+      .from("leads_table")
+      .select("created_at, last_attempted_at")
+      .eq("first_call_done", "Done");
 
-        // Count by type
-        if (typeLower === "call") {
-          quarterData[quarter].calls++;
-        } else if (typeLower === "meetings" || typeLower === "meeting") {
-          quarterData[quarter].meetings++;
-        } else if (typeLower === "conversion") {
-          quarterData[quarter].conversions++;
+    if (!callsError && callsData) {
+      callsData.forEach((lead) => {
+        // Use last_attempted_at if available (when field was set), otherwise created_at
+        const dateToUse = lead.last_attempted_at || lead.created_at;
+        if (dateToUse) {
+          const leadDate = new Date(dateToUse);
+          // Only count if within fiscal year range
+          if (leadDate >= startDate && leadDate <= endDate) {
+            const quarter = getQuarter(leadDate);
+            quarterData[quarter].calls++;
+          }
+        }
+      });
+    }
+
+    // Fetch meetings: leads with meeting_status = "Completed"
+    // Get all leads and filter by meeting_status = "Completed", then group by date
+    const { data: meetingsData, error: meetingsError } = await supabase
+      .from("leads_table")
+      .select("created_at, last_attempted_at, meeting_status");
+
+    if (!meetingsError && meetingsData) {
+      meetingsData.forEach((lead) => {
+        // Case-insensitive check for "Completed"
+        const status = String(lead.meeting_status || "").toLowerCase();
+        if (status === "completed") {
+          // Use last_attempted_at if available (when field was set), otherwise created_at
+          const dateToUse = lead.last_attempted_at || lead.created_at;
+          if (dateToUse) {
+            const leadDate = new Date(dateToUse);
+            // Only count if within fiscal year range
+            if (leadDate >= startDate && leadDate <= endDate) {
+              const quarter = getQuarter(leadDate);
+              quarterData[quarter].meetings++;
+            }
+          }
+        }
+      });
+    }
+
+    // Fetch conversions: leads with status = "Won"
+    // Get all leads with status = "Won" and group by created_at
+    const { data: conversionsData, error: conversionsError } = await supabase
+      .from("leads_table")
+      .select("created_at, status")
+      .eq("status", "Won");
+
+    if (!conversionsError && conversionsData) {
+      conversionsData.forEach((lead) => {
+        if (lead.created_at) {
+          const leadDate = new Date(lead.created_at);
+          // Only count if within fiscal year range
+          if (leadDate >= startDate && leadDate <= endDate) {
+            const quarter = getQuarter(leadDate);
+            quarterData[quarter].conversions++;
+          }
         }
       });
     }

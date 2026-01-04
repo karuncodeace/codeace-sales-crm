@@ -216,48 +216,52 @@ export async function GET() {
       }
     }
 
-    // If performance metrics are all zero, try to calculate from other tables
-    const hasPerformanceData = salesPersons.some(sp => 
-      (sp.call_attended && parseInt(sp.call_attended) > 0) ||
-      (sp.meetings_attended && parseInt(sp.meetings_attended) > 0) ||
-      (sp.total_conversions && parseInt(sp.total_conversions) > 0)
-    );
-
-    // Calculate metrics from other tables if sales_persons table doesn't have performance data
+    // Calculate metrics from leads_table for each sales person
+    // Use admin client to bypass RLS and get all leads
+    const adminClient = supabaseAdmin();
+    const salesPersonIds = salesPersons.map(sp => sp.id).filter(Boolean);
+    
     let calculatedMetrics = {};
-    if (!hasPerformanceData && salesPersons.length > 0) {
-      const salesPersonIds = salesPersons.map(sp => sp.id).filter(Boolean);
-      
-      // Count completed calls (tasks with type='Call' and status='Completed')
-      const { data: completedCalls } = await queryClient
-        .from("tasks_table")
-        .select("sales_person_id")
-        .eq("type", "Call")
-        .eq("status", "Completed")
-        .in("sales_person_id", salesPersonIds);
-      
-      // Count completed meetings (appointments with status='completed')
-      const { data: completedMeetings } = await queryClient
-        .from("appointments")
-        .select("salesperson_id")
-        .eq("status", "completed")
-        .in("salesperson_id", salesPersonIds);
-      
-      // Count converted leads (leads with status='Converted' or 'Closed Won')
-      const { data: convertedLeads } = await queryClient
+    
+    if (salesPersonIds.length > 0) {
+      // Fetch all leads assigned to these sales persons
+      const { data: allLeads, error: leadsError } = await adminClient
         .from("leads_table")
-        .select("assigned_to")
-        .in("status", ["Converted", "Closed Won", "Won"])
+        .select("id, assigned_to, first_call_done, meeting_status, status")
         .in("assigned_to", salesPersonIds);
       
-      // Aggregate by sales_person_id
-      salesPersonIds.forEach(spId => {
-        calculatedMetrics[spId] = {
-          calls: completedCalls?.filter(t => t.sales_person_id === spId).length || 0,
-          meetings: completedMeetings?.filter(a => a.salesperson_id === spId).length || 0,
-          conversions: convertedLeads?.filter(l => l.assigned_to === spId).length || 0,
-        };
-      });
+      if (!leadsError && allLeads) {
+        // Initialize metrics for each sales person
+        salesPersonIds.forEach(spId => {
+          calculatedMetrics[spId] = {
+            calls: 0,
+            meetings: 0,
+            conversions: 0,
+          };
+        });
+        
+        // Count metrics for each lead
+        allLeads.forEach(lead => {
+          const spId = lead.assigned_to;
+          if (!spId || !calculatedMetrics[spId]) return;
+          
+          // Count calls: first_call_done = "Done"
+          if (lead.first_call_done === "Done") {
+            calculatedMetrics[spId].calls++;
+          }
+          
+          // Count meetings: meeting_status = "Completed" (case-insensitive)
+          const meetingStatus = String(lead.meeting_status || "").toLowerCase();
+          if (meetingStatus === "completed") {
+            calculatedMetrics[spId].meetings++;
+          }
+          
+          // Count conversions: status = "Won"
+          if (lead.status === "Won") {
+            calculatedMetrics[spId].conversions++;
+          }
+        });
+      }
     }
 
     // Map sales persons data to performance metrics
@@ -280,22 +284,13 @@ export async function GET() {
         salesPersonName = salesPerson.id || "Unknown";
       }
 
-      // Use calculated metrics if available, otherwise use table values
+      // Use calculated metrics from leads_table
       const calculated = calculatedMetrics[salesPerson.id] || {};
       
-      // Get values from table fields: call_attended, meetings_attended, total_conversions
-      // Prioritize table values over calculated metrics
-      const calls = salesPerson.call_attended !== null && salesPerson.call_attended !== undefined 
-        ? parseInt(salesPerson.call_attended) || 0 
-        : (calculated.calls !== undefined ? calculated.calls : 0);
-      
-      const meetings = salesPerson.meetings_attended !== null && salesPerson.meetings_attended !== undefined 
-        ? parseInt(salesPerson.meetings_attended) || 0 
-        : (calculated.meetings !== undefined ? calculated.meetings : 0);
-      
-      const conversions = salesPerson.total_conversions !== null && salesPerson.total_conversions !== undefined 
-        ? parseInt(salesPerson.total_conversions) || 0 
-        : (calculated.conversions !== undefined ? calculated.conversions : 0);
+      // Get values from leads_table calculations
+      const calls = calculated.calls !== undefined ? calculated.calls : 0;
+      const meetings = calculated.meetings !== undefined ? calculated.meetings : 0;
+      const conversions = calculated.conversions !== undefined ? calculated.conversions : 0;
       
       return {
         name: salesPersonName,
