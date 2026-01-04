@@ -48,28 +48,33 @@ export async function GET() {
     // 2. First call done count from first_call_done field (past 7 days)
     // Check for "Done" string value - count leads with first_call_done = "Done" 
     // Fallback to created_at if last_attempted_at is NULL (for older records)
-    const firstCallDoneResult = await safeQuery(
+    // Fetch all leads and filter case-insensitively for "Done"
+    const allLeadsForFirstCall = await safeQuery(
       () => supabase.from("leads_table")
-        .eq("first_call_done", "Done")
-        .select("id, last_attempted_at, created_at"),
+        .select("id, first_call_done, last_attempted_at, created_at"),
       { data: [] }
     );
     
     let firstCallDone = 0;
-    if (firstCallDoneResult.data && Array.isArray(firstCallDoneResult.data)) {
+    if (allLeadsForFirstCall.data && Array.isArray(allLeadsForFirstCall.data)) {
       const now = new Date();
+      now.setHours(23, 59, 59, 999); // End of today
       const sevenDaysAgo = new Date(now);
       sevenDaysAgo.setDate(now.getDate() - 7);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
+      sevenDaysAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
       
-      firstCallDone = firstCallDoneResult.data.filter(lead => {
+      firstCallDone = allLeadsForFirstCall.data.filter(lead => {
+        // Case-insensitive check for "Done"
+        const firstCallStatus = String(lead.first_call_done || "").toLowerCase();
+        if (firstCallStatus !== "done") return false;
+        
         // Use last_attempted_at if available, otherwise fallback to created_at
         const dateStr = lead.last_attempted_at || lead.created_at;
         if (!dateStr) return false;
         
         const checkDate = new Date(dateStr);
         // Check if date is within last 7 days (including today)
-        return checkDate >= sevenDaysAgo && checkDate <= now;
+        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
       }).length;
     }
     
