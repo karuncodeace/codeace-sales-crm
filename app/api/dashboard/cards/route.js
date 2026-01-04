@@ -191,30 +191,45 @@ export async function GET() {
     // (Same query as proposals sent since both use "Follow up" status)
     const followUpCalls = proposalsSent;
     
-    // 8. Fetch leads with total_score for conversion rate calculation (past 1 week)
-    const leadsForConversionResult = await safeQuery(
+    // 8. Conversion rate calculation (past 7 days)
+    // Formula: (Converted leads / Total leads) * 100
+    // Converted leads = leads with status = "Won" in the past 7 days
+    // Total leads = leads created in the past 7 days (already calculated as leadsGenerated)
+    // Fetch all leads and filter case-insensitively for "Won" status
+    const allLeadsForConversion = await safeQuery(
       () => supabase.from("leads_table")
-        .select("total_score")
-        .gte("created_at", oneWeekAgoStr)
-        .lte("created_at", todayStr),
+        .select("id, status, last_attempted_at, created_at"),
       { data: [] }
     );
-    const leadsForConversion = leadsForConversionResult.data ?? [];
     
-    // 9. Calculate conversion rate: percentage of leads with total_score > 20 out of 25
-    let conversionRate = 0;
-    if (leadsForConversion && leadsForConversion.length > 0) {
-      const totalLeads = leadsForConversion.length;
-      const convertedLeads = leadsForConversion.filter(lead => {
-        const score = lead.total_score !== null && lead.total_score !== undefined 
-          ? Number(lead.total_score) 
-          : 0;
-        return score > 20;
-      }).length;
+    let convertedLeads = 0;
+    if (allLeadsForConversion.data && Array.isArray(allLeadsForConversion.data)) {
+      const now = new Date();
+      now.setHours(23, 59, 59, 999); // End of today
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
       
-      conversionRate = totalLeads > 0 
-        ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(1))
-        : 0;
+      convertedLeads = allLeadsForConversion.data.filter(lead => {
+        // Case-insensitive check for "Won" status
+        const status = String(lead.status || "").toLowerCase();
+        if (status !== "won") return false;
+        
+        // Use last_attempted_at if available, otherwise fallback to created_at
+        const dateStr = lead.last_attempted_at || lead.created_at;
+        if (!dateStr) return false;
+        
+        const checkDate = new Date(dateStr);
+        // Check if date is within last 7 days (including today)
+        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
+      }).length;
+    }
+    
+    // Calculate conversion rate: (Converted leads / Total leads) * 100
+    let conversionRate = 0;
+    const totalLeads = leadsGenerated || 0;
+    if (totalLeads > 0) {
+      conversionRate = parseFloat(((convertedLeads / totalLeads) * 100).toFixed(1));
     }
     
     const data = {

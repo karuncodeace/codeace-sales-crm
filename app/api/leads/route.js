@@ -245,7 +245,10 @@ export async function PATCH(request) {
       (first_call_done !== undefined && first_call_done !== previousFirstCallDone) ||
       (lead_qualification !== undefined && lead_qualification !== previousLeadQualification) ||
       (meeting_status !== undefined && meeting_status !== previousMeetingStatus) ||
-      (status !== undefined && status !== previousStatus && String(status).toLowerCase() === "follow up");
+      (status !== undefined && status !== previousStatus && (
+        String(status).toLowerCase() === "follow up" || 
+        String(status).toLowerCase() === "won"
+      ));
     
     if (shouldUpdateLastAttempted) {
       updateData.last_attempted_at = new Date().toISOString();
