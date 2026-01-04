@@ -1,6 +1,6 @@
 import { supabaseServer, supabaseAdmin } from "../../../../lib/supabase/serverClient";
 
-export async function GET() {
+export async function GET(request) {
   try {
     // Use admin client to bypass RLS for dashboard metrics
     const supabase = supabaseAdmin();
@@ -12,16 +12,32 @@ export async function GET() {
       );
     }
     
-    // Calculate date range for past 1 week (7 days)
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    const oneWeekAgo = new Date(today);
-    oneWeekAgo.setDate(today.getDate() - 7);
-    oneWeekAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
+    // Get query parameters for date filtering
+    const { searchParams } = new URL(request.url);
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+    
+    // Calculate date range - use filter params if provided, otherwise default to past 7 days
+    let startDate, endDate;
+    
+    if (startDateParam && endDateParam) {
+      // Use provided filter dates
+      startDate = new Date(startDateParam);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(endDateParam);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Default to past 7 days (including today)
+      const now = new Date();
+      endDate = new Date(now); // Use current time to include leads created right now
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0); // Start of day 7 days ago
+    }
     
     // Format dates for Supabase query (ISO format)
-    const oneWeekAgoStr = oneWeekAgo.toISOString();
-    const todayStr = today.toISOString();
+    const startDateStr = startDate.toISOString();
+    const endDateStr = endDate.toISOString();
     
     // Helper function to safely execute queries
     const safeQuery = async (queryFn, defaultValue) => {
@@ -36,12 +52,12 @@ export async function GET() {
       }
     };
     
-    // 1. Total leads from leads_table (past 1 week)
+    // 1. Total leads from leads_table (filtered by date range)
     const { count: leadsGenerated = 0 } = await safeQuery(
       () => supabase.from("leads_table")
         .select("*", { count: "exact", head: true })
-        .gte("created_at", oneWeekAgoStr)
-        .lte("created_at", todayStr),
+        .gte("created_at", startDateStr)
+        .lte("created_at", endDateStr),
       { count: 0 }
     );
     
@@ -56,14 +72,9 @@ export async function GET() {
     );
     
     let firstCallDone = 0;
+    let firstCallDoneLeadIds = [];
     if (allLeadsForFirstCall.data && Array.isArray(allLeadsForFirstCall.data)) {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999); // End of today
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      sevenDaysAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
-      
-      firstCallDone = allLeadsForFirstCall.data.filter(lead => {
+      const filteredLeads = allLeadsForFirstCall.data.filter(lead => {
         // Case-insensitive check for "Done"
         const firstCallStatus = String(lead.first_call_done || "").toLowerCase();
         if (firstCallStatus !== "done") return false;
@@ -73,9 +84,11 @@ export async function GET() {
         if (!dateStr) return false;
         
         const checkDate = new Date(dateStr);
-        // Check if date is within last 7 days (including today)
-        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
-      }).length;
+        // Check if date is within filter date range
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      firstCallDone = filteredLeads.length;
+      firstCallDoneLeadIds = filteredLeads.map(lead => lead.id);
     }
     
     // 3. Qualified leads count from lead_qualification field (past 1 week)
@@ -88,13 +101,9 @@ export async function GET() {
     );
     
     let qualifiedLeads = 0;
+    let qualifiedLeadsIds = [];
     if (qualifiedLeadsResult.data && Array.isArray(qualifiedLeadsResult.data)) {
-      const now = new Date();
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-      
-      qualifiedLeads = qualifiedLeadsResult.data.filter(lead => {
+      const filteredLeads = qualifiedLeadsResult.data.filter(lead => {
         const qualification = String(lead.lead_qualification || "").toLowerCase();
         if (!qualification.includes("qualified")) return false;
         
@@ -103,9 +112,11 @@ export async function GET() {
         if (!dateStr) return false;
         
         const checkDate = new Date(dateStr);
-        // Check if date is within last 7 days (including today)
-        return checkDate >= sevenDaysAgo && checkDate <= now;
-      }).length;
+        // Check if date is within filter date range
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      qualifiedLeads = filteredLeads.length;
+      qualifiedLeadsIds = filteredLeads.map(lead => lead.id);
     }
     
     // 4. Meeting scheduled count from meeting_status field (past 1 week)
@@ -117,12 +128,9 @@ export async function GET() {
     );
     
     let meetingScheduled = 0;
+    let meetingScheduledLeadIds = [];
     if (allLeadsForScheduled.data && Array.isArray(allLeadsForScheduled.data)) {
-      const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-      
-      meetingScheduled = allLeadsForScheduled.data.filter(lead => {
+      const filteredLeads = allLeadsForScheduled.data.filter(lead => {
         // Case-insensitive check for "Scheduled"
         const status = String(lead.meeting_status || "").toLowerCase();
         if (status !== "scheduled") return false;
@@ -132,8 +140,10 @@ export async function GET() {
         if (!dateToCheck) return false;
         
         const checkDate = new Date(dateToCheck);
-        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
-      }).length;
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      meetingScheduled = filteredLeads.length;
+      meetingScheduledLeadIds = filteredLeads.map(lead => lead.id);
     }
     
     // 5. Meeting conducted count from meeting_status field (past 1 week)
@@ -145,12 +155,9 @@ export async function GET() {
     );
     
     let meetingConducted = 0;
+    let meetingConductedLeadIds = [];
     if (allLeadsForCompleted.data && Array.isArray(allLeadsForCompleted.data)) {
-      const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-      
-      meetingConducted = allLeadsForCompleted.data.filter(lead => {
+      const filteredLeads = allLeadsForCompleted.data.filter(lead => {
         // Case-insensitive check for "Completed"
         const status = String(lead.meeting_status || "").toLowerCase();
         if (status !== "completed") return false;
@@ -160,8 +167,10 @@ export async function GET() {
         if (!dateToCheck) return false;
         
         const checkDate = new Date(dateToCheck);
-        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
-      }).length;
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      meetingConducted = filteredLeads.length;
+      meetingConductedLeadIds = filteredLeads.map(lead => lead.id);
     }
     
     // 6. Proposals sent count from status field (past 1 week)
@@ -174,21 +183,19 @@ export async function GET() {
     );
     
     let proposalsSent = 0;
+    let proposalsSentLeadIds = [];
     if (proposalsSentResult.data && Array.isArray(proposalsSentResult.data)) {
-      const now = new Date();
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-      
-      proposalsSent = proposalsSentResult.data.filter(lead => {
+      const filteredLeads = proposalsSentResult.data.filter(lead => {
         // Use last_attempted_at if available, otherwise fallback to created_at
         const dateStr = lead.last_attempted_at || lead.created_at;
         if (!dateStr) return false;
         
         const checkDate = new Date(dateStr);
-        // Check if date is within last 7 days (including today)
-        return checkDate >= sevenDaysAgo && checkDate <= now;
-      }).length;
+        // Check if date is within filter date range
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      proposalsSent = filteredLeads.length;
+      proposalsSentLeadIds = filteredLeads.map(lead => lead.id);
     }
     
     // 7. Follow up calls count from status field (past 1 week)
@@ -208,14 +215,9 @@ export async function GET() {
     );
     
     let convertedLeads = 0;
+    let convertedLeadsIds = [];
     if (allLeadsForConversion.data && Array.isArray(allLeadsForConversion.data)) {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999); // End of today
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      sevenDaysAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
-      
-      convertedLeads = allLeadsForConversion.data.filter(lead => {
+      const filteredLeads = allLeadsForConversion.data.filter(lead => {
         // Case-insensitive check for "Won" status
         const status = String(lead.status || "").toLowerCase();
         if (status !== "won") return false;
@@ -225,10 +227,23 @@ export async function GET() {
         if (!dateStr) return false;
         
         const checkDate = new Date(dateStr);
-        // Check if date is within last 7 days (including today)
-        return checkDate.getTime() >= sevenDaysAgo.getTime() && checkDate.getTime() <= now.getTime();
-      }).length;
+        // Check if date is within filter date range
+        return checkDate.getTime() >= startDate.getTime() && checkDate.getTime() <= endDate.getTime();
+      });
+      convertedLeads = filteredLeads.length;
+      convertedLeadsIds = filteredLeads.map(lead => lead.id);
     }
+    
+    // Get all unique lead IDs from all metrics
+    const allLeadIds = [
+      ...firstCallDoneLeadIds,
+      ...qualifiedLeadsIds,
+      ...meetingScheduledLeadIds,
+      ...meetingConductedLeadIds,
+      ...proposalsSentLeadIds,
+      ...convertedLeadsIds
+    ];
+    const uniqueLeadIds = [...new Set(allLeadIds)];
     
     // Calculate conversion rate: (Converted leads / Total leads) * 100
     let conversionRate = 0;
@@ -245,7 +260,8 @@ export async function GET() {
       meetingConducted: meetingConducted || 0,
       followUpCalls: followUpCalls || 0,
       proposalsSent: proposalsSent || 0,
-      conversionRate: conversionRate
+      conversionRate: conversionRate,
+      leadIds: uniqueLeadIds
     };
 
     return Response.json(data);

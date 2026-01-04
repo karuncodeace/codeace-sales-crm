@@ -1,4 +1,5 @@
 "use client"
+import { useEffect } from "react";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
 import { fetcher } from "../../../lib/swr/fetcher";
@@ -25,21 +26,28 @@ const fallbackCardsData = {
   conversionRate: 0
 };
 
-export default function Cards() {
+export default function Cards({ filterData }) {
   const { theme } = useTheme();
+
+  // Build API URL with filter parameters
+  // If filterData is null, use default (last 7 days) - no query params needed
+  const apiUrl = filterData && filterData.startDate && filterData.endDate
+    ? `/api/dashboard/cards?startDate=${encodeURIComponent(filterData.startDate)}&endDate=${encodeURIComponent(filterData.endDate)}`
+    : "/api/dashboard/cards";
 
   // Fetch data using SWR with fallback for instant display
   const { data = fallbackCardsData, error } = useSWR(
-    "/api/dashboard/cards",
+    apiUrl,
     fetcher,
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      refreshInterval: 30000, // Refresh every 30 seconds
-      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+      revalidateOnFocus: true, // Refresh when user focuses the tab
+      revalidateOnReconnect: true, // Refresh when connection is restored
+      refreshInterval: 10000, // Refresh every 10 seconds for real-time updates
+      dedupingInterval: 2000, // Dedupe requests within 2 seconds
       fallbackData: fallbackCardsData, // Show this immediately while fetching
     }
   );
+
   const cardBase =
     "relative overflow-hidden rounded-xl border shadow-sm hover:shadow-md transition-all";
 
