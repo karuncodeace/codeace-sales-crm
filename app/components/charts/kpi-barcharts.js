@@ -207,23 +207,8 @@ export default function KPICallBarChart() {
     [baseOptions, isDark, callsData, meetingsData, conversionsData, categories]
   );
 
-  if (error) {
-    return (
-      <div className={`rounded-2xl p-5 border ${
-        isDark
-          ? "bg-[#262626] border-gray-700 text-gray-300"
-          : "bg-white border-gray-200"
-      }`}>
-        <div className="text-center py-8">
-          <p className={`${isDark ? "text-red-400" : "text-red-600"}`}>
-            Failed to load chart data
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // No loading state needed - fallbackData ensures we always have data
+  // Even if there's an error, we'll use fallbackData to display the chart
 
   return (
     <div

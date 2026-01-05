@@ -114,8 +114,9 @@ export async function POST(request) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // Determine assigned_to based on role
+  // Determine assigned_to based on role and manual assignment
   // assigned_to in leads_table references sales_persons.id
+  // IMPORTANT: Manual assignment (when assignedTo is provided) should bypass round robin logic
   let finalAssignedTo = assignedTo;
   if (crmUser.role === "sales") {
     // Sales: always assign to their sales_person_id
@@ -125,31 +126,60 @@ export async function POST(request) {
       return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
     }
   } else if (crmUser.role === "admin") {
-    // Admin: can assign to any sales_person_id (use provided assignedTo or leave null)
+    // Admin: can manually assign to any sales_person_id
+    // If assignedTo is provided, use it (this bypasses round robin)
+    // If not provided, leave as null (round robin may assign later)
     finalAssignedTo = assignedTo || null;
   }
 
+  // Prepare insert data - explicitly set assigned_to to bypass round robin when manually assigned
+  const insertData = {
+    lead_name: name,
+    phone,
+    email,
+    contact_name: contactName,
+    lead_source: source,
+    status: status || "New",
+    priority: priority || "Warm",
+    company_size: companySize || "",
+    turnover: turnover || "",
+    industry_type: industryType || "",
+    // Explicitly set assigned_to - if provided, this manual assignment bypasses round robin
+    // Database triggers should check if assigned_to is already set before applying round robin
+    assigned_to: finalAssignedTo,
+    // created_at and last_activity will use Supabase defaults (now())
+  };
+
   const { data, error } = await supabase
     .from("leads_table")
-    .insert({
-      lead_name: name,
-      phone,
-      email,
-      contact_name: contactName,
-      lead_source: source,
-      status: status || "New",
-      priority: priority || "Warm",
-      company_size: companySize || "",
-      turnover: turnover || "",
-      industry_type: industryType || "",
-      assigned_to: finalAssignedTo,
-      // created_at and last_activity will use Supabase defaults (now())
-    })
+    .insert(insertData)
     .select()
     .single();
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  // CRITICAL: If assignedTo was manually provided, immediately update to override any round robin trigger
+  // This ensures manual assignment takes precedence over database triggers that might run AFTER INSERT
+  // We do this because some triggers run AFTER INSERT and can override the assigned_to value
+  if (finalAssignedTo && data && assignedTo) {
+    // Only override if this was a manual assignment (assignedTo was provided in request)
+    const { data: updatedData, error: updateError } = await supabase
+      .from("leads_table")
+      .update({ assigned_to: finalAssignedTo })
+      .eq("id", data.id)
+      .select()
+      .single();
+
+    if (!updateError && updatedData) {
+      // Use the updated data with correct assigned_to
+      data.assigned_to = updatedData.assigned_to;
+      console.log(`✅ Manual assignment preserved: Lead ${data.id} assigned to ${finalAssignedTo}`);
+    } else if (updateError) {
+      console.error("⚠️ Warning: Failed to override round robin assignment:", updateError.message);
+      // Don't fail the request, but log the warning
+    }
   }
 
   // Return the created lead in frontend format

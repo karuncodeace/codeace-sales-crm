@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AddLeadModal({ open, onClose, onAdd }) {
   const { theme } = useTheme();
@@ -17,10 +17,34 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
     lastActivity: "",
     createdAt: new Date().toISOString().split("T")[0],
     priority: "Warm",
+    assignedTo: "",
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [salesPersons, setSalesPersons] = useState([]);
+  const [loadingSalesPersons, setLoadingSalesPersons] = useState(false);
+
+  // Fetch sales persons when modal opens
+  useEffect(() => {
+    if (open) {
+      const fetchSalesPersons = async () => {
+        setLoadingSalesPersons(true);
+        try {
+          const res = await fetch("/api/sales-persons/list");
+          if (res.ok) {
+            const data = await res.json();
+            setSalesPersons(data || []);
+          }
+        } catch (error) {
+          console.error("Error fetching sales persons:", error);
+        } finally {
+          setLoadingSalesPersons(false);
+        }
+      };
+      fetchSalesPersons();
+    }
+  }, [open]);
 
   const updateField = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -63,6 +87,7 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
           source: formData.source,
           status: formData.status,
           priority: formData.priority,
+          assignedTo: formData.assignedTo || null,
         }),
       });
 
@@ -86,6 +111,7 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
         lastActivity: "",
         createdAt: new Date().toISOString().split("T")[0],
         priority: "Warm",
+        assignedTo: "",
       });
       setErrors({});
       onClose();
@@ -316,6 +342,29 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
                 <option value="Warm"> Warm</option>
                 <option value="Cold"> Cold</option>
               </select>
+            </div>
+
+            {/* Assigned Person */}
+            <div>
+              <label className={labelClass}>
+                Assigned Person
+              </label>
+              <select
+                className={selectClass("assignedTo")}
+                value={formData.assignedTo}
+                onChange={(e) => updateField("assignedTo", e.target.value)}
+                disabled={loadingSalesPersons}
+              >
+                <option value="">Select a sales person</option>
+                {salesPersons.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.full_name || "Unknown"}
+                  </option>
+                ))}
+              </select>
+              {loadingSalesPersons && (
+                <p className="mt-1 text-xs text-gray-400">Loading sales persons...</p>
+              )}
             </div>
           </div>
         </div>
