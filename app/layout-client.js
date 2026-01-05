@@ -60,7 +60,7 @@ function LayoutStructure({ children, fonts }) {
         suppressHydrationWarning
       >
         <Toaster
-          position="top-right"
+          position="bottom-right"
           toastOptions={{
             duration: 3000,
             style: {
