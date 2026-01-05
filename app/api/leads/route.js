@@ -26,8 +26,8 @@ export async function GET() {
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
-  // Order by id (descending to show newest leads first)
-  const { data, error } = await query.order("id", { ascending: true });
+  // Order by created_at (descending to show newest leads first)
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     console.error("Leads API: Query error", error.message);
@@ -99,55 +99,93 @@ function formatLastActivity(timestamp) {
 
 export async function POST(request) {
   const supabase = await supabaseServer();
-  
-  // Get CRM user for role-based assignment
+
+  // Get CRM user
   const crmUser = await getCrmUser();
   if (!crmUser) {
     return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
   }
-  
+
   const body = await request.json();
-  const { name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo } = body;
-
-  // Validate required fields
-  if (!name || !phone || !email || !contactName || !source) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  // Determine assigned_to based on role and manual assignment
-  // assigned_to in leads_table references sales_persons.id
-  // IMPORTANT: Manual assignment (when assignedTo is provided) should bypass round robin logic
-  let finalAssignedTo = assignedTo;
-  if (crmUser.role === "sales") {
-    // Sales: always assign to their sales_person_id
-    // Relationship: users.id -> sales_persons.user_id -> sales_persons.id
-    finalAssignedTo = crmUser.salesPersonId || null;
-    if (!finalAssignedTo) {
-      return Response.json({ error: "Sales person not found. Please contact administrator." }, { status: 400 });
-    }
-  } else if (crmUser.role === "admin") {
-    // Admin: can manually assign to any sales_person_id
-    // If assignedTo is provided, use it (this bypasses round robin)
-    // If not provided, leave as null (round robin may assign later)
-    finalAssignedTo = assignedTo || null;
-  }
-
-  // Prepare insert data - explicitly set assigned_to to bypass round robin when manually assigned
-  const insertData = {
-    lead_name: name,
+  const {
+    name,
     phone,
     email,
-    contact_name: contactName,
-    lead_source: source,
-    status: status || "New",
-    priority: priority || "Warm",
-    company_size: companySize || "",
-    turnover: turnover || "",
-    industry_type: industryType || "",
-    // Explicitly set assigned_to - if provided, this manual assignment bypasses round robin
-    // Database triggers should check if assigned_to is already set before applying round robin
+    contactName,
+    source,
+    status,
+    priority,
+    companySize,
+    turnover,
+    industryType,
+    assignedTo,
+  } = body;
+
+  // Basic validation
+  if (!name || !phone || !email || !contactName || !source) {
+    return Response.json(
+      { error: "Missing required fields" },
+      { status: 400 }
+    );
+  }
+
+   /**
+    * Determine finalAssignedTo
+    * --------------------------------
+    * SALES:
+    *  - Always assign to themselves
+    * ADMIN:
+    *  - Must explicitly choose salesperson
+    */
+   let finalAssignedTo = null;
+
+  if (crmUser.role === "sales") {
+    if (!crmUser.salesPersonId) {
+      return Response.json(
+        { error: "Sales person not mapped. Contact admin." },
+        { status: 400 }
+      );
+    }
+    finalAssignedTo = crmUser.salesPersonId;
+  }
+
+  if (crmUser.role === "admin") {
+    if (!assignedTo) {
+      return Response.json(
+        { error: "Admin must select a salesperson for manual lead" },
+        { status: 400 }
+      );
+    }
+    finalAssignedTo = assignedTo;
+  }
+
+  /**
+   * 🚨 HARD GUARD (MOST IMPORTANT)
+   * Manual lead MUST have assigned_to
+   */
+  if (!finalAssignedTo) {
+    return Response.json(
+      { error: "Manual lead must be assigned to a salesperson" },
+      { status: 400 }
+    );
+  }
+
+  // Final insert payload
+  const insertData = {
+    lead_name: name,
+    email,
+    phone,
+    lead_source: source,     // meta_ads / google_ads / referral etc
     assigned_to: finalAssignedTo,
-    // created_at and last_activity will use Supabase defaults (now())
+    is_manual: true,         // 🔥 BLOCKS AUTO ASSIGN TRIGGER
+    status: status || "New",
+
+    // Optional fields
+    contact_name: contactName || null,
+    priority: priority || "Warm",
+    company_size: companySize || null,
+    turnover: turnover || null,
+    industry_type: industryType || null,
   };
 
   const { data, error } = await supabase
@@ -160,60 +198,26 @@ export async function POST(request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  // CRITICAL: If assignedTo was manually provided, immediately update to override any round robin trigger
-  // This ensures manual assignment takes precedence over database triggers that might run AFTER INSERT
-  // We do this because some triggers run AFTER INSERT and can override the assigned_to value
-  if (finalAssignedTo && data && assignedTo) {
-    // Only override if this was a manual assignment (assignedTo was provided in request)
-    const { data: updatedData, error: updateError } = await supabase
-      .from("leads_table")
-      .update({ assigned_to: finalAssignedTo })
-      .eq("id", data.id)
-      .select()
-      .single();
-
-    if (!updateError && updatedData) {
-      // Use the updated data with correct assigned_to
-      data.assigned_to = updatedData.assigned_to;
-      console.log(`✅ Manual assignment preserved: Lead ${data.id} assigned to ${finalAssignedTo}`);
-    } else if (updateError) {
-      console.error("⚠️ Warning: Failed to override round robin assignment:", updateError.message);
-      // Don't fail the request, but log the warning
-    }
-  }
-
-  // Return the created lead in frontend format
-  const newLead = {
-    id: data.id,
-    name: data.lead_name,
-    phone: data.phone || "",
-    email: data.email || "",
-    contactName: data.contact_name || "",
-    source: data.lead_source,
-    status: data.status,
-    priority: data.priority,
-    assignedTo: data.assigned_to,
-    companySize: data.company_size || "",
-    turnover: data.turnover || "",
-    industryType: data.industry_type || "",
-    createdAt: data.created_at
-      ? new Date(data.created_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "",
-    lastActivity: formatLastActivity(data.last_activity),
-  };
-
-  // Note: Task creation for "New" stage is handled by database trigger
-  // Frontend should NOT create tasks here
-
-  // Update daily metrics: Lead created → increment leads
-  await updateDailyMetrics({ leads: 1 });
-
-  return Response.json({ success: true, lead: newLead });
+  return Response.json({
+    success: true,
+    lead: {
+      id: data.id,
+      name: data.lead_name,
+      phone: data.phone || "",
+      email: data.email || "",
+      contactName: data.contact_name || "",
+      source: data.lead_source,
+      status: data.status,
+      priority: data.priority,
+      assignedTo: data.assigned_to,
+      companySize: data.company_size || "",
+      turnover: data.turnover || "",
+      industryType: data.industry_type || "",
+      createdAt: data.created_at,
+    },
+  });
 }
+
 
 export async function PATCH(request) {
   try {

@@ -50,9 +50,24 @@ export async function GET(request) {
 
     const slots = await generateSlots(eventTypeId, startDate, endDate, timezone);
 
+    // Log if no slots were generated
+    if (!slots || slots.length === 0) {
+      console.warn(`⚠️ No slots generated for eventTypeId: ${eventTypeId}, date range: ${startDate} to ${endDate}`);
+    } else {
+      console.log(`✅ Generated ${slots.length} slots for eventTypeId: ${eventTypeId}`);
+    }
+
     return NextResponse.json(slots);
   } catch (error) {
     console.error("Slots API error:", error);
+    console.error("Error details:", {
+      eventTypeId,
+      startDate,
+      endDate,
+      timezone,
+      message: error.message,
+      stack: error.stack
+    });
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: error.message?.includes("not found") || error.message?.includes("required") ? 400 : 500 }
