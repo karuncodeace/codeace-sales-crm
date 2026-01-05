@@ -1,7 +1,18 @@
 import { supabaseServer, supabaseAdmin } from "../../../../lib/supabase/serverClient";
+import { getCrmUser } from "../../../../lib/crm/auth";
 
 export async function GET(request) {
   try {
+    // Get CRM user for role-based filtering
+    const crmUser = await getCrmUser();
+    
+    if (!crmUser) {
+      return Response.json(
+        { error: "Not authorized" },
+        { status: 403 }
+      );
+    }
+    
     // Use admin client to bypass RLS for dashboard metrics
     const supabase = supabaseAdmin();
     
@@ -16,6 +27,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
+    
+    // Determine if we need to filter by sales person
+    const salesPersonId = crmUser.role === "sales" ? crmUser.salesPersonId : null;
     
     // Calculate date range - use filter params if provided, otherwise default to past 7 days
     let startDate, endDate;
@@ -52,12 +66,19 @@ export async function GET(request) {
       }
     };
     
-    // 1. Total leads from leads_table (filtered by date range)
+    // 1. Total leads from leads_table (filtered by date range and sales person if applicable)
+    let leadsQuery = supabase.from("leads_table")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", startDateStr)
+      .lte("created_at", endDateStr);
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      leadsQuery = leadsQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const { count: leadsGenerated = 0 } = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", startDateStr)
-        .lte("created_at", endDateStr),
+      () => leadsQuery,
       { count: 0 }
     );
     
@@ -65,9 +86,16 @@ export async function GET(request) {
     // Check for "Done" string value - count leads with first_call_done = "Done" 
     // Fallback to created_at if last_attempted_at is NULL (for older records)
     // Fetch all leads and filter case-insensitively for "Done"
+    let firstCallQuery = supabase.from("leads_table")
+      .select("id, first_call_done, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      firstCallQuery = firstCallQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const allLeadsForFirstCall = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("id, first_call_done, last_attempted_at, created_at"),
+      () => firstCallQuery,
       { data: [] }
     );
     
@@ -94,9 +122,16 @@ export async function GET(request) {
     // 3. Qualified leads count from lead_qualification field (past 1 week)
     // Check for "qualified" or "Qualified" (case-insensitive)
     // Fallback to created_at if last_attempted_at is NULL (for older records)
+    let qualifiedLeadsQuery = supabase.from("leads_table")
+      .select("id, lead_qualification, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      qualifiedLeadsQuery = qualifiedLeadsQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const qualifiedLeadsResult = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("id, lead_qualification, last_attempted_at, created_at"),
+      () => qualifiedLeadsQuery,
       { data: [] }
     );
     
@@ -121,9 +156,16 @@ export async function GET(request) {
     
     // 4. Meeting scheduled count from meeting_status field (past 1 week)
     // Get all leads and filter case-insensitively for "Scheduled"
+    let scheduledQuery = supabase.from("leads_table")
+      .select("id, meeting_status, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      scheduledQuery = scheduledQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const allLeadsForScheduled = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("id, meeting_status, last_attempted_at, created_at"),
+      () => scheduledQuery,
       { data: [] }
     );
     
@@ -148,9 +190,16 @@ export async function GET(request) {
     
     // 5. Meeting conducted count from meeting_status field (past 1 week)
     // Get all leads and filter case-insensitively for "Completed"
+    let completedQuery = supabase.from("leads_table")
+      .select("id, meeting_status, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      completedQuery = completedQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const allLeadsForCompleted = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("id, meeting_status, last_attempted_at, created_at"),
+      () => completedQuery,
       { data: [] }
     );
     
@@ -175,10 +224,17 @@ export async function GET(request) {
     
     // 6. Proposals sent count from status field (past 1 week)
     // Check for "Follow up" status - fallback to created_at if last_attempted_at is NULL
+    let proposalsQuery = supabase.from("leads_table")
+      .eq("status", "Follow up")
+      .select("id, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      proposalsQuery = proposalsQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const proposalsSentResult = await safeQuery(
-      () => supabase.from("leads_table")
-        .eq("status", "Follow up")
-        .select("id, last_attempted_at, created_at"),
+      () => proposalsQuery,
       { data: [] }
     );
     
@@ -208,9 +264,16 @@ export async function GET(request) {
     // Converted leads = leads with status = "Won" in the past 7 days
     // Total leads = leads created in the past 7 days (already calculated as leadsGenerated)
     // Fetch all leads and filter case-insensitively for "Won" status
+    let conversionQuery = supabase.from("leads_table")
+      .select("id, status, last_attempted_at, created_at, assigned_to");
+    
+    // Filter by sales person if user is sales
+    if (salesPersonId) {
+      conversionQuery = conversionQuery.eq("assigned_to", salesPersonId);
+    }
+    
     const allLeadsForConversion = await safeQuery(
-      () => supabase.from("leads_table")
-        .select("id, status, last_attempted_at, created_at"),
+      () => conversionQuery,
       { data: [] }
     );
     

@@ -905,7 +905,7 @@ export default function LeadsTable() {
 
                     {[
                       "Contact Name",
-                      "Lead Name",
+                      "Organization Name",
                       "Contact Info",
                       
                       "Status",
@@ -965,21 +965,10 @@ export default function LeadsTable() {
                         <div className="flex flex-col items-center justify-center h-full gap-3">
                           <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                             {leadData.length === 0 
-                              ? "No leads assigned to you yet. Click 'Add Lead' to create your first lead, or contact an admin to assign existing leads to you."
+                              ? "No leads assigned to you yet!!!"
                               : "No leads found matching your filters. Try adjusting your search or filters."}
                           </p>
-                          {leadData.length === 0 && (
-                            <button
-                              onClick={() => setOpenAddLead(true)}
-                              className={`mt-2 px-4 py-2 text-sm font-medium rounded-lg ${
-                                theme === "dark"
-                                  ? "bg-orange-600 hover:bg-orange-700 text-white"
-                                  : "bg-orange-500 hover:bg-orange-600 text-white"
-                              }`}
-                            >
-                              Add Your First Lead
-                            </button>
-                          )}
+                          
                         </div>
                       </td>
                     </tr>

@@ -1410,6 +1410,8 @@ export default function TasksPage() {
                                         </span>
                                     </div>
                                 </th>
+
+
                             ))}
                         </tr>
                     </thead>
@@ -1449,7 +1451,7 @@ export default function TasksPage() {
                                     <div className="flex flex-col items-center gap-2">
                                         <p className="text-sm">
                                             {tasksData?.length === 0 
-                                              ? "No tasks assigned to you yet. Tasks are created automatically when leads are added or when lead status changes. Contact an admin if you need tasks assigned to you."
+                                              ? "No tasks assigned to you yet!!!"
                                               : "No tasks found matching your filters. Try adjusting your search or filters."}
                                         </p>
                                     </div>

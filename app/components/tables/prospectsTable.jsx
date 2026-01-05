@@ -256,7 +256,7 @@ export default function ProspectsTable() {
                                 </th>
 
                                 {["Contact Name",
-                                    "Lead Name",
+                                    "Organization Name",
                                     "Contact Info",
 
                                     "Status",

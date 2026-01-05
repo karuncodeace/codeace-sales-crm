@@ -83,7 +83,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.leadsGenerated ?? 0}
+              {error ? "-" : data?.leadsGenerated ?? 0}
             </p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function Cards({ filterData }) {
               className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"
                 }`}
             >
-              {error ? "N/A" : data?.firstCallDone ?? 0}
+              {error ? "-" : data?.firstCallDone ?? 0}
             </p>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.qualifiedLeads ?? 0}
+              {error ? "-" : data?.qualifiedLeads ?? 0}
             </p>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.meetingScheduled ?? 0}
+              {error ? "-" : data?.meetingScheduled ?? 0}
             </p>
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.meetingConducted ?? 0}
+              {error ? "-" : data?.meetingConducted ?? 0}
             </p>
           </div>
         </div>
@@ -261,7 +261,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.followUpCalls ?? 0}
+              {error ? "-" : data?.followUpCalls ?? 0}
             </p>
           </div>
         </div>
@@ -295,7 +295,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : data?.proposalsSent ?? 0}
+              {error ? "-" : data?.proposalsSent ?? 0}
             </p>
           </div>
         </div>
@@ -329,7 +329,7 @@ export default function Cards({ filterData }) {
               </h3>
             </div>
             <p className={`text-2xl sm:text-3xl xl:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {error ? "N/A" : `${data?.conversionRate ?? 0}%`}
+              {error ? "-" : `${data?.conversionRate ?? 0}%`}
             </p>
           </div>
         </div>
