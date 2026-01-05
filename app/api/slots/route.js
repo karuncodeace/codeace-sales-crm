@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { generateSlots } from "../../../lib/slots/generateSlots";
 
 export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const eventTypeId = searchParams.get("eventTypeId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const timezone = searchParams.get("timezone");
+  const { searchParams } = new URL(request.url);
+  const eventTypeId = searchParams.get("eventTypeId");
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
+  const timezone = searchParams.get("timezone");
 
+  try {
     if (!eventTypeId) {
       return NextResponse.json(
         { error: "eventTypeId is required" },
@@ -61,10 +61,10 @@ export async function GET(request) {
   } catch (error) {
     console.error("Slots API error:", error);
     console.error("Error details:", {
-      eventTypeId,
-      startDate,
-      endDate,
-      timezone,
+      eventTypeId: eventTypeId || "unknown",
+      startDate: startDate || "unknown",
+      endDate: endDate || "unknown",
+      timezone: timezone || "unknown",
       message: error.message,
       stack: error.stack
     });

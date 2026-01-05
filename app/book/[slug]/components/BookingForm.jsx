@@ -52,6 +52,39 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     setSubmitError(null);
   };
 
+  // Handle lead selection - auto-fill email and phone
+  const handleLeadChange = (e) => {
+    const leadId = e.target.value;
+    setFormData((prev) => ({ ...prev, lead_id: leadId || "" }));
+    
+    // Clear error for lead_id
+    if (errors.lead_id) {
+      setErrors((prev) => ({ ...prev, lead_id: null }));
+    }
+    setSubmitError(null);
+
+    // Auto-fill email and phone from selected lead
+    if (leadId) {
+      const selectedLead = leads.find(lead => lead.id === leadId);
+      if (selectedLead) {
+        setFormData((prev) => ({
+          ...prev,
+          lead_id: leadId,
+          email: selectedLead.email || prev.email || "",
+          phone: selectedLead.phone || prev.phone || "",
+        }));
+      }
+    } else {
+      // Clear email and phone if no lead is selected
+      setFormData((prev) => ({
+        ...prev,
+        lead_id: "",
+        email: "",
+        phone: "",
+      }));
+    }
+  };
+
   const validate = () => {
     const newErrors = {};
 
@@ -195,6 +228,59 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Lead Selection - First Field */}
+        <div>
+          <label
+            htmlFor="lead_id"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
+          >
+            Lead <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="lead_id"
+            name="lead_id"
+            value={formData.lead_id || ""}
+            onChange={handleLeadChange}
+            disabled={leadsLoading || !selectedSlot}
+            className={`
+              w-full px-4 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
+              ${
+                errors.lead_id
+                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
+              }
+              ${leadsLoading || !selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
+              ${theme === "light" ? "text-gray-900" : "text-white"}
+            `}
+          >
+            <option value="">
+              {leadsLoading ? "Loading leads..." : "Select a lead"}
+            </option>
+            {leads.length === 0 && !leadsLoading && (
+              <option value="" disabled>No leads available</option>
+            )}
+            {leads.map((lead) => (
+              <option key={lead.id} value={lead.id}>
+                {lead.id} - {lead.name || lead.lead_name || "Unnamed Lead"}
+              </option>
+            ))}
+          </select>
+          {errors.lead_id && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.lead_id}</p>
+          )}
+          {leadsError && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>
+              Unable to load leads. Please refresh the page.
+            </p>
+          )}
+          {!leadsLoading && leads.length === 0 && !leadsError && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
+              No leads found. Please create a lead first.
+            </p>
+          )}
+        </div>
+
+        {/* Email - Second Field */}
         <div>
           <label
             htmlFor="email"
@@ -225,6 +311,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           )}
         </div>
 
+        {/* Phone - Third Field */}
         <div>
           <label
             htmlFor="phone"
@@ -252,57 +339,6 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           />
           {errors.phone && (
             <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.phone}</p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor="lead_id"
-            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
-          >
-            Lead <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="lead_id"
-            name="lead_id"
-            value={formData.lead_id || ""}
-            onChange={handleChange}
-            disabled={leadsLoading}
-            className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
-              ${
-                errors.lead_id
-                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
-                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
-              }
-              ${leadsLoading ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
-              ${theme === "light" ? "text-gray-900" : "text-white"}
-            `}
-          >
-            <option value="">
-              {leadsLoading ? "Loading leads..." : "Select a lead"}
-            </option>
-            {leads.length === 0 && !leadsLoading && (
-              <option value="" disabled>No leads available</option>
-            )}
-            {leads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.id} - {lead.name || lead.lead_name || "Unnamed Lead"}
-              </option>
-            ))}
-          </select>
-          {errors.lead_id && (
-            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.lead_id}</p>
-          )}
-          {leadsError && (
-            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>
-              Unable to load leads. Please refresh the page.
-            </p>
-          )}
-          {!leadsLoading && leads.length === 0 && !leadsError && (
-            <p className={`mt-1 text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
-              No leads found. Please create a lead first.
-            </p>
           )}
         </div>
 
