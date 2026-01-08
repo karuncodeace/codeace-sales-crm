@@ -18,6 +18,8 @@ export default function ChatBot({ isFullPage = false }) {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
+  const [typingMessages, setTypingMessages] = useState({}); // Track typing animation state
+  const typingIntervalsRef = useRef({}); // Track intervals for cleanup
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -46,6 +48,81 @@ export default function ChatBot({ isFullPage = false }) {
       localStorage.setItem('loria_chat_history', JSON.stringify(chatHistory));
     }
   }, [chatHistory]);
+
+  // Typing animation hook
+  useEffect(() => {
+    // Cleanup function for all intervals
+    return () => {
+      Object.values(typingIntervalsRef.current).forEach((interval) => {
+        if (interval) clearInterval(interval);
+      });
+      typingIntervalsRef.current = {};
+    };
+  }, []);
+
+  // Typing animation effect
+  useEffect(() => {
+    // Find messages that need typing animation
+    const botMessagesNeedingAnimation = messages.filter(
+      (message) => message.sender === "bot" && !message.isTypingComplete
+    );
+
+    botMessagesNeedingAnimation.forEach((message) => {
+      const messageId = message.id;
+      const fullText = message.text;
+      
+      // Skip if already animating or interval exists
+      if (typingIntervalsRef.current[messageId] || (typingMessages[messageId] && typingMessages[messageId].isAnimating)) {
+        return;
+      }
+
+      // Initialize typing state
+      setTypingMessages((prev) => ({
+        ...prev,
+        [messageId]: {
+          displayedText: "",
+          isComplete: false,
+          isAnimating: true,
+        },
+      }));
+
+      // Start typing animation
+      let currentIndex = 0;
+      const typingInterval = setInterval(() => {
+        if (currentIndex < fullText.length) {
+          currentIndex += 1;
+          setTypingMessages((prev) => ({
+            ...prev,
+            [messageId]: {
+              displayedText: fullText.substring(0, currentIndex),
+              isComplete: false,
+              isAnimating: true,
+            },
+          }));
+        } else {
+          clearInterval(typingInterval);
+          delete typingIntervalsRef.current[messageId];
+          setTypingMessages((prev) => ({
+            ...prev,
+            [messageId]: {
+              displayedText: fullText,
+              isComplete: true,
+              isAnimating: false,
+            },
+          }));
+          // Mark message as typing complete
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId ? { ...msg, isTypingComplete: true } : msg
+            )
+          );
+        }
+      }, 15); // Adjust speed: lower = faster (15ms per character)
+
+      // Store interval reference
+      typingIntervalsRef.current[messageId] = typingInterval;
+    });
+  }, [messages]); // Only depend on messages
 
   // Save current chat to history
   const saveCurrentChat = () => {
@@ -98,8 +175,25 @@ export default function ChatBot({ isFullPage = false }) {
 
   // Load chat from history
   const handleLoadChat = (chat) => {
-    setMessages(chat.messages);
+    // Mark all messages as typing complete when loading from history
+    const messagesWithTypingComplete = chat.messages.map(msg => ({
+      ...msg,
+      isTypingComplete: true
+    }));
+    setMessages(messagesWithTypingComplete);
     setCurrentChatId(chat.id);
+    // Initialize typing messages state for loaded messages (all complete)
+    const loadedTypingState = {};
+    messagesWithTypingComplete.forEach(msg => {
+      if (msg.sender === "bot") {
+        loadedTypingState[msg.id] = {
+          displayedText: msg.text,
+          isComplete: true,
+          isAnimating: false,
+        };
+      }
+    });
+    setTypingMessages(loadedTypingState);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -206,7 +300,7 @@ export default function ChatBot({ isFullPage = false }) {
       }
 
       const data = await response.json();
-      
+
       // Debug logging
       console.log("API Response:", {
         hasData: data.data !== undefined,
@@ -245,6 +339,7 @@ export default function ChatBot({ isFullPage = false }) {
           sender: "bot",
           timestamp: new Date(),
           isList: data.data.length > 0, // Only mark as list if there are items
+          isTypingComplete: false, // Mark for typing animation
         };
         setMessages((prev) => [...prev, botMessage]);
       } 
@@ -256,6 +351,7 @@ export default function ChatBot({ isFullPage = false }) {
           sender: "bot",
           timestamp: new Date(),
           isList: false,
+          isTypingComplete: false, // Mark for typing animation
         };
         setMessages((prev) => [...prev, botMessage]);
       } 
@@ -267,6 +363,7 @@ export default function ChatBot({ isFullPage = false }) {
           sender: "bot",
           timestamp: new Date(),
           isList: false,
+          isTypingComplete: false, // Mark for typing animation
         };
         setMessages((prev) => [...prev, errorMessage]);
       }
@@ -278,6 +375,7 @@ export default function ChatBot({ isFullPage = false }) {
         sender: "bot",
         timestamp: new Date(),
         isList: false,
+        isTypingComplete: false, // Mark for typing animation
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -304,10 +402,10 @@ export default function ChatBot({ isFullPage = false }) {
       if (isNaN(dateObj.getTime())) {
         return "";
       }
-      return new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
       }).format(dateObj);
     } catch (error) {
       console.error("Error formatting time:", error);
@@ -443,7 +541,7 @@ export default function ChatBot({ isFullPage = false }) {
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Clear Chat</span>
-              </button>
+            </button>
             )}
             <button
               className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg transition-colors text-sm ${
@@ -526,17 +624,17 @@ export default function ChatBot({ isFullPage = false }) {
               ) : (
                 <>
                   {messages.map((message) => (
-                    <div
-                      key={message.id}
+                  <div
+                    key={message.id}
                       className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}
-                    >
+                  >
                       <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
                         <div className="w-9 h-9 flex-shrink-0 flex items-start justify-center pt-0.5">
-                          {message.sender === "bot" ? (
+                        {message.sender === "bot" ? (
                             <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
-                              <Sparkles className="w-5 h-5 text-white" />
-                            </div>
-                          ) : (
+                            <Sparkles className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ring-2 ${
                               isDark 
                                 ? "bg-gray-700 text-gray-200 ring-gray-600" 
@@ -549,16 +647,30 @@ export default function ChatBot({ isFullPage = false }) {
                         <div className="relative flex-1 overflow-hidden min-w-0">
                           <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
                             {message.isList ? (
-                              <div className="whitespace-pre-line font-medium">{message.text}</div>
+                              <div className="whitespace-pre-line font-medium">
+                                {message.isTypingComplete || !typingMessages[message.id]
+                                  ? message.text
+                                  : typingMessages[message.id]?.displayedText || ""}
+                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                )}
+                              </div>
                             ) : (
-                              <p className="whitespace-pre-wrap">{message.text}</p>
+                              <p className="whitespace-pre-wrap">
+                                {message.isTypingComplete || !typingMessages[message.id]
+                                  ? message.text
+                                  : typingMessages[message.id]?.displayedText || ""}
+                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                )}
+                              </p>
                             )}
                           </div>
                           {message.timestamp && (
                             <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                               {formatTime(message.timestamp)}
                             </p>
-                          )}
+                        )}
                         </div>
                       </div>
                     </div>
@@ -738,11 +850,21 @@ export default function ChatBot({ isFullPage = false }) {
                 >
                   {message.isList ? (
                     <div className="text-sm leading-relaxed whitespace-pre-line">
-                      {message.text}
+                      {message.isTypingComplete || !typingMessages[message.id]
+                        ? message.text
+                        : typingMessages[message.id]?.displayedText || ""}
+                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.text}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.isTypingComplete || !typingMessages[message.id]
+                        ? message.text
+                        : typingMessages[message.id]?.displayedText || ""}
+                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                      )}
                     </p>
                   )}
                   <p
