@@ -231,6 +231,9 @@ export default function LeadsTable() {
   const filteredLeads = useMemo(() => {
     let result = leadData;
 
+    // Exclude junk leads from the table
+    result = result.filter((lead) => lead.status !== "Junk Lead");
+
     // Apply advanced filters
     if (advancedFilters.source) {
       result = result.filter((lead) => lead.source === advancedFilters.source);
@@ -652,6 +655,34 @@ export default function LeadsTable() {
     } catch (error) {
       // Revalidate to restore correct state on error
       mutate();
+    }
+  };
+
+  const handleMoveToJunk = async (leadId) => {
+    // Optimistically remove from UI
+    mutate(
+      leadData.filter((lead) => lead.id !== leadId),
+      false
+    );
+
+    // Persist to backend
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, status: "Junk Lead" }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to move to junk");
+      }
+      toast.success("Lead moved to junk");
+      setOpenActions(null);
+      // Revalidate to ensure consistency
+      mutate();
+    } catch (error) {
+      // Revalidate to restore correct state on error
+      mutate();
+      toast.error(error.message || "Failed to move to junk");
     }
   };
   useEffect(() => {
@@ -1262,6 +1293,21 @@ export default function LeadsTable() {
                                   >
                                     <Mail className="w-4 h-4" />
                                     Email
+                                  </button>
+                                  <div className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleMoveToJunk(lead.id);
+                                    }}
+                                    className={`flex w-full items-center gap-2 px-4 py-2 transition-colors text-red-600 dark:text-red-400
+                                    ${theme === "dark" ? "hover:bg-red-500/10" : "hover:bg-red-50"}
+                                  `}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Move to Junk
                                   </button>
                                 </div>
                               )}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../context/themeContext";
-import { MessageSquare, X, Send, Sparkles, Minimize2 } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, Minimize2, Trash2, History, Settings, HelpCircle } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 
@@ -15,17 +15,105 @@ export default function ChatBot({ isFullPage = false }) {
   const [mounted, setMounted] = useState(false);
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
   const isDark = theme === "dark";
   const isChatPage = pathname === "/loria-ai-bot";
 
+  // Initialize chat history from localStorage
   useEffect(() => {
     setMounted(true);
-    // Remove default message to show empty state with logo
+    const savedHistory = localStorage.getItem('loria_chat_history');
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        setChatHistory(parsed);
+      } catch (e) {
+        console.error("Failed to parse chat history:", e);
+      }
+    }
+    // Start with empty messages
     setMessages([]);
   }, []);
+
+  // Save chat history to localStorage
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      localStorage.setItem('loria_chat_history', JSON.stringify(chatHistory));
+    }
+  }, [chatHistory]);
+
+  // Save current chat to history
+  const saveCurrentChat = () => {
+    if (messages.length > 0 && currentChatId) {
+      const chatTitle = messages[0]?.text?.substring(0, 50) || "New Chat";
+      const existingChatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
+      const updatedChat = {
+        id: currentChatId,
+        title: chatTitle,
+        messages: [...messages],
+        updatedAt: new Date().toISOString(),
+      };
+      
+      if (existingChatIndex >= 0) {
+        // Update existing chat
+        setChatHistory((prev) => {
+          const updated = [...prev];
+          updated[existingChatIndex] = updatedChat;
+          return updated;
+        });
+      } else {
+        // Add new chat
+        setChatHistory((prev) => [updatedChat, ...prev.slice(0, 9)]); // Keep last 10 chats
+      }
+    }
+  };
+
+  // Create new chat
+  const handleNewChat = () => {
+    // Save current chat to history if it has messages
+    saveCurrentChat();
+    // Clear current chat
+    setMessages([]);
+    setCurrentChatId(Date.now());
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  // Clear all messages in current chat
+  const handleClearChat = () => {
+    if (messages.length === 0) return;
+    if (confirm("Are you sure you want to clear this conversation?")) {
+      setMessages([]);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  // Load chat from history
+  const handleLoadChat = (chat) => {
+    setMessages(chat.messages);
+    setCurrentChatId(chat.id);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  // Delete chat from history
+  const handleDeleteChat = (chatId, e) => {
+    e.stopPropagation();
+    setChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
+    if (currentChatId === chatId) {
+      setMessages([]);
+      setCurrentChatId(null);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -41,62 +129,163 @@ export default function ChatBot({ isFullPage = false }) {
     }
   }, [isOpen, isMinimized, isFullPage]);
 
-  const handleSend = async () => {
-    if (!inputValue.trim()) return;
+  /**
+   * Extracts primary display field from record based on table type
+   */
+  const getPrimaryDisplayField = (record) => {
+    // Try common field names in order of preference
+    return record.title || 
+           record.name || 
+           record.lead_name || 
+           record.task_title || 
+           record.booking_name ||
+           record.contact_name ||
+           // Fallback to first non-id field
+           Object.keys(record).find(key => key !== "id" && !key.endsWith("_id") && key !== "created_at" && key !== "updated_at") || 
+           "Record";
+  };
 
+  /**
+   * Formats list data as bullet points
+   */
+  const formatListData = (data) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return "No records found.";
+    }
+
+    return data
+      .map(record => {
+        const field = getPrimaryDisplayField(record);
+        const value = record[field];
+        return value ? String(value) : null;
+      })
+      .filter(Boolean)
+      .map(item => `- ${item}`)
+      .join("\n");
+  };
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
+
+    const userQuestion = inputValue.trim();
     const userMessage = {
-      id: messages.length + 1,
-      text: inputValue,
+      id: Date.now(),
+      text: userQuestion,
       sender: "user",
       timestamp: new Date(),
     };
 
+    // Initialize chat ID if this is the first message
+    if (!currentChatId) {
+      setCurrentChatId(Date.now());
+    }
+
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
-
-    // Set loading state (add placeholder or spinner if desired, but for now we just wait)
-    const currentMessages = [...messages, userMessage];
-
-    // Add a temporary loading message or just wait? 
-    // Let's add a temporary invisible loading state or just handle it in the UI if needed
-    // For now, we just fetch.
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/loria-ai/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: inputValue })
+        body: JSON.stringify({ question: userQuestion })
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        // Use the detailed message from the API if available
+        const errorMessage = errorData.message || errorData.error || `Failed to get response (${response.status})`;
+        console.error("API Error:", {
+          status: response.status,
+          error: errorData.error,
+          message: errorData.message,
+          details: errorData.details,
+          fullError: errorData
+        });
+        throw new Error(errorMessage);
+      }
 
-      if (data.answer) {
+      const data = await response.json();
+      
+      // Debug logging
+      console.log("API Response:", {
+        hasData: data.data !== undefined,
+        dataLength: data.data?.length,
+        hasAnswer: !!data.answer,
+        answerLength: data.answer?.length,
+        answerPreview: data.answer?.substring(0, 50)
+      });
+
+      // Handle response with data array (list queries)
+      // Check if it's a list query response (has data array, even if empty)
+      if (data.data !== undefined && Array.isArray(data.data)) {
+        let displayText;
+        if (data.data.length > 0) {
+          // Format the list as bullet points
+          displayText = formatListData(data.data);
+          // If formatting returns empty, use the answer field
+          if (!displayText || displayText.trim().length === 0) {
+            displayText = data.answer || "No records found matching the specified criteria.";
+          }
+        } else {
+          // Use the answer if provided, otherwise show no records message
+          displayText = data.answer || "No records found matching the specified criteria.";
+        }
+        
+        // Ensure we have something to display
+        if (!displayText || displayText.trim().length === 0) {
+          displayText = "No records found matching the specified criteria.";
+        }
+        
+        console.log("Display text for list:", displayText);
+        
         const botMessage = {
-          id: messages.length + 2,
+          id: Date.now() + 1,
+          text: displayText,
+          sender: "bot",
+          timestamp: new Date(),
+          isList: data.data.length > 0, // Only mark as list if there are items
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      } 
+      // Handle text answer (aggregate, field_lookup, record_lookup, or conversational)
+      else if (data.answer) {
+        const botMessage = {
+          id: Date.now() + 1,
           text: data.answer,
           sender: "bot",
           timestamp: new Date(),
+          isList: false,
         };
         setMessages((prev) => [...prev, botMessage]);
-      } else {
-        // Handle error or empty response
+      } 
+      // Handle error response
+      else {
         const errorMessage = {
-          id: messages.length + 2,
-          text: data.error || "I'm having trouble connecting right now. Please try again.",
+          id: Date.now() + 1,
+          text: data.message || data.error || "I'm having trouble connecting right now. Please try again.",
           sender: "bot",
           timestamp: new Date(),
+          isList: false,
         };
         setMessages((prev) => [...prev, errorMessage]);
       }
     } catch (error) {
       console.error("Failed to send message:", error);
       const errorMessage = {
-        id: messages.length + 2,
-        text: "Sorry, something went wrong. Please try again later.",
+        id: Date.now() + 1,
+        text: error.message || "Sorry, something went wrong. Please try again later.",
         sender: "bot",
         timestamp: new Date(),
+        isList: false,
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      // Auto-save chat after message is added
+      if (currentChatId) {
+        setTimeout(() => saveCurrentChat(), 100);
+      }
     }
   };
 
@@ -109,11 +298,21 @@ export default function ChatBot({ isFullPage = false }) {
 
   const formatTime = (date) => {
     if (!date) return "";
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(date);
+    try {
+      const dateObj = date instanceof Date ? date : new Date(date);
+      // Check if date is valid
+      if (isNaN(dateObj.getTime())) {
+        return "";
+      }
+      return new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(dateObj);
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "";
+    }
   };
 
   // Prevent hydration mismatch by not rendering until mounted
@@ -140,7 +339,7 @@ export default function ChatBot({ isFullPage = false }) {
           <path d="M9 13V14M15 13V14" />
           <path d="M4 18.5H8.09861C8.66175 18.5 9.18763 18.2186 9.5 17.75C9.81237 17.2814 10.3383 17 10.9014 17H13.0986C13.6617 17 14.1876 17.2814 14.5 17.75C14.8124 18.2186 15.3383 18.5 15.9014 18.5H20" />
         </svg>
-        <span className="text-[10px] font-medium opacity-90">Liora</span>
+        <span className="text-[10px] font-medium opacity-90">Loria</span>
       </button>
     );
   }
@@ -150,37 +349,111 @@ export default function ChatBot({ isFullPage = false }) {
     return (
       <div className={`flex w-full h-full font-sans ${isDark ? "bg-[#171717] text-gray-100" : "bg-white text-gray-900"}`}>
         {/* Sidebar */}
-        <div className={`w-[260px] flex flex-col hidden md:flex border-r rounded-tr-4xl rounded-br-4xl ${isDark ? "bg-[#171717] border-white/5" : "bg-gray-50 border-gray-200"}`}>
+        <div className={`w-[280px] flex flex-col hidden md:flex border-r ${isDark ? "bg-[#1a1a1a] border-white/5" : "bg-white border-gray-200"}`}>
           <div className="p-6 flex items-center justify-center">
             <Image
               src="/loria-logo.svg"
-              alt="Liora Logo"
+              alt="Loria Logo"
               width={160}
               height={40}
               className="w-auto h-12"
               priority
             />
+          </div>
 
-          </div>
-          <div className="p-3 ">
+          {/* New Chat Button */}
+          <div className="p-3 border-b border-gray-200/10">
             <button
-              onClick={() => {
-                setMessages([]);
-                setMounted(false);
-                setTimeout(() => setMounted(true), 10); // Reset chat
-              }}
-              className={`flex items-center gap-2 w-full px-3 py-3 rounded-lg transition-colors text-sm ${isDark ? "text-white bg-orange-600" : "text-white bg-orange-600"}`}
+              onClick={handleNewChat}
+              className={`flex items-center justify-center gap-2 w-full px-3 py-3 rounded-xl transition-all text-sm font-medium shadow-sm hover:shadow-md ${
+                isDark 
+                  ? "text-white bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400" 
+                  : "text-white bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400"
+              }`}
             >
-              <span className="text-xl">+</span> New chat
+              <span className="text-lg font-bold">+</span> 
+              <span>New Chat</span>
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            <div className={`text-xs font-medium mb-2 px-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>Today</div>
-            <button className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate ${isDark ? "hover:bg-white/5 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}>
-              Pipeline analysis for Q3
-            </button>
-            <button className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate ${isDark ? "hover:bg-white/5 text-gray-300" : "hover:bg-gray-200 text-gray-700"}`}>
-              Draft email to John Doe
+
+          {/* Chat History */}
+          <div className="flex-1 overflow-y-auto px-3 py-4">
+            {chatHistory.length > 0 ? (
+              <>
+                <div className={`text-xs font-semibold mb-3 px-2 uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Recent Chats
+                </div>
+                <div className="space-y-1">
+                  {chatHistory.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                        currentChatId === chat.id
+                          ? isDark
+                            ? "bg-orange-500/20 border border-orange-500/30"
+                            : "bg-orange-50 border border-orange-200"
+                          : isDark
+                            ? "hover:bg-white/5 border border-transparent"
+                            : "hover:bg-gray-100 border border-transparent"
+                      }`}
+                      onClick={() => handleLoadChat(chat)}
+                    >
+                      <History className={`w-4 h-4 flex-shrink-0 ${isDark ? "text-gray-400" : "text-gray-500"}`} />
+                      <span className={`flex-1 text-sm truncate ${
+                        currentChatId === chat.id
+                          ? isDark ? "text-orange-300 font-medium" : "text-orange-700 font-medium"
+                          : isDark ? "text-gray-300" : "text-gray-700"
+                      }`}>
+                        {chat.title}
+                      </span>
+                      <button
+                        onClick={(e) => handleDeleteChat(chat.id, e)}
+                        className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${
+                          isDark
+                            ? "hover:bg-red-500/20 text-red-400"
+                            : "hover:bg-red-50 text-red-500"
+                        }`}
+                        title="Delete chat"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className={`text-center py-8 px-4 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">No chat history</p>
+                <p className="text-xs mt-1">Start a conversation to see it here</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar Footer Actions */}
+          <div className={`p-3 space-y-2 border-t ${isDark ? "border-white/10" : "border-gray-200"}`}>
+            {messages.length > 0 && (
+              <button
+                onClick={handleClearChat}
+                className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-gray-300"
+                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-700"
+                }`}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Clear Chat</span>
+              </button>
+            )}
+            <button
+              className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                isDark
+                  ? "hover:bg-white/5 text-gray-400 hover:text-gray-300"
+                  : "hover:bg-gray-100 text-gray-600 hover:text-gray-700"
+              }`}
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Help & Support</span>
             </button>
           </div>
           <div className={`p-3 border-t ${isDark ? "border-white/10" : "border-gray-200"}`}>
@@ -200,94 +473,163 @@ export default function ChatBot({ isFullPage = false }) {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col h-full relative ">
-
+        <div className="flex-1 flex flex-col h-full relative">
+          {/* Header Bar */}
+          <div className={`sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b backdrop-blur-sm ${isDark ? "bg-[#171717]/95 border-white/5" : "bg-white/95 border-gray-200"}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className={`text-lg font-semibold ${isDark ? "text-gray-100" : "text-gray-900"}`}>Loria AI</h2>
+                <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>Sales CRM Assistant</p>
+              </div>
+            </div>
+            {messages.length > 0 && (
+              <button
+                onClick={handleClearChat}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-gray-300"
+                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-700"
+                }`}
+                title="Clear conversation"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Clear</span>
+              </button>
+            )}
+          </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto w-full ">
-            <div className="flex flex-col items-center w-full pb-32 pt-10 " >
+          <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
+            <div className="flex flex-col items-center w-full pb-32 pt-6">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center mt-20 gap-4">
-                  <div className={`w-60 h-20 flex items-center justify-center mb-4 `}>
+                  <div className={`w-60 h-20 flex items-center justify-center mb-6 `}>
                     <Image
                       src="/loria-logo.svg"
-                      alt="Liora Logo"
+                      alt="Loria Logo"
                       width={150}
                       height={40}
-
                       priority
                     />
                   </div>
-
-
-                  <p className={`text-center max-w-xl text-xl leading-relaxed italic ${isDark ? "text-gray-400" : "text-gray-600"}`} style={{ fontFamily: 'var(--font-instrument-serif)' }}>
-                    I'm your intelligent sales companion, designed to help you close more deals. Ask me to analyze your pipeline, draft personalized emails, or provide strategic insights on your prospects.
+                  <p className={`text-center max-w-xl text-xl leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`} style={{ fontFamily: 'var(--font-instrument-serif)' }}>
+                    I'm Loria, your intelligent sales companion, designed to help you close more deals.
+                  </p>
+                  <p className={`text-center max-w-lg text-sm mt-3 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    Ask me to analyze your pipeline, track leads, manage tasks, or get insights on your sales performance.
                   </p>
                 </div>
 
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`w-full border-b  ${isDark ? "border-white/5 bg-[#171717] text-gray-100" : "border-gray-100 bg-white text-gray-800"}`}
-                  >
-                    <div className="max-w-3xl mx-auto py-8 px-4 flex gap-6">
-                      <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-sm overflow-hidden">
-                        {message.sender === "bot" ? (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20">
-                            <Sparkles className="w-5 h-5 text-white" />
+                <>
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}
+                    >
+                      <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
+                        <div className="w-9 h-9 flex-shrink-0 flex items-start justify-center pt-0.5">
+                          {message.sender === "bot" ? (
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
+                              <Sparkles className="w-5 h-5 text-white" />
+                            </div>
+                          ) : (
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ring-2 ${
+                              isDark 
+                                ? "bg-gray-700 text-gray-200 ring-gray-600" 
+                                : "bg-gray-100 text-gray-700 ring-gray-200"
+                            }`}>
+                              You
+                            </div>
+                          )}
+                        </div>
+                        <div className="relative flex-1 overflow-hidden min-w-0">
+                          <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
+                            {message.isList ? (
+                              <div className="whitespace-pre-line font-medium">{message.text}</div>
+                            ) : (
+                              <p className="whitespace-pre-wrap">{message.text}</p>
+                            )}
                           </div>
-                        ) : (
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}>
-                            U
-                          </div>
-                        )}
-                      </div>
-                      <div className="relative flex-1 overflow-hidden">
-                        <div className="prose prose-sm md:prose-base max-w-none leading-7 dark:prose-invert">
-                          <p className="whitespace-pre-wrap">{message.text}</p>
+                          {message.timestamp && (
+                            <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              {formatTime(message.timestamp)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {isLoading && (
+                    <div className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}>
+                      <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
+                        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
+                            <Sparkles className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                        <div className="relative flex-1 overflow-hidden flex items-center">
+                          <div className="flex items-center gap-3">
+                            
+                            <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               <div ref={messagesEndRef} />
             </div>
           </div>
 
           {/* Input Area */}
-          <div className={`absolute bottom-0 w-full pt-10 pb-6 px-4 bg-gradient-to-t ${isDark ? "from-[#171717] via-[#171717] to-transparent" : "from-white via-white to-transparent"}`}>
+          <div className={`sticky bottom-0 w-full pt-6 pb-6 px-6 bg-gradient-to-t ${isDark ? "from-[#171717] via-[#171717]/98 to-transparent" : "from-white via-white/98 to-transparent"} border-t ${isDark ? "border-white/5" : "border-gray-200"}`}>
             <div className="max-w-3xl mx-auto w-full">
-              <div className={`relative flex items-end w-full p-3 rounded-2xl border shadow-lg ring-offset-2 transition-all ${isDark ? "bg-[#262626] border-white/10 focus-within:border-orange-500/50 focus-within:ring-orange-500/20" : "bg-white border-gray-200 focus-within:border-orange-500 focus-within:ring-orange-100"}`}>
+              <div className={`relative flex items-end w-full p-4 rounded-2xl border-2 shadow-xl transition-all ${
+                isDark 
+                  ? "bg-[#262626] border-gray-700/50 focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20" 
+                  : "bg-white border-gray-300 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-100"
+              }`}>
                 <textarea
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSend();
                     }
                   }}
-                  placeholder="Message Liora..."
-                  className={`w-full max-h-[200px] py-2 pl-2 pr-10 bg-transparent border-0 focus:ring-0 focus:outline-none resize-none custom-scrollbar ${isDark ? "text-white placeholder-gray-400" : "text-gray-900 placeholder-gray-400"}`}
+                  placeholder="Message Loria..."
+                  className={`w-full max-h-[200px] py-2 pl-3 pr-12 bg-transparent border-0 focus:ring-0 focus:outline-none resize-none custom-scrollbar text-base ${
+                    isDark 
+                      ? "text-white placeholder-gray-500" 
+                      : "text-gray-900 placeholder-gray-400"
+                  }`}
                   rows={1}
-                  style={{ minHeight: '44px' }}
+                  style={{ minHeight: '48px' }}
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputValue.trim()}
-                  className={`absolute right-3 bottom-3 p-1.5 rounded-lg transition-all duration-200 ${inputValue.trim()
-                    ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:scale-105"
-                    : isDark ? "bg-transparent text-gray-500 cursor-not-allowed" : "bg-transparent text-gray-300 cursor-not-allowed"
-                    }`}
+                  disabled={!inputValue.trim() || isLoading}
+                  className={`absolute right-3 bottom-3 p-2.5 rounded-xl transition-all duration-200 ${
+                    inputValue.trim() && !isLoading
+                      ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30 hover:scale-105 hover:shadow-xl hover:shadow-orange-500/40"
+                      : isDark 
+                        ? "bg-gray-700/50 text-gray-600 cursor-not-allowed" 
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  }`}
+                  title="Send message"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-center text-xs text-gray-500 mt-2">
-                Liora can make mistakes. Consider checking important information.
+              <p className="text-center text-xs text-gray-500 mt-3">
+                Loria can make mistakes. Consider checking important information.
               </p>
             </div>
           </div>
@@ -330,7 +672,7 @@ export default function ChatBot({ isFullPage = false }) {
               className={`font-bold text-base ${isDark ? "text-white" : "text-gray-900"
                 }`}
             >
-              AI Assistant
+              Loria AI
             </h3>
             <div className={`text-xs flex items-center gap-1.5 ${isDark ? "text-gray-400" : "text-gray-500"
               }`}
@@ -394,9 +736,15 @@ export default function ChatBot({ isFullPage = false }) {
                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
                     }`}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.text}
-                  </p>
+                  {message.isList ? (
+                    <div className="text-sm leading-relaxed whitespace-pre-line">
+                      {message.text}
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.text}
+                    </p>
+                  )}
                   <p
                     className={`text-[10px] mt-1.5 ${message.sender === "user"
                       ? "text-orange-100/80"
@@ -410,6 +758,26 @@ export default function ChatBot({ isFullPage = false }) {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className={`flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                <div
+                  className={`max-w-[80%] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl px-4 py-3 shadow-lg ${
+                    isDark
+                      ? "bg-[#262626] text-gray-100 border border-gray-700/50"
+                      : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -437,8 +805,8 @@ export default function ChatBot({ isFullPage = false }) {
               </div>
               <button
                 onClick={handleSend}
-                disabled={!inputValue.trim()}
-                className={`p-3 rounded-xl transition-all duration-200 ${inputValue.trim()
+                disabled={!inputValue.trim() || isLoading}
+                className={`p-3 rounded-xl transition-all duration-200 ${inputValue.trim() && !isLoading
                   ? isDark
                     ? "bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30 hover:scale-105"
                     : "bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30 hover:scale-105"
@@ -454,19 +822,23 @@ export default function ChatBot({ isFullPage = false }) {
         </>
       )}
 
-      <style jsx>{`
+      <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+          width: 8px;
+          height: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: ${isDark ? "#374151" : "#d1d5db"};
+          background: ${isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)"};
           border-radius: 10px;
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: ${isDark ? "#4b5563" : "#cbd5e1"};
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: ${isDark ? "#4b5563" : "#9ca3af"};
+          background: ${isDark ? "#6b7280" : "#94a3b8"};
         }
       `}</style>
     </div>
