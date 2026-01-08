@@ -11,10 +11,11 @@ import { SidebarProvider, useSidebar } from "./context/sidebarContext";
 import { KeyboardShortcutsProvider } from "./context/keyboardShortcutsContext";
 import { Toaster } from "react-hot-toast";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
+import ChatBot from "./components/ui/ChatBot";
 
 function MainContent({ children }) {
   const { isCollapsed } = useSidebar();
-  
+
   return (
     <main
       className="flex-1 overflow-y-auto transition-all duration-300 p-6 pt-2 pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
@@ -32,12 +33,13 @@ function MainContent({ children }) {
 
 function LayoutStructure({ children, fonts }) {
   const { theme } = useTheme();
-  const { manrope, geistMono, dynaPuff } = fonts;
+  const { manrope, geistMono, dynaPuff, instrumentSerif } = fonts;
   const pathname = usePathname();
-  
+
   const isLoginPage = pathname === "/login";
   const isLogoutPage = pathname === "/logout";
   const isAuthCallbackPage = pathname === "/auth/callback";
+  const isLyraPage = pathname === "/loria-ai-bot";
 
   // Auto-logout after 24 hours
   useEffect(() => {
@@ -56,7 +58,7 @@ function LayoutStructure({ children, fonts }) {
   return (
     <html lang="en" className={`${manrope.variable} ${theme}`}>
       <body
-        className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
+        className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable} ${instrumentSerif.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
         suppressHydrationWarning
       >
         <Toaster
@@ -82,7 +84,7 @@ function LayoutStructure({ children, fonts }) {
             },
           }}
         />
-        {isLoginPage || isLogoutPage || isAuthCallbackPage ? (
+        {isLoginPage || isLogoutPage || isAuthCallbackPage || isLyraPage ? (
           children
         ) : (
           <SidebarProvider>
@@ -90,6 +92,7 @@ function LayoutStructure({ children, fonts }) {
               <Sidebar2 />
               <TopBar2 />
               <MainContent>{children}</MainContent>
+              <ChatBot />
             </div>
           </SidebarProvider>
         )}

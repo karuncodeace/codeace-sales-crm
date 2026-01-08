@@ -1,5 +1,5 @@
 import "./globals.css";
-import { Manrope, Geist_Mono, DynaPuff } from "next/font/google";
+import { Manrope, Geist_Mono, DynaPuff, Instrument_Serif } from "next/font/google";
 import LayoutClient from "./layout-client";
 
 const manrope = Manrope({
@@ -17,6 +17,13 @@ const dynaPuff = DynaPuff({
   subsets: ["latin"],
 });
 
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: "italic",
+});
+
 export const metadata = {
   title: "Sales CRM | CodeAce",
   description: "Takeover the sales with Sales CRM",
@@ -25,7 +32,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <LayoutClient
-      fonts={{ manrope, geistMono, dynaPuff }}
+      fonts={{ manrope, geistMono, dynaPuff, instrumentSerif }}
     >
       {children}
     </LayoutClient>
