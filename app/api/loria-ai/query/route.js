@@ -553,14 +553,15 @@ export async function POST(request) {
     try {
       // Handle different query types with STRICT rules
       if (parsedIntent.query_type === "aggregate") {
-        // Aggregate: For leads_table, return NUMBER ONLY; for others, single sentence
+        // Aggregate: Natural language response with filter verification
         const timeRange = parsedIntent.filters?.time_range || null;
-        answer = await generateAggregateAnswer(
+        answer = generateAggregateAnswer(
           question,
           parsedIntent.metric,
           queryResult.value,
           timeRange,
-          parsedIntent.table // Pass table name for strict leads_table rules
+          parsedIntent.table,
+          parsedIntent.filters || {} // Pass filters for natural language generation
         );
       } else if (parsedIntent.query_type === "field_lookup") {
         // Field lookup: ONLY the field value
