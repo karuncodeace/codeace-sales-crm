@@ -485,7 +485,10 @@ export default function TasksPage() {
             result = result.filter((task) => task.status?.toLowerCase() === advancedFilters.status.toLowerCase());
         }
         if (advancedFilters.assignedTo) {
-            result = result.filter((task) => task.assignedTo === advancedFilters.assignedTo);
+            result = result.filter((task) => {
+                const taskSalesPersonId = String(task.salesperson_id || task.sales_person_id || task.assignedTo || "");
+                return taskSalesPersonId === String(advancedFilters.assignedTo);
+            });
         }
         if (advancedFilters.priority) {
             result = result.filter((task) => task.priority === advancedFilters.priority);
@@ -503,7 +506,8 @@ export default function TasksPage() {
                     task.leadName,
                     task.phone,
                     task.id,
-                    task.assignedTo,
+                    String(task.lead_id || ""), // Add lead_id to search (convert to string)
+                    String(task.assignedTo || ""),
                 ]
                     .filter(Boolean)
                     .join(" ")
@@ -1276,7 +1280,13 @@ export default function TasksPage() {
                             </svg>
                             Filter
                         </button>
-                        <FilterBtn open={openFilter} onClose={() => setOpenFilter(false)} onApply={handleApplyFilters} />
+                        <FilterBtn 
+                            open={openFilter} 
+                            onClose={() => setOpenFilter(false)} 
+                            onApply={handleApplyFilters}
+                            currentFilters={advancedFilters}
+                            salesPersonsData={salesPersonsData}
+                        />
                     </div>
                 </div>
 

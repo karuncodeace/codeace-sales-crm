@@ -53,14 +53,24 @@ export async function GET() {
       4: { calls: 0, meetings: 0, conversions: 0 }, // Q4: January - March
     };
 
-    // Fetch calls: leads with first_call_done = "Done"
-    // Get all leads with first_call_done = "Done" and filter by date for quarter grouping
-    const { data: callsData, error: callsError } = await supabase
+    // Fetch calls: leads with first_call_done = "Done" (handle multiple formats)
+    // Get all leads and filter by first_call_done in JavaScript to handle boolean/string formats
+    const { data: allLeadsForCalls, error: callsError } = await supabase
       .from("leads_table")
-      .select("created_at, last_attempted_at")
-      .eq("first_call_done", "Done");
+      .select("created_at, last_attempted_at, first_call_done");
 
-    if (!callsError && callsData) {
+    if (!callsError && allLeadsForCalls) {
+      // Filter leads where first_call_done indicates a completed call
+      const callsData = allLeadsForCalls.filter((lead) => {
+        const firstCallDone = lead.first_call_done;
+        // Handle multiple formats: boolean true, number 1, string "Done"/"done"/"DONE"
+        return (
+          firstCallDone === true ||
+          firstCallDone === 1 ||
+          String(firstCallDone || "").toLowerCase().trim() === "done"
+        );
+      });
+
       callsData.forEach((lead) => {
         // Use last_attempted_at if available (when field was set), otherwise created_at
         const dateToUse = lead.last_attempted_at || lead.created_at;

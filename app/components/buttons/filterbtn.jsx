@@ -1,19 +1,32 @@
 "use client";
 
 import { useTheme } from "../../context/themeContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function FilterModal({ open, onClose, onApply }) {
+export default function FilterModal({ open, onClose, onApply, currentFilters = {}, salesPersonsData = [] }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
   const [filters, setFilters] = useState({
-    source: "",
-    status: "",
-    assignedTo: "",
-    priority: "",
-    type: "",
+    source: currentFilters.source || "",
+    status: currentFilters.status || "",
+    assignedTo: currentFilters.assignedTo || "",
+    priority: currentFilters.priority || "",
+    type: currentFilters.type || "",
   });
+
+  // Update filters when currentFilters prop changes
+  useEffect(() => {
+    if (open) {
+      setFilters({
+        source: currentFilters.source || "",
+        status: currentFilters.status || "",
+        assignedTo: currentFilters.assignedTo || "",
+        priority: currentFilters.priority || "",
+        type: currentFilters.type || "",
+      });
+    }
+  }, [currentFilters, open]);
 
   const updateFilter = (field, value) => {
     setFilters({ ...filters, [field]: value });
@@ -46,32 +59,10 @@ export default function FilterModal({ open, onClose, onApply }) {
         }`}
       >
         {/* Title */}
-        <h2 className="text-lg font-semibold mb-4">Filter Leads</h2>
+        <h2 className="text-lg font-semibold mb-4">Filter Tasks</h2>
 
         {/* FORM FIELDS */}
         <div className="space-y-4">
-
-          {/* Lead Source */}
-          <div>
-            <label className="text-sm font-medium">Lead Source</label>
-            <select
-              className={`mt-1 w-full p-2 rounded-md border ${
-                isDark
-                  ? "bg-[#262626] border-gray-700 text-gray-300"
-                  : "bg-white border-gray-300"
-              }`}
-              value={filters.source}
-              onChange={(e) => updateFilter("source", e.target.value)}
-            >
-              <option value="">All</option>
-              <option>Meta Ads</option>
-              <option>Google Ads</option>
-              <option>Website Form</option>
-              <option>Referral</option>
-              <option>LinkedIn</option>
-            </select>
-          </div>
-
           {/* Status */}
           <div>
             <label className="text-sm font-medium">Status</label>
@@ -85,12 +76,8 @@ export default function FilterModal({ open, onClose, onApply }) {
               onChange={(e) => updateFilter("status", e.target.value)}
             >
               <option value="">All</option>
-              <option>New</option>
-              <option>Contacted</option>
-              <option>Follow Up</option>
-              <option>Qualified</option>
-              <option>Proposal</option>
-              <option>Noresponse</option>
+              <option>Pending</option>
+              <option>Completed</option>
             </select>
           </div>
 
@@ -107,10 +94,20 @@ export default function FilterModal({ open, onClose, onApply }) {
               onChange={(e) => updateFilter("assignedTo", e.target.value)}
             >
               <option value="">All</option>
-              <option>Sarah Lin</option>
-              <option>Jorge Patel</option>
-              <option>Priya Nair</option>
-              <option>David Chen</option>
+              {Array.isArray(salesPersonsData) && salesPersonsData.length > 0 ? (
+                salesPersonsData.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.full_name || person.name || person.email || person.id}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option>Sarah Lin</option>
+                  <option>Jorge Patel</option>
+                  <option>Priya Nair</option>
+                  <option>David Chen</option>
+                </>
+              )}
             </select>
           </div>
 

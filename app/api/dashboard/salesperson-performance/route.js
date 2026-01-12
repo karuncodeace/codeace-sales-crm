@@ -245,8 +245,13 @@ export async function GET() {
           const spId = lead.assigned_to;
           if (!spId || !calculatedMetrics[spId]) return;
           
-          // Count calls: first_call_done = "Done"
-          if (lead.first_call_done === "Done") {
+          // Count calls: first_call_done = "Done" (handle multiple formats: boolean true, string "Done"/"done"/"DONE")
+          const firstCallDone = lead.first_call_done;
+          if (
+            firstCallDone === true ||
+            firstCallDone === 1 ||
+            String(firstCallDone || "").toLowerCase().trim() === "done"
+          ) {
             calculatedMetrics[spId].calls++;
           }
           
