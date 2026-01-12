@@ -296,6 +296,25 @@ export default function TasksPage() {
     // Fetch task activities for due dates
     const { data: activitiesData } = useSWR("/api/task-activities", fetcher);
 
+    // Fetch user role to conditionally show/hide "Assigned To" column
+    const [userRole, setUserRole] = useState(null);
+    useEffect(() => {
+        const fetchUserRole = async () => {
+            try {
+                const response = await fetch("/api/profile");
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data && data.data.role) {
+                        setUserRole(data.data.role.toLowerCase());
+                    }
+                }
+            } catch (error) {
+                // Error fetching user role
+            }
+        };
+        fetchUserRole();
+    }, []);
+
 
     const handleApplyFilters = (filters) => {
         setAdvancedFilters(filters);
@@ -1346,7 +1365,7 @@ export default function TasksPage() {
                                 "Phone",
                                 "Due",
                                 "Status",
-                                "Assigned To",
+                                ...(userRole !== "sales" ? ["Assigned To"] : []),
                                 "Priority",
 
                                 
@@ -1412,19 +1431,27 @@ export default function TasksPage() {
                             </tr>
                         ) : (
                             paginatedTasks.map((task) => (
-                                <tr key={task.id} className={task.status?.toLowerCase() === "completed" ? "opacity-60" : ""}>
+                                <tr 
+                                    key={task.id} 
+                                    className={`${task.status?.toLowerCase() === "completed" ? "opacity-60" : ""} cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50`}
+                                    onClick={() => router.push(`/leads/${task.lead_id}`)}
+                                >
                                     <td className="size-px whitespace-nowrap">
                                         <div className="ps-6 py-2">
                                             <label
                                                 htmlFor={`task-${task.id}`}
                                                 className="flex"
+                                                onClick={(e) => e.stopPropagation()}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     className="shrink-0 size-4 accent-orange-500 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                                                     id={`task-${task.id}`}
                                                     checked={task.status?.toLowerCase() === "completed"}
-                                                    onChange={() => handleMarkComplete(task)}
+                                                    onChange={(e) => {
+                                                        e.stopPropagation();
+                                                        handleMarkComplete(task);
+                                                    }}
                                                 />
                                                 <span className="sr-only">
                                                     Select {task.id}
@@ -1504,15 +1531,17 @@ export default function TasksPage() {
                                             </span>
                                         </div>
                                     </td>
+                                    {userRole !== "sales" && (
+                                        <td className="size-px whitespace-nowrap">
+                                            <div className="px-6 py-2">
+                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                                    {task.assignedTo}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    )}
                                     <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2">
-                                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                {task.assignedTo}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2">
+                                        <div className="px-6 py-2" onClick={(e) => e.stopPropagation()}>
                                             <PriorityDropdown
                                                 value={task.priority}
                                                 theme={theme}

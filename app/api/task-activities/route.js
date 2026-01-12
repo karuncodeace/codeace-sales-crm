@@ -92,6 +92,39 @@ export async function GET(request) {
   }
 }
 
+export async function PATCH(request) {
+  try {
+    const body = await request.json();
+    const { id, comments, activity, notes_type } = body;
+
+    if (!id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const updateData = {};
+    if (comments !== undefined) updateData.comments = comments;
+    if (activity !== undefined) updateData.activity = activity;
+    if (notes_type !== undefined) updateData.notes_type = notes_type;
+
+    if (Object.keys(updateData).length === 0) {
+      return Response.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from("task_activities")
+      .update(updateData)
+      .eq("id", id);
+
+    if (error) {
+      return Response.json({ error: error.message || "Failed to update task activity" }, { status: 500 });
+    }
+
+    return Response.json({ success: true });
+  } catch (err) {
+    return Response.json({ error: err.message || "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);

@@ -1688,16 +1688,16 @@ export default function LeadsTable() {
 
       {/* Status Change Comment Modal */}
       {statusChangeModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
           <div
-            className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+            className={`w-full max-w-md mx-auto my-auto rounded-2xl shadow-2xl transform transition-all ${
               theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
             }`}
           >
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
+            <div className={`flex items-center justify-between px-4 sm:px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="p-2 rounded-lg bg-orange-500/10 flex-shrink-0">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
@@ -1714,9 +1714,9 @@ export default function LeadsTable() {
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Change Status</h2>
-                  <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg font-semibold truncate">Change Status</h2>
+                  <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"} truncate`}>
                     Changing to: <span className="font-medium text-orange-500">{statusChangeModal.newStatus}</span>
                   </p>
                 </div>
@@ -1745,13 +1745,13 @@ export default function LeadsTable() {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-4 sm:px-6 py-5 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
               {/* Connect Through */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                   Connect Through
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: "call", label: "Call", icon: (
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1986,11 +1986,11 @@ export default function LeadsTable() {
             </div>
 
             {/* Footer */}
-            <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+            <div className={`flex flex-col sm:flex-row justify-end gap-3 px-4 sm:px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
               <button
                 onClick={handleCancelStatusChange}
                 disabled={statusChangeModal.isSubmitting}
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   theme === "dark"
                     ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -2001,7 +2001,7 @@ export default function LeadsTable() {
               <button
                 onClick={handleConfirmStatusChange}
                 disabled={statusChangeModal.isSubmitting || !statusChangeModal.comment.trim()}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {statusChangeModal.isSubmitting ? (
                   <>

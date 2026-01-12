@@ -170,14 +170,12 @@ function NotesTab({ theme, leadId, leadName }) {
         setIsSubmitting(true);
         try {
             const response = await fetch('/api/task-activities', {
-                method: 'POST',
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    lead_id: leadId,
-                    activity: "Note Updated",
-                    type: "note",
+                    id: noteId,
                     comments: editNoteText.trim(),
-                    connect_through: "note",
+                    activity: "Note Updated",
                 }),
             });
             
@@ -202,7 +200,7 @@ function NotesTab({ theme, leadId, leadName }) {
                     <div className="flex gap-2 justify-end">
                         <button
                             onClick={() => toast.dismiss(t.id)}
-                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
                         >
                             Cancel
                         </button>
