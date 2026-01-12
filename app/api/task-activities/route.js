@@ -10,7 +10,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-  const { lead_id, activity, type, comments, connect_through, due_date, notes_type, salesperson_id } = body;
+  const { lead_id, activity, type, comments, connect_through, due_date, notes_type, salesperson_id, source } = body;
 
   if (!lead_id) {
     return Response.json({ error: "lead_id is required" }, { status: 400 });
@@ -21,7 +21,7 @@ export async function POST(request) {
     activity: activity || "",
     type: type || "note",
     comments: comments || "",
-    source: "user",
+    source: source || "user", // Allow frontend to specify source (e.g., 'ui' for UI-initiated activities)
     created_at: new Date().toISOString(),
   };
 

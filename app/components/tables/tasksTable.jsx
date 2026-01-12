@@ -129,6 +129,16 @@ const NEXT_STAGE_MAP = {
   "Won": null, // No next stage after Won
 };
 
+// Strict stage constants for Demo task completion flow
+// These must match EXACTLY with database values (case-sensitive)
+const STAGE_CONSTANTS = {
+  NEW: "New",
+  DEMO: "Demo",
+  SECOND_DEMO: "Second Demo",
+  PROPOSAL: "Proposal",
+  WON: "Won",
+};
+
 // Helper function to check if task is a demo scheduling task
 function isDemoSchedulingTask(task, leadStatus) {
   if (!task || !task.title) return false;
@@ -588,6 +598,8 @@ export default function TasksPage() {
     };
     
     // Confirm task completion with stage progression
+    // IMPORTANT: This function follows a strict 3-step order to prevent duplicate task creation.
+    // Backend triggers handle task creation - frontend should NEVER create tasks directly.
     const handleConfirmTaskCompletion = async () => {
         const { task, leadId, leadName, currentStatus, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
         
@@ -608,99 +620,40 @@ export default function TasksPage() {
         try {
             const nextStage = getNextStage(validStatus);
             
-            // Validate nextStage before proceeding
-            if (!nextStage) {
-                // Still mark task as completed even if no next stage
-            }
+            // Get assigned salesperson_id from lead data
+            const lead = leadsMap[leadId];
+            const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to || null;
             
-            // Save to stage_notes table
-            const stageNotesRes = await fetch("/api/stage-notes", {
+            // STEP 1: Insert into task_activities
+            // This must happen FIRST before any other updates
+            // Note: reschedule_comments (next stage comment) is stored in leads_table.next_stage_notes in STEP 3
+            const activityRes = await fetch("/api/task-activities", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     lead_id: leadId,
-                    current_stage_notes: comment,
-                    next_stage_notes: nextStageComments || null,
-                    outcome: outcome || "Success",
+                    activity: "Stage completed", // Activity description
+                    type: "manual", // Type is 'manual' for UI-initiated task completions
+                    comments: comment, // Required: current stage comment
+                    connect_through: connectThrough || null, // Call / Email / WhatsApp / Meeting
+                    source: "ui", // Source is 'ui' for frontend-initiated activities
+                    salesperson_id: assignedSalespersonId, // Assigned to logged-in user (from lead's assigned_to)
                 }),
             });
             
-            if (!stageNotesRes.ok) {
-                const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
-                const errorMessage = errorData.error || errorData.details || "Failed to save stage notes";
-                throw new Error(errorMessage);
+            if (!activityRes.ok) {
+                const errorData = await activityRes.json().catch(() => ({ error: "Unknown error" }));
+                throw new Error(errorData.error || "Failed to save task activity");
             }
             
-            // Update lead status and stage notes - only if nextStage is valid
-            if (nextStage && nextStage !== "null" && nextStage !== "undefined" && canCreateTaskForStage(nextStage)) {
-                const leadUpdateRes = await fetch("/api/leads", {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        id: leadId,
-                        status: nextStage,
-                        current_stage: nextStage,
-                        next_stage_notes: nextStageComments || null,
-                    }),
-                });
-                
-                if (!leadUpdateRes.ok) {
-                    throw new Error("Failed to update lead status");
-                }
-                
-                // Get existing tasks for this lead to check for duplicates and demo count
-                const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
-                const existingTasks = await existingTasksRes.json().catch(() => []);
-                // Exclude the current task being completed from active tasks check
-                const activeTasks = Array.isArray(existingTasks) 
-                    ? existingTasks.filter(t => 
-                        String(t.status || "").toLowerCase() !== "completed" && t.id !== task.id
-                      )
-                    : [];
-                
-                // Create task for next stage (only if no active tasks exist, excluding current task)
-                if (activeTasks.length === 0 && nextStage && nextStage !== "null" && nextStage !== "undefined") {
-                    try {
-                        // Ensure leadName is valid
-                        const validLeadName = leadName || "Client";
-                        
-                        const taskDetails = getTaskDetailsForNextStage(nextStage, validLeadName, existingTasks);
-                        if (taskDetails) {
-                            // Validate nextStage before creating task
-                            if (!nextStage || typeof nextStage !== "string") {
-                                throw new Error(`Cannot create task: Invalid next stage: ${nextStage}`);
-                            }
-                            
-                            const createRes = await fetch("/api/tasks", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    lead_id: leadId,
-                                    stage: nextStage, // CRITICAL: Always include stage
-                                    title: taskDetails.title,
-                                    type: taskDetails.type,
-                                }),
-                            });
-
-                            if (!createRes.ok) {
-                                const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
-                                throw new Error(errorData.error || "Failed to create next task");
-                            }
-                        }
-                    } catch (error) {
-                        // Don't throw - still complete the current task even if next task creation fails
-                        toast.error(`Task completed, but failed to create next task: ${error.message}`);
-                    }
-                }
-            }
-            
-            // Mark task as completed
+            // STEP 2: Update tasks_table - mark task as completed
             const taskRes = await fetch("/api/tasks", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: task.id,
                     status: "Completed",
+                    // completed_at is automatically set by the API when status changes to "Completed"
                 }),
             });
             
@@ -716,19 +669,45 @@ export default function TasksPage() {
                 throw new Error(errorMessage);
             }
             
-            // Create activity record with task details and user comments
-            await fetch("/api/task-activities", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    lead_id: leadId,
-                    activity: `Task completed: ${task.title}`,
-                    type: "task",
-                    comments: comment || `Task "${task.title}" has been completed`,
-                    connect_through: connectThrough || null,
-                    due_date: dueDate || null,
-                }),
-            });
+            // STEP 3: Update leads_table - move to next stage
+            // Only update if there's a valid next stage
+            if (nextStage && nextStage !== "null" && nextStage !== "undefined") {
+                const leadUpdateRes = await fetch("/api/leads", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: leadId,
+                        current_stage: nextStage, // Move to next stage (Demo / Second Demo / Proposal / Won)
+                        status: nextStage, // Also update status field for consistency
+                        next_stage_notes: nextStageComments || null, // Optional next stage comment
+                    }),
+                });
+                
+                if (!leadUpdateRes.ok) {
+                    throw new Error("Failed to update lead status");
+                }
+                
+                // NOTE: Task creation for next stage is handled by PostgreSQL triggers.
+                // The trigger automatically creates the next task when current_stage is updated.
+                // Frontend should NEVER create tasks directly to avoid duplicates and rollback errors.
+            }
+            
+            // Save to stage_notes table (optional, for historical tracking)
+            try {
+                await fetch("/api/stage-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        current_stage_notes: comment,
+                        next_stage_notes: nextStageComments || null,
+                        outcome: outcome || "Success",
+                    }),
+                });
+            } catch (stageNotesError) {
+                // Don't fail the entire operation if stage notes save fails
+                console.warn("Failed to save stage notes:", stageNotesError);
+            }
             
             // Close modal
             setTaskCompletionModal({
@@ -778,6 +757,7 @@ export default function TasksPage() {
     };
 
     // Handle demo outcome confirmation
+    // IMPORTANT: Follows the same 3-step order - NO task creation from frontend
     const handleDemoOutcomeConfirm = async () => {
         const { task, leadId, leadName, requiresSecondDemo } = demoOutcomeModal;
         
@@ -789,9 +769,36 @@ export default function TasksPage() {
         setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: true }));
 
         try {
+            // Get lead data to get assigned salesperson_id
+            const lead = leadsMap[leadId] || leadsMap[task.lead_id];
+            const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to || null;
+            const currentLeadStatus = lead?.status || "New";
+            
             if (requiresSecondDemo) {
-                // YES: Stay in Contacted stage, mark task as completed, and create Second Demo task
-                // Mark task as completed
+                // YES: Client needs a second demo
+                // Update current_stage to "Second Demo" - this triggers the backend to create the second demo task
+                // IMPORTANT: We MUST change the stage value (OLD ≠ NEW) for the trigger to fire
+                
+                // STEP 1: Insert into task_activities
+                const activityRes = await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: "Stage completed",
+                        type: "manual",
+                        comments: "Demo completed - scheduling second demo",
+                        connect_through: null,
+                        source: "ui",
+                        salesperson_id: assignedSalespersonId,
+                    }),
+                });
+
+                if (!activityRes.ok) {
+                    throw new Error("Failed to save task activity");
+                }
+
+                // STEP 2: Mark task as completed
                 const taskRes = await fetch("/api/tasks", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -806,49 +813,25 @@ export default function TasksPage() {
                     throw new Error(errorData.error || "Failed to complete task");
                 }
 
-                // Get existing tasks for this lead to calculate demo count
-                const existingTasksRes = await fetch(`/api/tasks?lead_id=${leadId}`);
-                const existingTasksData = existingTasksRes.ok ? await existingTasksRes.json() : [];
-                const existingTasks = Array.isArray(existingTasksData) ? existingTasksData : [];
-                
-                // Create Second Demo task
-                // When "YES" is selected, we're creating a second demo after "Schedule Demo"
-                // Count all demo-related tasks (including "Schedule Demo") to determine it's the second demo
-                const allDemoRelatedTasks = existingTasks.filter(t => {
-                    const title = (t.title || "").toLowerCase();
-                    return title.includes("demo");
-                });
-                // demoCount should be 2 for "Second Demo" (1 for Schedule Demo + 1 for the new one)
-                const demoCount = allDemoRelatedTasks.length + 1;
-                const secondDemoTitle = generateTaskTitle("Demo", leadName || "Client", { demoCount });
-                
-                const createSecondDemoRes = await fetch("/api/tasks", {
-                    method: "POST",
+                // STEP 3: Update leads_table.current_stage to "Second Demo"
+                // This stage change triggers the PostgreSQL trigger to create the "Second demo scheduled {client name}" task
+                // NOTE: The database trigger is the SINGLE SOURCE OF TRUTH for task creation.
+                // Frontend should NEVER create tasks directly - only update current_stage.
+                const leadUpdateRes = await fetch("/api/leads", {
+                    method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        lead_id: leadId,
-                        stage: "Demo", // Stage is Demo for the task
-                        title: secondDemoTitle,
-                        type: "Meeting",
+                        id: leadId,
+                        current_stage: STAGE_CONSTANTS.SECOND_DEMO, // Explicitly set to "Second Demo"
+                        status: STAGE_CONSTANTS.SECOND_DEMO, // Also update status for consistency
+                        // DO NOT send task title, task creation, or any tasks_table operations
+                        // The backend trigger handles all task creation based on current_stage changes
                     }),
                 });
-
-                if (!createSecondDemoRes.ok) {
-                    const errorData = await createSecondDemoRes.json().catch(() => ({ error: "Unknown error" }));
-                    throw new Error(errorData.error || "Failed to create second demo task");
+                
+                if (!leadUpdateRes.ok) {
+                    throw new Error("Failed to update lead status");
                 }
-
-                // Create activity record
-                await fetch("/api/task-activities", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        lead_id: leadId,
-                        activity: `Task completed: ${task.title}`,
-                        type: "task",
-                        comments: "Demo completed - scheduling second demo",
-                    }),
-                });
                 
                 // Close modal
                 setDemoOutcomeModal({
@@ -860,101 +843,36 @@ export default function TasksPage() {
                     isSubmitting: false,
                 });
 
-                toast.success("Task completed and second demo scheduled");
+                toast.success("Task completed. Second demo will be scheduled by the system.");
 
                 // Refresh data
                 mutate("/api/tasks");
                 mutate("/api/leads");
             } else {
-                // NO: Proceed with normal flow - update to Demo stage and create next task
-                // Get lead data to determine current status
-                const lead = leadsMap[task.lead_id];
-                const currentLeadStatus = lead?.status || "New";
-                const nextStage = getNextStage(currentLeadStatus); // This should be "Demo" when current is "Contacted"
+                // NO: Client does not need a second demo - proceed to Proposal stage
+                // Update current_stage to "Proposal" - this triggers the backend to create the proposal task
+                // IMPORTANT: We MUST change the stage value (OLD ≠ NEW) for the trigger to fire
                 
-                // Save to stage_notes table
-                const stageNotesRes = await fetch("/api/stage-notes", {
+                // STEP 1: Insert into task_activities
+                const activityRes = await fetch("/api/task-activities", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         lead_id: leadId,
-                        current_stage_notes: "Demo completed - proceeding to next stage",
-                        next_stage_notes: null,
-                        outcome: "Success",
+                        activity: "Stage completed",
+                        type: "manual",
+                        comments: "Demo completed - proceeding to next stage",
+                        connect_through: null,
+                        source: "ui",
+                        salesperson_id: assignedSalespersonId,
                     }),
                 });
 
-                if (!stageNotesRes.ok) {
-                    const errorData = await stageNotesRes.json().catch(() => ({ error: "Unknown error" }));
-                    throw new Error(errorData.error || errorData.details || "Failed to save stage notes");
+                if (!activityRes.ok) {
+                    throw new Error("Failed to save task activity");
                 }
 
-                // Update lead status and stage notes
-                if (nextStage && canCreateTaskForStage(nextStage)) {
-                    const leadUpdateRes = await fetch("/api/leads", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            id: leadId,
-                            status: nextStage,
-                            current_stage: nextStage,
-                        }),
-                    });
-
-                    if (!leadUpdateRes.ok) {
-                        throw new Error("Failed to update lead status");
-                    }
-
-                    // Get existing tasks for this lead to check for duplicates and demo count
-                    // Use the tasks from state (same as normal flow) - exclude the current task being completed
-                    const activeTasks = Array.isArray(tasksData) 
-                        ? tasksData.filter(t => 
-                            t.lead_id === leadId && 
-                            String(t.status || "").toLowerCase() !== "completed" &&
-                            t.id !== task.id // Exclude the current task
-                          )
-                        : [];
-                    
-                    // Create task for next stage (only if no active tasks exist)
-                    if (activeTasks.length === 0) {
-                        // Validate nextStage before creating task
-                        if (!nextStage || typeof nextStage !== "string") {
-                            throw new Error(`Cannot create task: Invalid next stage: ${nextStage}`);
-                        }
-                        
-                        // For Demo stage, exclude "Schedule Demo" tasks when calculating demo count
-                        // Only count actual demo tasks ("Demo with" or "Second Demo")
-                        let tasksForDemoCount = tasksData || [];
-                        if (nextStage === "Demo") {
-                            tasksForDemoCount = tasksForDemoCount.filter(t => {
-                                const title = (t.title || "").toLowerCase();
-                                // Exclude "Schedule Demo" tasks - only count actual demo tasks
-                                return title.includes("demo") && !title.includes("schedule");
-                            });
-                        }
-                        
-                        const taskDetails = getTaskDetailsForNextStage(nextStage, leadName, tasksForDemoCount);
-                        if (taskDetails) {
-                            const createRes = await fetch("/api/tasks", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    lead_id: leadId,
-                                    stage: nextStage, // CRITICAL: Always include stage
-                                    title: taskDetails.title,
-                                    type: taskDetails.type,
-                                }),
-                            });
-
-                            if (!createRes.ok) {
-                                const errorData = await createRes.json().catch(() => ({ error: "Unknown error" }));
-                                throw new Error(errorData.error || "Failed to create next task");
-                            }
-                        }
-                    }
-                }
-
-                // Mark task as completed
+                // STEP 2: Mark task as completed
                 const taskRes = await fetch("/api/tasks", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -969,17 +887,43 @@ export default function TasksPage() {
                     throw new Error(errorData.error || "Failed to complete task");
                 }
 
-                // Create activity record
-                await fetch("/api/task-activities", {
-                    method: "POST",
+                // STEP 3: Update leads_table.current_stage to "Proposal"
+                // This stage change triggers the PostgreSQL trigger to create the "Proposal and follow up with {client name}" task
+                // NOTE: The database trigger is the SINGLE SOURCE OF TRUTH for task creation.
+                // Frontend should NEVER create tasks directly - only update current_stage.
+                const leadUpdateRes = await fetch("/api/leads", {
+                    method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        lead_id: leadId,
-                        activity: `Task completed: ${task.title}`,
-                        type: "task",
-                        comments: "Demo completed - proceeding to next stage",
+                        id: leadId,
+                        current_stage: STAGE_CONSTANTS.PROPOSAL, // Explicitly set to "Proposal"
+                        status: STAGE_CONSTANTS.PROPOSAL, // Also update status for consistency
+                        next_stage_notes: null,
+                        // DO NOT send task title, task creation, or any tasks_table operations
+                        // The backend trigger handles all task creation based on current_stage changes
                     }),
                 });
+
+                if (!leadUpdateRes.ok) {
+                    throw new Error("Failed to update lead status");
+                }
+                
+                // Save to stage_notes table (optional, for historical tracking)
+                try {
+                    await fetch("/api/stage-notes", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            lead_id: leadId,
+                            current_stage_notes: "Demo completed - proceeding to next stage",
+                            next_stage_notes: null,
+                            outcome: "Success",
+                        }),
+                    });
+                } catch (stageNotesError) {
+                    // Don't fail the entire operation if stage notes save fails
+                    console.warn("Failed to save stage notes:", stageNotesError);
+                }
 
                 // Close modal
                 setDemoOutcomeModal({
@@ -1121,7 +1065,30 @@ export default function TasksPage() {
                 });
             } else {
                 // NO: Not Qualified - mark lead as Disqualified, complete task, but don't move stage
-                // Mark task as completed
+                // Get lead data to get assigned salesperson_id
+                const lead = leadsMap[leadId] || leadsMap[task.lead_id];
+                const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to || null;
+                
+                // STEP 1: Insert into task_activities
+                const activityRes = await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: "Stage completed",
+                        type: "manual",
+                        comments: disqualificationNote || "Lead not qualified",
+                        connect_through: null,
+                        source: "ui",
+                        salesperson_id: assignedSalespersonId,
+                    }),
+                });
+
+                if (!activityRes.ok) {
+                    throw new Error("Failed to save task activity");
+                }
+
+                // STEP 2: Mark task as completed
                 const taskRes = await fetch("/api/tasks", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -1135,7 +1102,7 @@ export default function TasksPage() {
                     throw new Error("Failed to complete task");
                 }
 
-                // Update lead status to Disqualified and set qualification
+                // STEP 3: Update lead status to Disqualified and set qualification
                 const leadUpdateRes = await fetch("/api/leads", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -1150,20 +1117,6 @@ export default function TasksPage() {
                 if (!leadUpdateRes.ok) {
                     throw new Error("Failed to update lead status");
                 }
-
-                // Save activity with disqualification note
-                await fetch("/api/task-activities", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        lead_id: leadId,
-                        activity: `Task completed: ${task.title} - Lead marked as Disqualified`,
-                        type: "task",
-                        comments: disqualificationNote || "Lead not qualified",
-                        connect_through: "",
-                        due_date: null,
-                    }),
-                });
 
                 // Save to stage_notes table
                 await fetch("/api/stage-notes", {
