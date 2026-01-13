@@ -1217,21 +1217,21 @@ export default function TasksTab({ leadId, leadName }) {
 
       {/* Task Completion Modal */}
       {taskCompletionModal.isOpen && taskCompletionModal.task && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6">
           <div
-            className={`w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-all ${
+            className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl transform transition-all max-h-[90vh] overflow-y-auto ${
               isDark ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
             }`}
           >
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <CheckCircle2 className="w-5 h-5 text-orange-500" />
+            <div className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10 flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Complete Task</h2>
-                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg font-semibold truncate">Complete Task</h2>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"} truncate`}>
                     {leadData?.status && getNextStage(leadData.status) && (
                       <>Moving to: <span className="font-medium text-orange-500">{getNextStage(leadData.status)}</span></>
                     )}
@@ -1265,13 +1265,13 @@ export default function TasksTab({ leadId, leadName }) {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
               {/* Connect Through */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                   Connect Through
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: "call", label: "Call", icon: "📞" },
                     { id: "email", label: "Email", icon: "✉️" },
@@ -1282,7 +1282,7 @@ export default function TasksTab({ leadId, leadName }) {
                       key={option.id}
                       type="button"
                       onClick={() => setTaskCompletionModal((prev) => ({ ...prev, connectThrough: option.id }))}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 ${
+                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
                         taskCompletionModal.connectThrough === option.id
                           ? "border-orange-500 bg-orange-500/10 text-orange-500"
                           : isDark
@@ -1290,7 +1290,7 @@ export default function TasksTab({ leadId, leadName }) {
                             : "border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <span className="text-lg">{option.icon}</span>
+                      <span className="text-base sm:text-lg">{option.icon}</span>
                       <span className="text-xs font-medium">{option.label}</span>
                     </button>
                   ))}
@@ -1304,7 +1304,7 @@ export default function TasksTab({ leadId, leadName }) {
                 </label>
                 <textarea
                   placeholder="Add a comment about completing this task..."
-                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
                     isDark
                       ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
                       : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
@@ -1326,7 +1326,7 @@ export default function TasksTab({ leadId, leadName }) {
                 </label>
                 <textarea
                   placeholder="Add comments about the next stage..."
-                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
+                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
                     isDark
                       ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
                       : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
@@ -1348,7 +1348,7 @@ export default function TasksTab({ leadId, leadName }) {
                 <select
                   value={taskCompletionModal.outcome}
                   onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, outcome: e.target.value }))}
-                  className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
+                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
                     isDark
                       ? "bg-[#262626] border-gray-700 text-gray-200"
                       : "bg-white border-gray-200 text-gray-900"
@@ -1373,7 +1373,7 @@ export default function TasksTab({ leadId, leadName }) {
                     <button
                       type="button"
                       onClick={() => setTaskCompletionModal((prev) => ({ ...prev, showCalendar: !prev.showCalendar }))}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all duration-200 ${
+                      className={`w-full flex items-center justify-between p-2.5 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
                         taskCompletionModal.dueDate
                           ? "border-orange-500 bg-orange-500/5"
                           : isDark
@@ -1381,13 +1381,13 @@ export default function TasksTab({ leadId, leadName }) {
                             : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${taskCompletionModal.dueDate ? "bg-orange-500/20 text-orange-500" : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${taskCompletionModal.dueDate ? "bg-orange-500/20 text-orange-500" : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                         </div>
-                        <span className={`text-sm ${taskCompletionModal.dueDate ? (isDark ? "text-gray-200" : "text-gray-900") : (isDark ? "text-gray-500" : "text-gray-400")}`}>
+                        <span className={`text-xs sm:text-sm truncate ${taskCompletionModal.dueDate ? (isDark ? "text-gray-200" : "text-gray-900") : (isDark ? "text-gray-500" : "text-gray-400")}`}>
                           {taskCompletionModal.dueDate 
                             ? new Date(taskCompletionModal.dueDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
                             : "Select due date for next task"
@@ -1401,12 +1401,12 @@ export default function TasksTab({ leadId, leadName }) {
 
                     {/* Calendar Dropdown */}
                     {taskCompletionModal.showCalendar && (
-                      <div className={`absolute z-50 mt-2 w-full p-4 rounded-2xl shadow-2xl border ${isDark ? "bg-[#1f1f1f] border-gray-700" : "bg-white border-gray-200"}`}>
+                      <div className={`absolute z-50 mt-2 w-full left-0 right-0 p-3 sm:p-4 rounded-2xl shadow-2xl border ${isDark ? "bg-[#1f1f1f] border-gray-700" : "bg-white border-gray-200"}`}>
                         {/* Quick Select Options */}
                         <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                           Quick Select
                         </p>
-                        <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="flex flex-wrap gap-2 mb-3 sm:mb-4">
                           {[
                             { label: "Today", days: 0 },
                             { label: "Tomorrow", days: 1 },
@@ -1437,16 +1437,16 @@ export default function TasksTab({ leadId, leadName }) {
                         </div>
                         
                         {/* Divider */}
-                        <div className={`flex items-center gap-3 my-4 ${isDark ? "text-gray-600" : "text-gray-300"}`}>
+                        <div className={`flex items-center gap-2 sm:gap-3 my-3 sm:my-4 ${isDark ? "text-gray-600" : "text-gray-300"}`}>
                           <div className="flex-1 h-px bg-current"></div>
                           <span className={`text-xs font-medium ${isDark ? "text-gray-500" : "text-gray-400"}`}>or pick a date</span>
                           <div className="flex-1 h-px bg-current"></div>
                         </div>
                         
                         {/* Custom Date Input */}
-                        <div className={`p-3 rounded-xl border-2 border-dashed ${isDark ? "border-gray-700 bg-gray-800/30" : "border-gray-200 bg-gray-50"}`}>
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-1.5 rounded-lg ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                        <div className={`p-2.5 sm:p-3 rounded-xl border-2 border-dashed ${isDark ? "border-gray-700 bg-gray-800/30" : "border-gray-200 bg-gray-50"}`}>
+                          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                            <div className={`p-1.5 rounded-lg flex-shrink-0 ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
                               <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
@@ -1495,11 +1495,11 @@ export default function TasksTab({ leadId, leadName }) {
             </div>
 
             {/* Footer */}
-            <div className={`flex justify-end gap-3 px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+            <div className={`flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
               <button
                 onClick={handleCancelTaskCompletion}
                 disabled={taskCompletionModal.isSubmitting}
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`w-full sm:w-auto px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isDark
                     ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -1510,7 +1510,7 @@ export default function TasksTab({ leadId, leadName }) {
               <button
                 onClick={handleConfirmTaskCompletion}
                 disabled={taskCompletionModal.isSubmitting || !taskCompletionModal.comment.trim()}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {taskCompletionModal.isSubmitting ? (
                   <>

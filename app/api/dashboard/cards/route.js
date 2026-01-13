@@ -194,6 +194,52 @@ export async function GET(request) {
       meetingScheduledLeadIds = filteredLeads.map(lead => lead.id);
     }
 
+    // Also count scheduled bookings from bookings table
+    let bookingsQuery = supabase.from("bookings")
+      .select("id, status, created_at, start_time, lead_id, host_user_id")
+      .eq("status", "scheduled")
+      .gte("created_at", startDateStr)
+      .lte("created_at", endDateStr);
+
+    const allBookingsForScheduled = await safeQuery(
+      () => bookingsQuery,
+      { data: [] }
+    );
+
+    let bookingsScheduledCount = 0;
+    if (allBookingsForScheduled.data && Array.isArray(allBookingsForScheduled.data)) {
+      // If filtering by sales person, we need to check the lead's assigned_to
+      if (salesPersonId) {
+        // Get all lead IDs from bookings
+        const bookingLeadIds = allBookingsForScheduled.data
+          .map(b => b.lead_id)
+          .filter(id => id !== null);
+        
+        if (bookingLeadIds.length > 0) {
+          // Check which leads are assigned to this sales person
+          const { data: assignedLeads } = await safeQuery(
+            () => supabase.from("leads_table")
+              .select("id")
+              .in("id", bookingLeadIds)
+              .eq("assigned_to", salesPersonId),
+            { data: [] }
+          );
+          
+          const assignedLeadIds = new Set((assignedLeads || []).map(l => l.id));
+          // Count bookings that have leads assigned to this sales person
+          bookingsScheduledCount = allBookingsForScheduled.data.filter(
+            b => b.lead_id && assignedLeadIds.has(b.lead_id)
+          ).length;
+        }
+      } else {
+        // Count all scheduled bookings if not filtering by sales person
+        bookingsScheduledCount = allBookingsForScheduled.data.length;
+      }
+    }
+
+    // Add bookings count to meeting scheduled count
+    meetingScheduled = meetingScheduled + bookingsScheduledCount;
+
     // 5. Meeting conducted count from meeting_status field (past 1 week)
     // Get all leads and filter case-insensitively for "Completed"
     let completedQuery = supabase.from("leads_table")
