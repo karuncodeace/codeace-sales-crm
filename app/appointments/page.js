@@ -407,7 +407,7 @@ export default function BookingsPage() {
                             </div>
                             <div>
                               <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                                Booking
+                                Meeting with {booking.lead_id || "N/A"}
                               </h3>
                             </div>
                           </div>
