@@ -385,7 +385,7 @@ export async function PATCH(request) {
                 comments: `Task "${title}" has been created due to status change`,
                 source: "user",
                 created_at: new Date().toISOString(),
-                salesperson_id: crmUser.id, // Store assigned sales person
+                assigned_to: crmUser.id, // Store assigned sales person
               });
 
             if (activityError) {

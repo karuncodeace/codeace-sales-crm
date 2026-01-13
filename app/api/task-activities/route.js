@@ -10,7 +10,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-  const { lead_id, activity, type, comments, connect_through, due_date, notes_type, salesperson_id, source } = body;
+  const { lead_id, activity, type, comments, connect_through, due_date, notes_type, salesperson_id, assigned_to, source } = body;
 
   if (!lead_id) {
     return Response.json({ error: "lead_id is required" }, { status: 400 });
@@ -29,7 +29,12 @@ export async function POST(request) {
   if (connect_through) insertData.connect_through = connect_through;
   if (due_date) insertData.due_date = due_date;
   if (notes_type) insertData.notes_type = notes_type;
-  if (salesperson_id) insertData.salesperson_id = salesperson_id; // Store assigned sales person
+  // Use assigned_to if provided, otherwise fallback to salesperson_id for backward compatibility
+  if (assigned_to) {
+    insertData.assigned_to = assigned_to;
+  } else if (salesperson_id) {
+    insertData.assigned_to = salesperson_id; // Map salesperson_id to assigned_to
+  }
 
     const { error } = await supabase
       .from("task_activities")

@@ -377,7 +377,7 @@ export default function TasksTab({ leadId, leadName }) {
           comments: comment, // Required: current stage comment
           connect_through: connectThrough || null, // Call / Email / WhatsApp / Meeting
           source: "ui", // Source is 'ui' for frontend-initiated activities
-          salesperson_id: assignedSalespersonId, // Assigned to logged-in user (from lead's assigned_to)
+          assigned_to: assignedSalespersonId, // Assigned to logged-in user (from lead's assigned_to)
         }),
       });
       
@@ -422,6 +422,44 @@ export default function TasksTab({ leadId, leadName }) {
         // NOTE: Task creation for next stage is handled by PostgreSQL triggers.
         // The trigger automatically creates the next task when current_stage is updated.
         // Frontend should NEVER create tasks directly to avoid duplicates and rollback errors.
+        
+        // STEP 4: Update next task's due_date if provided
+        // Wait a bit for the trigger to create the task, then update its due_date
+        if (dueDate && dueDate.trim()) {
+          // Wait 500ms for the database trigger to create the task
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Fetch the newly created task for this lead and next stage
+          const nextTaskRes = await fetch(`/api/tasks?lead_id=${leadId}`);
+          if (nextTaskRes.ok) {
+            const nextTasksData = await nextTaskRes.json();
+            // Find the task with the next stage (most recently created pending task)
+            const nextTask = Array.isArray(nextTasksData) 
+              ? nextTasksData
+                  .filter(t => t.status?.toLowerCase() !== "completed" && (t.stage === nextStage || t.lead_stage === nextStage))
+                  .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+              : null;
+            
+            if (nextTask && nextTask.id) {
+              // Convert date to ISO format if needed
+              const dueDateISO = dueDate.includes('T') ? dueDate : `${dueDate}T00:00:00.000Z`;
+              
+              // Update the next task's due_date
+              const updateDueDateRes = await fetch("/api/tasks", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  id: nextTask.id,
+                  due_date: dueDateISO,
+                }),
+              });
+              
+              if (!updateDueDateRes.ok) {
+                console.warn("Failed to update next task due_date, but task completion succeeded");
+              }
+            }
+          }
+        }
       }
       
       // Save to stage_notes table (optional, for historical tracking)
@@ -1324,6 +1362,136 @@ export default function TasksTab({ leadId, leadName }) {
                   Select the outcome of this stage.
                 </p>
               </div>
+
+              {/* Next Task Due Date */}
+              {leadData?.status && getNextStage(leadData.status) && (
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    Next Task Due Date
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setTaskCompletionModal((prev) => ({ ...prev, showCalendar: !prev.showCalendar }))}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all duration-200 ${
+                        taskCompletionModal.dueDate
+                          ? "border-orange-500 bg-orange-500/5"
+                          : isDark
+                            ? "border-gray-700 hover:border-gray-600"
+                            : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${taskCompletionModal.dueDate ? "bg-orange-500/20 text-orange-500" : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <span className={`text-sm ${taskCompletionModal.dueDate ? (isDark ? "text-gray-200" : "text-gray-900") : (isDark ? "text-gray-500" : "text-gray-400")}`}>
+                          {taskCompletionModal.dueDate 
+                            ? new Date(taskCompletionModal.dueDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                            : "Select due date for next task"
+                          }
+                        </span>
+                      </div>
+                      <svg className={`w-5 h-5 transition-transform ${taskCompletionModal.showCalendar ? "rotate-180" : ""} ${isDark ? "text-gray-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Calendar Dropdown */}
+                    {taskCompletionModal.showCalendar && (
+                      <div className={`absolute z-50 mt-2 w-full p-4 rounded-2xl shadow-2xl border ${isDark ? "bg-[#1f1f1f] border-gray-700" : "bg-white border-gray-200"}`}>
+                        {/* Quick Select Options */}
+                        <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          Quick Select
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {[
+                            { label: "Today", days: 0 },
+                            { label: "Tomorrow", days: 1 },
+                            { label: "In 3 days", days: 3 },
+                            { label: "In a week", days: 7 },
+                          ].map((option) => {
+                            const date = new Date();
+                            date.setDate(date.getDate() + option.days);
+                            const dateStr = date.toISOString().split('T')[0];
+                            const isSelected = taskCompletionModal.dueDate === dateStr;
+                            return (
+                              <button
+                                key={option.label}
+                                type="button"
+                                onClick={() => setTaskCompletionModal((prev) => ({ ...prev, dueDate: dateStr, showCalendar: false }))}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                                  isSelected
+                                    ? "bg-orange-500 text-white"
+                                    : isDark
+                                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Divider */}
+                        <div className={`flex items-center gap-3 my-4 ${isDark ? "text-gray-600" : "text-gray-300"}`}>
+                          <div className="flex-1 h-px bg-current"></div>
+                          <span className={`text-xs font-medium ${isDark ? "text-gray-500" : "text-gray-400"}`}>or pick a date</span>
+                          <div className="flex-1 h-px bg-current"></div>
+                        </div>
+                        
+                        {/* Custom Date Input */}
+                        <div className={`p-3 rounded-xl border-2 border-dashed ${isDark ? "border-gray-700 bg-gray-800/30" : "border-gray-200 bg-gray-50"}`}>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-1.5 rounded-lg ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                              <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                            <span className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                              Custom Date
+                            </span>
+                          </div>
+                          <input
+                            type="date"
+                            value={taskCompletionModal.dueDate}
+                            onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, dueDate: e.target.value, showCalendar: false }))}
+                            className={`w-full p-3 rounded-lg border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 cursor-pointer ${
+                              isDark
+                                ? "bg-[#262626] border-gray-600 text-gray-200 hover:border-gray-500"
+                                : "bg-white border-gray-200 text-gray-900 hover:border-gray-300"
+                            }`}
+                          />
+                        </div>
+                        
+                        {/* Clear button */}
+                        {taskCompletionModal.dueDate && (
+                          <button
+                            type="button"
+                            onClick={() => setTaskCompletionModal((prev) => ({ ...prev, dueDate: "" }))}
+                            className={`mt-3 w-full py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                              isDark
+                                ? "text-red-400 hover:bg-red-500/10 border border-red-500/20"
+                                : "text-red-500 hover:bg-red-50 border border-red-200"
+                            }`}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Clear date
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    Optional: Set due date for the next task that will be created.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Footer */}

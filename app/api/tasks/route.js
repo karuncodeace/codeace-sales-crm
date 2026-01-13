@@ -168,7 +168,7 @@ export async function POST(request) {
       comments: comments || `Task "${title || type || "Task"}" has been created`,
       source: "user",
       created_at: new Date().toISOString(),
-      salesperson_id: finalSalesPersonId, // Store assigned sales person (task_activities uses salesperson_id)
+      assigned_to: finalSalesPersonId, // Store assigned sales person (task_activities uses assigned_to)
     };
 
     // Add optional fields
