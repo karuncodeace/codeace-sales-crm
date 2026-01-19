@@ -25,18 +25,24 @@ function NotesTab({ theme, leadId, leadName }) {
 
     // Format timestamp for display (using Asia/Calcutta timezone)
     const formatNoteDate = (dateString) => {
-        if (!dateString) return "—";
+        if (!dateString) return { date: "—", time: "—" };
         const date = new Date(dateString);
-        const options = {
+        const dateOptions = {
             timeZone: 'Asia/Calcutta',
             year: 'numeric',
             month: 'short',
-            day: 'numeric',
+            day: 'numeric'
+        };
+        const timeOptions = {
+            timeZone: 'Asia/Calcutta',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true
         };
-        return date.toLocaleString('en-IN', options);
+        return {
+            date: date.toLocaleDateString('en-IN', dateOptions),
+            time: date.toLocaleTimeString('en-IN', timeOptions).toLowerCase()
+        };
     };
 
     const formatRelativeTime = (dateString) => {
@@ -100,7 +106,7 @@ function NotesTab({ theme, leadId, leadName }) {
             user: getDisplayName(act.source),
             userInitials: getInitials(act.source),
             createdAt: act.created_at,
-            formattedDate: formatNoteDate(act.created_at),
+            dateTime: formatNoteDate(act.created_at),
             relativeTime: formatRelativeTime(act.created_at),
             notesType: (act.notes_type || "general").toLowerCase(),
         }))
@@ -401,14 +407,14 @@ function NotesTab({ theme, leadId, leadName }) {
 
             {/* Notes Grid Layout */}
             {filteredNotes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredNotes.map((note) => (
                         <div
                             key={note.id}
-                            className={`group relative rounded-xl p-5 transition-all duration-200 hover:shadow-lg border ${
+                            className={`group relative rounded-xl p-5 transition-all duration-200 hover:shadow-xl border ${
                                 theme === "dark" 
-                                    ? "bg-transparent border-gray-700 hover:border-gray-600" 
-                                    : "bg-white border-gray-200 hover:border-gray-300 shadow-sm"
+                                    ? "bg-[#262626] border-gray-700 hover:border-orange-500/30 hover:bg-[#2a2a2a]" 
+                                    : "bg-white border-gray-200 hover:border-orange-200 hover:shadow-md"
                             }`}
                         >
                             {editingNoteId === note.id ? (
@@ -449,79 +455,96 @@ function NotesTab({ theme, leadId, leadName }) {
                             ) : (
                                 <>
                                     {/* Note Header */}
-                                    <div className="flex items-start gap-3 mb-3">
-                                        <div className={`p-2 rounded-lg flex-shrink-0 ${theme === "dark" ? "bg-orange-500/20" : "bg-orange-100"}`}>
-                                            <StickyNote className={`w-4 h-4 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-[11px] px-2 py-0.5 rounded-full uppercase tracking-wide ${
-                                                    theme === "dark"
-                                                        ? "bg-gray-800 text-orange-300 border border-gray-700"
-                                                        : "bg-white text-orange-700 border border-orange-100"
-                                                }`}>
-                                                    {note.notesType === "call" && "Call Notes"}
-                                                    {note.notesType === "meeting" && "Meeting Notes"}
-                                                    {note.notesType === "general" && "General Notes"}
-                                                </span>
-                                                <span className={`text-[11px] ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                                    {note.formattedDate}
-                                                </span>
+                                    <div className="mb-4">
+                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                            <div className={`p-2.5 rounded-lg flex-shrink-0 ${theme === "dark" ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                                                <StickyNote className={`w-5 h-5 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
                                             </div>
-                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                                                {note.content}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Note Footer */}
-                                    <div className={`flex items-center justify-between pt-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${theme === "dark" ? "bg-orange-900/40 text-orange-400" : "bg-orange-100 text-orange-600"}`}>
-                                                {note.userInitials}
-                                            </div>
-                                            <div>
-                                                <p className={`text-xs font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                                    {note.user}
-                                                </p>
-                                                <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                                    {note.relativeTime}
-                                                </p>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingNoteId(note.id);
+                                                        setEditNoteText(note.content);
+                                                    }}
+                                                    className={`p-1.5 rounded-lg transition-colors ${
+                                                        theme === "dark" 
+                                                            ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200" 
+                                                            : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                                                    }`}
+                                                    title="Edit note"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteNote(note.id)}
+                                                    disabled={deletingNoteId === note.id}
+                                                    className={`p-1.5 rounded-lg transition-colors ${
+                                                        theme === "dark" 
+                                                            ? "hover:bg-red-900/20 text-gray-400 hover:text-red-400" 
+                                                            : "hover:bg-red-50 text-gray-500 hover:text-red-600"
+                                                    }`}
+                                                    title="Delete note"
+                                                >
+                                                    {deletingNoteId === note.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4" />
+                                                    )}
+                                                </button>
                                             </div>
                                         </div>
                                         
-                                        {/* Action Buttons */}
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingNoteId(note.id);
-                                                    setEditNoteText(note.content);
-                                                }}
-                                                className={`p-1.5 rounded-lg transition-colors ${
-                                                    theme === "dark" 
-                                                        ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200" 
-                                                        : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                                                }`}
-                                                title="Edit note"
-                                            >
-                                                <Edit2 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteNote(note.id)}
-                                                disabled={deletingNoteId === note.id}
-                                                className={`p-1.5 rounded-lg transition-colors ${
-                                                    theme === "dark" 
-                                                        ? "hover:bg-red-900/20 text-gray-400 hover:text-red-400" 
-                                                        : "hover:bg-red-50 text-gray-500 hover:text-red-600"
-                                                }`}
-                                                title="Delete note"
-                                            >
-                                                {deletingNoteId === note.id ? (
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                )}
-                                            </button>
+                                        {/* Note Type Badge */}
+                                        <div className="mb-3">
+                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
+                                                note.notesType === "call"
+                                                    ? theme === "dark"
+                                                        ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                                                    : note.notesType === "meeting"
+                                                    ? theme === "dark"
+                                                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                                        : "bg-purple-50 text-purple-700 border border-purple-200"
+                                                    : theme === "dark"
+                                                        ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                                                        : "bg-orange-50 text-orange-700 border border-orange-200"
+                                            }`}>
+                                                {note.notesType === "call" && "Call Notes"}
+                                                {note.notesType === "meeting" && "Meeting Notes"}
+                                                {note.notesType === "general" && "General Notes"}
+                                            </span>
+                                        </div>
+
+                                        {/* Date and Time */}
+                                        <div className={`text-xs mb-4 space-y-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                                            <div>{note.dateTime?.date || "—"}</div>
+                                            <div>{note.dateTime?.time || ""}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Note Content */}
+                                    <div className="mb-4">
+                                        <p className={`text-sm leading-relaxed whitespace-pre-wrap line-clamp-4 ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
+                                            {note.content}
+                                        </p>
+                                    </div>
+
+                                    {/* Note Footer */}
+                                    <div className={`flex items-center gap-3 pt-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                                            theme === "dark" 
+                                                ? "bg-orange-500/20 text-orange-400" 
+                                                : "bg-orange-100 text-orange-600"
+                                        }`}>
+                                            {note.userInitials}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-xs font-medium truncate ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                                                {note.user}
+                                            </p>
+                                            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                {note.relativeTime}
+                                            </p>
                                         </div>
                                     </div>
                                 </>

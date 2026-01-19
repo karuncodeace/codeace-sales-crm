@@ -29,7 +29,75 @@ export async function GET(request) {
     const endDateParam = searchParams.get("endDate");
 
     // Determine if we need to filter by sales person
-    const salesPersonId = crmUser.role === "sales" ? crmUser.salesPersonId : null;
+    // Validate sales person ID for sales users - this is critical for correct filtering
+    let salesPersonId = null;
+    if (crmUser.role === "sales") {
+      salesPersonId = crmUser.salesPersonId;
+      
+      // Validate that sales person ID exists - log warning if missing
+      if (!salesPersonId) {
+        console.warn("⚠️ Dashboard Cards API: Sales user missing salesPersonId", {
+          userId: crmUser.id,
+          email: crmUser.email,
+          role: crmUser.role,
+          salesPersonId: crmUser.salesPersonId
+        });
+        
+        // Try to fetch sales person ID directly as fallback
+        try {
+          const { data: salesPerson } = await supabase
+            .from("sales_persons")
+            .select("id")
+            .eq("user_id", crmUser.id)
+            .maybeSingle();
+          
+          if (salesPerson && salesPerson.id) {
+            salesPersonId = salesPerson.id;
+            console.log("✅ Dashboard Cards API: Retrieved salesPersonId from fallback query", {
+              userId: crmUser.id,
+              salesPersonId: salesPersonId
+            });
+          } else {
+            console.error("❌ Dashboard Cards API: Cannot find sales_person_id for sales user", {
+              userId: crmUser.id,
+              email: crmUser.email
+            });
+            // Return empty data instead of failing - prevents dashboard from breaking
+            return Response.json({
+              leadsGenerated: 0,
+              firstCallDone: 0,
+              qualifiedLeads: 0,
+              meetingScheduled: 0,
+              meetingConducted: 0,
+              followUpCalls: 0,
+              proposalsSent: 0,
+              conversionRate: 0,
+              leadIds: [],
+              error: "Sales person ID not found - please contact admin"
+            });
+          }
+        } catch (fallbackError) {
+          console.error("❌ Dashboard Cards API: Fallback query failed", fallbackError);
+          return Response.json({
+            leadsGenerated: 0,
+            firstCallDone: 0,
+            qualifiedLeads: 0,
+            meetingScheduled: 0,
+            meetingConducted: 0,
+            followUpCalls: 0,
+            proposalsSent: 0,
+            conversionRate: 0,
+            leadIds: [],
+            error: "Failed to retrieve sales person information"
+          });
+        }
+      } else {
+        console.log("✅ Dashboard Cards API: Using salesPersonId", {
+          userId: crmUser.id,
+          salesPersonId: salesPersonId
+        });
+      }
+    }
 
     // Calculate date range - use filter params if provided, otherwise default to past 7 days
     let startDate, endDate;
@@ -58,12 +126,34 @@ export async function GET(request) {
       try {
         const result = await queryFn();
         if (result.error) {
+          console.error("Query error:", result.error);
           return defaultValue;
         }
         return result;
       } catch (error) {
+        console.error("Query exception:", error);
         return defaultValue;
       }
+    };
+
+    // Helper function to apply sales person filtering consistently
+    // This ensures all queries use the same filtering logic
+    const applySalesPersonFilter = (query, tableName) => {
+      if (!salesPersonId) {
+        return query; // No filtering needed for admin users
+      }
+      
+      // Apply filtering based on table structure
+      if (tableName === "leads_table") {
+        return query.eq("assigned_to", salesPersonId);
+      } else if (tableName === "tasks_table") {
+        return query.eq("sales_person_id", salesPersonId);
+      } else if (tableName === "appointments") {
+        return query.eq("salesperson_id", salesPersonId);
+      }
+      
+      // For other tables, return query as-is
+      return query;
     };
 
     // 1. Total leads from leads_table (filtered by date range and sales person if applicable)
@@ -72,10 +162,8 @@ export async function GET(request) {
       .gte("created_at", startDateStr)
       .lte("created_at", endDateStr);
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      leadsQuery = leadsQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    leadsQuery = applySalesPersonFilter(leadsQuery, "leads_table");
 
     const { count: leadsGenerated = 0 } = await safeQuery(
       () => leadsQuery,
@@ -91,10 +179,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      firstCallQuery = firstCallQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    firstCallQuery = applySalesPersonFilter(firstCallQuery, "leads_table");
 
     const allLeadsForFirstCall = await safeQuery(
       () => firstCallQuery,
@@ -129,10 +215,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      qualifiedLeadsQuery = qualifiedLeadsQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    qualifiedLeadsQuery = applySalesPersonFilter(qualifiedLeadsQuery, "leads_table");
 
     const qualifiedLeadsResult = await safeQuery(
       () => qualifiedLeadsQuery,
@@ -165,10 +249,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      scheduledQuery = scheduledQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    scheduledQuery = applySalesPersonFilter(scheduledQuery, "leads_table");
 
     const allLeadsForScheduled = await safeQuery(
       () => scheduledQuery,
@@ -247,10 +329,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      completedQuery = completedQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    completedQuery = applySalesPersonFilter(completedQuery, "leads_table");
 
     const allLeadsForCompleted = await safeQuery(
       () => completedQuery,
@@ -284,10 +364,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      proposalsQuery = proposalsQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    proposalsQuery = applySalesPersonFilter(proposalsQuery, "leads_table");
 
     const proposalsSentResult = await safeQuery(
       () => proposalsQuery,
@@ -325,10 +403,8 @@ export async function GET(request) {
       .or(`last_attempted_at.gte."${startDateStr}",created_at.gte."${startDateStr}"`)
       .order('created_at', { ascending: false });
 
-    // Filter by sales person if user is sales
-    if (salesPersonId) {
-      conversionQuery = conversionQuery.eq("assigned_to", salesPersonId);
-    }
+    // Apply sales person filtering using helper function
+    conversionQuery = applySalesPersonFilter(conversionQuery, "leads_table");
 
     const allLeadsForConversion = await safeQuery(
       () => conversionQuery,
@@ -384,6 +460,25 @@ export async function GET(request) {
       conversionRate: conversionRate,
       leadIds: uniqueLeadIds
     };
+
+    // Log final results for debugging
+    console.log("✅ Dashboard Cards API: Final counts", {
+      userId: crmUser.id,
+      role: crmUser.role,
+      salesPersonId: salesPersonId,
+      dateRange: { start: startDateStr, end: endDateStr },
+      counts: {
+        leadsGenerated: data.leadsGenerated,
+        firstCallDone: data.firstCallDone,
+        qualifiedLeads: data.qualifiedLeads,
+        meetingScheduled: data.meetingScheduled,
+        meetingConducted: data.meetingConducted,
+        followUpCalls: data.followUpCalls,
+        proposalsSent: data.proposalsSent,
+        conversionRate: data.conversionRate
+      },
+      uniqueLeadIdsCount: uniqueLeadIds.length
+    });
 
     return Response.json(data);
   } catch (error) {
