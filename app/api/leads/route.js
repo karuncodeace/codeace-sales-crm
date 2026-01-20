@@ -26,6 +26,9 @@ export async function GET() {
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
+  // Exclude disqualified leads from the UI
+  query = query.neq("status", "Disqualified");
+  
   // Order by created_at (descending to show newest leads first)
   const { data, error } = await query.order("created_at", { ascending: false });
 

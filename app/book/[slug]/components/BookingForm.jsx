@@ -20,7 +20,14 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
   // Fetch leads for dropdown
   const { data: leadsData, error: leadsError, isLoading: leadsLoading } = useSWR("/api/leads", fetcher);
-  const leads = Array.isArray(leadsData) ? leadsData : [];
+  // Filter out disqualified leads from the UI
+  const leads = Array.isArray(leadsData) 
+    ? leadsData.filter((lead) => 
+        lead.status !== "Disqualified" && 
+        lead.status !== "Junk" && 
+        lead.status !== "Junk Lead"
+      )
+    : [];
 
   // Close dropdown when clicking outside
   useEffect(() => {

@@ -239,8 +239,12 @@ export default function LeadsTable() {
   const filteredLeads = useMemo(() => {
     let result = leadData;
 
-    // Exclude junk leads from the table
-    result = result.filter((lead) => lead.status !== "Junk Lead");
+    // Exclude junk leads and disqualified leads from the table
+    result = result.filter((lead) => 
+      lead.status !== "Junk Lead" && 
+      lead.status !== "Disqualified" &&
+      lead.status !== "Junk"
+    );
 
     // Apply advanced filters
     if (advancedFilters.source) {
