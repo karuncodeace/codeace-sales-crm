@@ -47,10 +47,10 @@ export async function GET() {
 
     // Initialize quarter counters
     const quarterData = {
-      1: { calls: 0, meetings: 0, conversions: 0 }, // Q1: April - June
-      2: { calls: 0, meetings: 0, conversions: 0 }, // Q2: July - September
-      3: { calls: 0, meetings: 0, conversions: 0 }, // Q3: October - December
-      4: { calls: 0, meetings: 0, conversions: 0 }, // Q4: January - March
+      1: { calls: 0, meetings: 0, conversions: 0, leads: 0 }, // Q1: April - June
+      2: { calls: 0, meetings: 0, conversions: 0, leads: 0 }, // Q2: July - September
+      3: { calls: 0, meetings: 0, conversions: 0, leads: 0 }, // Q3: October - December
+      4: { calls: 0, meetings: 0, conversions: 0, leads: 0 }, // Q4: January - March
     };
 
     // Fetch calls: leads with first_call_done = "Done" (handle multiple formats)
@@ -130,6 +130,24 @@ export async function GET() {
       });
     }
 
+    // Fetch total leads: count all leads created in each quarter
+    const { data: allLeads, error: leadsError } = await supabase
+      .from("leads_table")
+      .select("created_at");
+
+    if (!leadsError && allLeads) {
+      allLeads.forEach((lead) => {
+        if (lead.created_at) {
+          const leadDate = new Date(lead.created_at);
+          // Only count if within fiscal year range
+          if (leadDate >= startDate && leadDate <= endDate) {
+            const quarter = getQuarter(leadDate);
+            quarterData[quarter].leads++;
+          }
+        }
+      });
+    }
+
     // Format data for chart (Q1, Q2, Q3, Q4 order)
     const data = {
       calls: [
@@ -150,6 +168,12 @@ export async function GET() {
         quarterData[3].conversions,
         quarterData[4].conversions,
       ],
+      leads: [
+        quarterData[1].leads,
+        quarterData[2].leads,
+        quarterData[3].leads,
+        quarterData[4].leads,
+      ],
       categories: ["Q1", "Q2", "Q3", "Q4"],
     };
 
@@ -157,6 +181,7 @@ export async function GET() {
     while (data.calls.length < 4) data.calls.push(0);
     while (data.meetings.length < 4) data.meetings.push(0);
     while (data.conversions.length < 4) data.conversions.push(0);
+    while (data.leads.length < 4) data.leads.push(0);
 
     return Response.json(data);
   } catch (error) {
@@ -165,6 +190,7 @@ export async function GET() {
         calls: [0, 0, 0, 0],
         meetings: [0, 0, 0, 0],
         conversions: [0, 0, 0, 0],
+        leads: [0, 0, 0, 0],
         categories: ["Q1", "Q2", "Q3", "Q4"],
       },
       { status: 500 }

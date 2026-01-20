@@ -17,6 +17,7 @@ export default function KPICallBarChart() {
     calls: [420, 380, 450, 400],
     meetings: [95, 85, 110, 100],
     conversions: [58, 52, 68, 60],
+    leads: [500, 480, 520, 490],
     categories: ["Q1", "Q2", "Q3", "Q4"]
   };
 
@@ -153,6 +154,9 @@ export default function KPICallBarChart() {
   const conversionsData = Array.isArray(data.conversions) 
     ? data.conversions.map(val => Number(val) || 0).slice(0, 4) 
     : [0, 0, 0, 0];
+  const leadsData = Array.isArray(data.leads) 
+    ? data.leads.map(val => Number(val) || 0).slice(0, 4) 
+    : [0, 0, 0, 0];
   const categories = Array.isArray(data.categories) && data.categories.length === 4
     ? data.categories
     : ["Q1", "Q2", "Q3", "Q4"];
@@ -161,6 +165,7 @@ export default function KPICallBarChart() {
   while (callsData.length < 4) callsData.push(0);
   while (meetingsData.length < 4) meetingsData.push(0);
   while (conversionsData.length < 4) conversionsData.push(0);
+  while (leadsData.length < 4) leadsData.push(0);
 
   const chartCards = useMemo(
     () => [
@@ -171,6 +176,7 @@ export default function KPICallBarChart() {
         type: "bar",
         height: 400,
         series: [
+          { name: "Leads", data: leadsData },
           { name: "Calls", data: callsData },
           { name: "Meetings", data: meetingsData },
           { name: "Conversions", data: conversionsData },
@@ -180,8 +186,8 @@ export default function KPICallBarChart() {
 
           // Color theme based on mode
           colors: isDark
-            ? ["#60a5fa", "#34d399", "#fbbf24"] // brighter in dark mode
-            : ["#3B82F6", "#10B981", "#F59E0B"], // original CRM palette
+            ? ["#a78bfa", "#60a5fa", "#34d399", "#fbbf24"] // brighter in dark mode (purple, blue, green, orange)
+            : ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B"], // original CRM palette (purple, blue, green, orange)
 
           xaxis: {
             ...baseOptions.xaxis,
@@ -204,7 +210,7 @@ export default function KPICallBarChart() {
         },
       },
     ],
-    [baseOptions, isDark, callsData, meetingsData, conversionsData, categories]
+    [baseOptions, isDark, callsData, meetingsData, conversionsData, leadsData, categories]
   );
 
   // No loading state needed - fallbackData ensures we always have data
