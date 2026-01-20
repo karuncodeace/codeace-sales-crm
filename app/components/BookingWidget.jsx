@@ -9,7 +9,8 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
   const isDark = theme === "dark";
 
   // Generate the booking URL
-  const eventTypeId = callType?.id || "discovery";
+  // Use slug if available, otherwise fall back to id
+  const eventTypeId = callType?.slug || callType?.id || "discovery";
   const baseUrl = getCalEventUrl(eventTypeId);
   const params = new URLSearchParams();
   
@@ -43,7 +44,13 @@ export default function BookingWidget({ leadId, leadName, leadEmail, salesperson
             Ready to Book?
           </h3>
           <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            {callType?.label ? `Schedule your ${callType.label.toLowerCase()}` : "Schedule your meeting"} by clicking the button below.
+            {callType?.id === "demo-call" || callType?.slug === "demo-call" || callType?.id === "discovery-call" || callType?.id === "discovery" 
+              ? "Schedule your Demo Meeting" 
+              : callType?.id === "discussion-call" || callType?.slug === "discussion-call" || callType?.id === "sales-call" || callType?.id === "sales"
+              ? "Schedule your Discussion Meeting"
+              : callType?.label 
+              ? `Schedule your ${callType.label.toLowerCase()}` 
+              : "Schedule your meeting"} by clicking the button below.
           </p>
         </div>
 

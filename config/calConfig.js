@@ -15,6 +15,8 @@ export const CAL_EVENT_TYPES = {
   discovery: "admin/discovery-call",
   "kick-off": "admin/this-is-kick-off-call",
   sales: "admin/sales-call", // Assuming sales-call exists, adjust if needed
+  "demo-call": "admin/demo-call",
+  "discussion-call": "admin/discussion-call",
 };
 
 // Get the full booking URL for an event type
