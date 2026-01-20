@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTheme } from "../../../context/themeContext";
 import useSWR from "swr";
+import { Search, X } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
@@ -13,10 +14,48 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     phone: "",
     lead_id: "",
   });
+  const [leadSearchTerm, setLeadSearchTerm] = useState("");
+  const [isLeadDropdownOpen, setIsLeadDropdownOpen] = useState(false);
+  const leadDropdownRef = useRef(null);
 
   // Fetch leads for dropdown
   const { data: leadsData, error: leadsError, isLoading: leadsLoading } = useSWR("/api/leads", fetcher);
   const leads = Array.isArray(leadsData) ? leadsData : [];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (leadDropdownRef.current && !leadDropdownRef.current.contains(event.target)) {
+        setIsLeadDropdownOpen(false);
+      }
+    };
+
+    if (isLeadDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isLeadDropdownOpen]);
+
+  // Filter leads based on search term
+  const filteredLeads = useMemo(() => {
+    if (!leadSearchTerm.trim()) return leads;
+    
+    const searchLower = leadSearchTerm.toLowerCase();
+    return leads.filter((lead) => {
+      const leadId = (lead.id || "").toLowerCase();
+      const leadName = ((lead.name || lead.lead_name || "")).toLowerCase();
+      const contactName = ((lead.contactName || lead.contact_name || "")).toLowerCase();
+      
+      return (
+        leadId.includes(searchLower) ||
+        leadName.includes(searchLower) ||
+        contactName.includes(searchLower)
+      );
+    });
+  }, [leads, leadSearchTerm]);
 
   // Convert slug to title (e.g., "discovery-call" -> "Discovery Call")
   const slugToTitle = (slug) => {
@@ -53,8 +92,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
   };
 
   // Handle lead selection - auto-fill email and phone
-  const handleLeadChange = (e) => {
-    const leadId = e.target.value;
+  const handleLeadSelect = (leadId) => {
     setFormData((prev) => ({ ...prev, lead_id: leadId || "" }));
     
     // Clear error for lead_id
@@ -73,6 +111,10 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           email: selectedLead.email || prev.email || "",
           phone: selectedLead.phone || prev.phone || "",
         }));
+        // Update search term to show selected lead
+        const contactName = selectedLead.contactName || selectedLead.contact_name || "";
+        const leadName = selectedLead.name || selectedLead.lead_name || "";
+        setLeadSearchTerm(`${leadId}, ${contactName}, ${leadName}`);
       }
     } else {
       // Clear email and phone if no lead is selected
@@ -82,8 +124,32 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         email: "",
         phone: "",
       }));
+      setLeadSearchTerm("");
     }
+    setIsLeadDropdownOpen(false);
   };
+
+  // Format lead display: "lead no, contact name, lead name"
+  const formatLeadDisplay = (lead) => {
+    const leadId = lead.id || "";
+    const contactName = lead.contactName || lead.contact_name || "";
+    const leadName = lead.name || lead.lead_name || "";
+    return `${leadId}, ${contactName}, ${leadName}`;
+  };
+
+  // Update search term when formData.lead_id changes (e.g., from external source)
+  useEffect(() => {
+    if (formData.lead_id && leads.length > 0) {
+      const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+      if (selectedLead) {
+        const formatted = formatLeadDisplay(selectedLead);
+        // Only update if the search term doesn't already match
+        setLeadSearchTerm((prev) => prev !== formatted ? formatted : prev);
+      }
+    } else if (!formData.lead_id) {
+      setLeadSearchTerm("");
+    }
+  }, [formData.lead_id, leads]);
 
   const validate = () => {
     const newErrors = {};
@@ -228,43 +294,91 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Lead Selection - First Field */}
-        <div>
+        {/* Lead Selection - First Field with Search */}
+        <div className="relative" ref={leadDropdownRef}>
           <label
-            htmlFor="lead_id"
+            htmlFor="lead_search"
             className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
             Lead <span className="text-red-500">*</span>
           </label>
-          <select
-            id="lead_id"
-            name="lead_id"
-            value={formData.lead_id || ""}
-            onChange={handleLeadChange}
-            disabled={leadsLoading || !selectedSlot}
-            className={`
-              w-full px-4 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
-              ${
-                errors.lead_id
-                  ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
-                  : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
-              }
-              ${leadsLoading || !selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
-              ${theme === "light" ? "text-gray-900" : "text-white"}
-            `}
-          >
-            <option value="">
-              {leadsLoading ? "Loading leads..." : "Select a lead"}
-            </option>
-            {leads.length === 0 && !leadsLoading && (
-              <option value="" disabled>No leads available</option>
+          <div className="relative">
+            <div className="relative">
+              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${theme === "light" ? "text-gray-400" : "text-gray-500"}`} />
+              <input
+                type="text"
+                id="lead_search"
+                value={leadSearchTerm}
+                onChange={(e) => {
+                  setLeadSearchTerm(e.target.value);
+                  setIsLeadDropdownOpen(true);
+                  if (!e.target.value) {
+                    setFormData((prev) => ({ ...prev, lead_id: "" }));
+                  }
+                }}
+                onFocus={() => setIsLeadDropdownOpen(true)}
+                disabled={leadsLoading || !selectedSlot}
+                placeholder={leadsLoading ? "Loading leads..." : "Search by lead no, contact name, or lead name"}
+                className={`
+                  w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
+                  ${
+                    errors.lead_id
+                      ? `${theme === "light" ? "border-red-300" : "border-red-500"}`
+                      : `${theme === "light" ? "border-gray-200" : "border-gray-700"}`
+                  }
+                  ${leadsLoading || !selectedSlot ? `${theme === "light" ? "bg-gray-100 cursor-not-allowed" : "bg-[#262626] cursor-not-allowed"}` : `${theme === "light" ? "bg-white" : "bg-[#262626]"}`}
+                  ${theme === "light" ? "text-gray-900" : "text-white"}
+                `}
+              />
+              {leadSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLeadSearchTerm("");
+                    setFormData((prev) => ({ ...prev, lead_id: "" }));
+                    setIsLeadDropdownOpen(false);
+                  }}
+                  className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${theme === "light" ? "text-gray-400 hover:text-gray-600" : "text-gray-500 hover:text-gray-300"}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Dropdown List */}
+            {isLeadDropdownOpen && !leadsLoading && selectedSlot && (
+              <div className={`absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-md border shadow-lg ${
+                theme === "light" 
+                  ? "bg-white border-gray-200" 
+                  : "bg-[#262626] border-gray-700"
+              }`}>
+                {filteredLeads.length === 0 ? (
+                  <div className={`px-4 py-3 text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
+                    No leads found
+                  </div>
+                ) : (
+                  filteredLeads.map((lead) => (
+                    <button
+                      key={lead.id}
+                      type="button"
+                      onClick={() => handleLeadSelect(lead.id)}
+                      className={`w-full text-left px-4 py-2 hover:bg-orange-500 hover:text-white transition-colors ${
+                        formData.lead_id === lead.id
+                          ? theme === "light"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-orange-500/20 text-orange-400"
+                          : theme === "light"
+                            ? "text-gray-900"
+                            : "text-white"
+                      }`}
+                    >
+                      {formatLeadDisplay(lead)}
+                    </button>
+                  ))
+                )}
+              </div>
             )}
-            {leads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.id} - {lead.name || lead.lead_name || "Unnamed Lead"}
-              </option>
-            ))}
-          </select>
+          </div>
           {errors.lead_id && (
             <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.lead_id}</p>
           )}
