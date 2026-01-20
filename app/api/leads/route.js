@@ -230,7 +230,7 @@ export async function PATCH(request) {
     }
     
     const body = await request.json();
-    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes, first_call_done, lead_qualification, meeting_status } = body;
+    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes, first_call_done, lead_qualification, meeting_status, response_status } = body;
 
     if (!id) {
       return Response.json({ error: "Lead ID is required" }, { status: 400 });
@@ -239,7 +239,7 @@ export async function PATCH(request) {
     // Check if user has access to this lead
     let query = getFilteredQuery(supabase, "leads_table", crmUser);
     const { data: existingLead, error: accessError } = await query
-      .select("id, lead_name, status, assigned_to, first_call_done, lead_qualification, meeting_status")
+      .select("id, lead_name, status, assigned_to, first_call_done, lead_qualification, meeting_status, response_status")
       .eq("id", id)
       .single();
 
@@ -252,6 +252,7 @@ export async function PATCH(request) {
     const previousFirstCallDone = existingLead?.first_call_done;
     const previousLeadQualification = existingLead?.lead_qualification;
     const previousMeetingStatus = existingLead?.meeting_status;
+    const previousResponseStatus = existingLead?.response_status;
     const leadName = existingLead?.lead_name || "";
 
     const updateData = {};
@@ -272,6 +273,7 @@ export async function PATCH(request) {
     if (first_call_done !== undefined) updateData.first_call_done = first_call_done;
     if (lead_qualification !== undefined) updateData.lead_qualification = lead_qualification;
     if (meeting_status !== undefined) updateData.meeting_status = meeting_status;
+    if (response_status !== undefined) updateData.response_status = response_status;
     
     // Track when specific fields are updated for dashboard metrics
     // Update last_attempted_at when these fields change
@@ -279,6 +281,7 @@ export async function PATCH(request) {
       (first_call_done !== undefined && first_call_done !== previousFirstCallDone) ||
       (lead_qualification !== undefined && lead_qualification !== previousLeadQualification) ||
       (meeting_status !== undefined && meeting_status !== previousMeetingStatus) ||
+      (response_status !== undefined && response_status !== previousResponseStatus) ||
       (status !== undefined && status !== previousStatus && (
         String(status).toLowerCase() === "follow up" || 
         String(status).toLowerCase() === "won"

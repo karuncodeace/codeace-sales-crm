@@ -279,7 +279,7 @@ export default function TasksPage() {
         task: null,
         leadId: null,
         leadName: "",
-        isQualified: null, // null = not selected, true = qualified, false = not qualified, "notConnected" = not connected
+        responseStatus: null, // null = not selected, "responded" = responded, "notResponded" = not responded, "junkLead" = junk lead
         disqualificationNote: "",
         isSubmitting: false,
     });
@@ -583,8 +583,8 @@ export default function TasksPage() {
                 task: task,
                 leadId: task.lead_id,
                 leadName: leadName,
-                isQualified: null,
-                disqualificationNote: "",
+                responseStatus: null,
+                note: "",
                 isSubmitting: false,
             });
             return;
@@ -1033,11 +1033,11 @@ export default function TasksPage() {
         });
     };
 
-    // Handle qualification confirmation
+    // Handle qualification confirmation (Response Status)
     const handleQualificationConfirm = async () => {
-        const { task, leadId, leadName, isQualified, disqualificationNote } = qualificationModal;
+        const { task, leadId, leadName, responseStatus, note } = qualificationModal;
         
-        if (isQualified === null) {
+        if (responseStatus === null) {
             toast.error("Please select an option");
             return;
         }
@@ -1045,61 +1045,14 @@ export default function TasksPage() {
         setQualificationModal((prev) => ({ ...prev, isSubmitting: true }));
 
         try {
-            if (isQualified === "notConnected") {
-                // NOT CONNECTED: Keep task as Pending (don't mark as completed), keep lead in same stage, don't show next modal
-                // Don't update task status - just save activity note so task remains visible
-
-                // Save activity with not connected note
-                await fetch("/api/task-activities", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        lead_id: leadId,
-                        activity: `Task attempted: ${task.title} - Client did not attend the call`,
-                        type: "task",
-                        comments: disqualificationNote || "Client did not attend the call - Task remains pending for retry",
-                        connect_through: "",
-                        due_date: null,
-                    }),
-                });
-
-                // Save to stage_notes table
-                await fetch("/api/stage-notes", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        lead_id: leadId,
-                        current_stage_notes: disqualificationNote || "Client did not attend the call",
-                        next_stage_notes: null,
-                        outcome: "Not Connected",
-                    }),
-                });
-
-                // Close modal and refresh
-                setQualificationModal({
-                    isOpen: false,
-                    task: null,
-                    leadId: null,
-                    leadName: "",
-                    isQualified: null,
-                    disqualificationNote: "",
-                    isSubmitting: false,
-                });
-                
-                toast.success("Task updated. Lead remains in current stage. Task is still pending for retry.");
-                
-                // Refresh data
-                mutate("/api/tasks");
-                mutate("/api/leads");
-            } else if (isQualified) {
-                // YES: Qualified - proceed with normal flow
-                // Update lead qualification field
+            if (responseStatus === "responded") {
+                // RESPONDED: Update response_status, proceed with normal flow (trigger next workflow)
                 await fetch("/api/leads", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         id: leadId,
-                        lead_qualification: "Lead is Qualified",
+                        response_status: "Responded",
                     }),
                 });
                 
@@ -1109,8 +1062,8 @@ export default function TasksPage() {
                     task: null,
                     leadId: null,
                     leadName: "",
-                    isQualified: null,
-                    disqualificationNote: "",
+                    responseStatus: null,
+                    note: "",
                     isSubmitting: false,
                 });
                 
@@ -1136,8 +1089,52 @@ export default function TasksPage() {
                     isSubmitting: false,
                     showCalendar: false,
                 });
-            } else {
-                // NO: Not Qualified - mark lead as Disqualified, complete task, but don't move stage
+            } else if (responseStatus === "notResponded") {
+                // NOT RESPONDED: Do NOT update lead, task stays in same state
+                // Save activity note so task remains visible
+                await fetch("/api/task-activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        activity: `Task attempted: ${task.title} - Client did not respond`,
+                        type: "task",
+                        comments: note || "Client did not respond - Task remains pending for retry",
+                        connect_through: "",
+                        due_date: null,
+                    }),
+                });
+
+                // Save to stage_notes table
+                await fetch("/api/stage-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        current_stage_notes: note || "Client did not respond",
+                        next_stage_notes: null,
+                        outcome: "Not Responded",
+                    }),
+                });
+
+                // Close modal and refresh
+                setQualificationModal({
+                    isOpen: false,
+                    task: null,
+                    leadId: null,
+                    leadName: "",
+                    responseStatus: null,
+                    note: "",
+                    isSubmitting: false,
+                });
+                
+                toast.success("Task updated. Lead remains in current stage. Task is still pending for retry.");
+                
+                // Refresh data
+                mutate("/api/tasks");
+                mutate("/api/leads");
+            } else if (responseStatus === "junkLead") {
+                // JUNK LEAD: Update lead as junk, remove from UI immediately
                 // Get lead data to get assigned salesperson_id
                 const lead = leadsMap[leadId] || leadsMap[task.lead_id];
                 const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to || null;
@@ -1148,9 +1145,9 @@ export default function TasksPage() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         lead_id: leadId,
-                        activity: "Stage completed",
+                        activity: "Lead marked as junk",
                         type: "manual",
-                        comments: disqualificationNote || "Lead not qualified",
+                        comments: note || "Lead marked as junk",
                         connect_through: null,
                         source: "ui",
                         assigned_to: assignedSalespersonId,
@@ -1175,15 +1172,15 @@ export default function TasksPage() {
                     throw new Error("Failed to complete task");
                 }
 
-                // STEP 3: Update lead status to Disqualified and set qualification
+                // STEP 3: Update lead status to Junk and set response_status
                 const leadUpdateRes = await fetch("/api/leads", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         id: leadId,
-                        status: "Disqualified",
-                        current_stage: "Disqualified",
-                        lead_qualification: "This lead is not qualified",
+                        status: "Junk",
+                        current_stage: "Junk",
+                        response_status: "Junk Lead",
                     }),
                 });
                 
@@ -1197,9 +1194,9 @@ export default function TasksPage() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         lead_id: leadId,
-                        current_stage_notes: disqualificationNote || "Lead not qualified",
+                        current_stage_notes: note || "Lead marked as junk",
                         next_stage_notes: null,
-                        outcome: "Disqualified",
+                        outcome: "Junk",
                     }),
                 });
 
@@ -1209,14 +1206,14 @@ export default function TasksPage() {
                     task: null,
                     leadId: null,
                     leadName: "",
-                    isQualified: null,
-                    disqualificationNote: "",
+                    responseStatus: null,
+                    note: "",
                     isSubmitting: false,
                 });
                 
-                toast.success("Task completed. Lead marked as Disqualified.");
+                toast.success("Lead marked as junk and removed from list.");
                 
-                // Refresh data
+                // Refresh data - this will remove the lead from UI
                 mutate("/api/tasks");
                 mutate("/api/leads");
             }
@@ -1234,8 +1231,8 @@ export default function TasksPage() {
             task: null,
             leadId: null,
             leadName: "",
-            isQualified: null,
-            disqualificationNote: "",
+            responseStatus: null,
+            note: "",
             isSubmitting: false,
         });
     };
@@ -2171,9 +2168,9 @@ export default function TasksPage() {
                                     <CheckCircle2 className="w-5 h-5 text-orange-500" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-semibold">Lead Qualification Check</h2>
+                                    <h2 className="text-lg font-semibold">Lead Response Status</h2>
                                     <p className={`text-xs mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                        Is this lead qualified?
+                                        How did the lead respond?
                                     </p>
                                 </div>
                             </div>
@@ -2206,7 +2203,7 @@ export default function TasksPage() {
                             <div className="space-y-3">
                                 <label
                                     className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                        qualificationModal.isQualified === true
+                                        qualificationModal.responseStatus === "responded"
                                             ? theme === "dark"
                                                 ? "border-orange-500 bg-orange-500/10"
                                                 : "border-orange-500 bg-orange-50"
@@ -2217,19 +2214,19 @@ export default function TasksPage() {
                                 >
                                     <input
                                         type="radio"
-                                        name="qualification"
-                                        checked={qualificationModal.isQualified === true}
-                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: true }))}
+                                        name="responseStatus"
+                                        checked={qualificationModal.responseStatus === "responded"}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, responseStatus: "responded" }))}
                                         className="w-4 h-4 text-orange-500 focus:ring-orange-500"
                                     />
                                     <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
-                                        Yes (Qualified)
+                                        Responded
                                     </span>
                                 </label>
 
                                 <label
                                     className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                        qualificationModal.isQualified === false
+                                        qualificationModal.responseStatus === "notResponded"
                                             ? theme === "dark"
                                                 ? "border-orange-500 bg-orange-500/10"
                                                 : "border-orange-500 bg-orange-50"
@@ -2240,19 +2237,19 @@ export default function TasksPage() {
                                 >
                                     <input
                                         type="radio"
-                                        name="qualification"
-                                        checked={qualificationModal.isQualified === false}
-                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: false }))}
+                                        name="responseStatus"
+                                        checked={qualificationModal.responseStatus === "notResponded"}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, responseStatus: "notResponded" }))}
                                         className="w-4 h-4 text-orange-500 focus:ring-orange-500"
                                     />
-                                        <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
-                                        No (Not Qualified)
+                                    <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
+                                        Not Responded
                                     </span>
                                 </label>
 
                                 <label
                                     className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                        qualificationModal.isQualified === "notConnected"
+                                        qualificationModal.responseStatus === "junkLead"
                                             ? theme === "dark"
                                                 ? "border-orange-500 bg-orange-500/10"
                                                 : "border-orange-500 bg-orange-50"
@@ -2263,35 +2260,35 @@ export default function TasksPage() {
                                 >
                                     <input
                                         type="radio"
-                                        name="qualification"
-                                        checked={qualificationModal.isQualified === "notConnected"}
-                                        onChange={() => setQualificationModal((prev) => ({ ...prev, isQualified: "notConnected" }))}
+                                        name="responseStatus"
+                                        checked={qualificationModal.responseStatus === "junkLead"}
+                                        onChange={() => setQualificationModal((prev) => ({ ...prev, responseStatus: "junkLead" }))}
                                         className="w-4 h-4 text-orange-500 focus:ring-orange-500"
                                     />
                                     <span className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
-                                        Not Connected (Client did not attend)
+                                        Junk Lead
                                     </span>
                                 </label>
                             </div>
 
-                            {/* Note field (show if Not Qualified or Not Connected is selected) */}
-                            {(qualificationModal.isQualified === false || qualificationModal.isQualified === "notConnected") && (
+                            {/* Note field (show if Not Responded or Junk Lead is selected) */}
+                            {(qualificationModal.responseStatus === "notResponded" || qualificationModal.responseStatus === "junkLead") && (
                                 <div>
                                     <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                        {qualificationModal.isQualified === "notConnected" ? "Note" : "Disqualification Note"} <span className="text-gray-500">(Optional)</span>
+                                        {qualificationModal.responseStatus === "junkLead" ? "Note" : "Note"} <span className="text-gray-500">(Optional)</span>
                                     </label>
                                     <textarea
-                                        placeholder={qualificationModal.isQualified === "notConnected" 
-                                            ? "Add a note about the call attempt..." 
-                                            : "Add a note about why this lead is not qualified..."}
+                                        placeholder={qualificationModal.responseStatus === "junkLead" 
+                                            ? "Add a note about why this is a junk lead..." 
+                                            : "Add a note about the response attempt..."}
                                         className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
                                             theme === "dark"
                                                 ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
                                                 : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
                                         }`}
                                         rows={3}
-                                        value={qualificationModal.disqualificationNote}
-                                        onChange={(e) => setQualificationModal((prev) => ({ ...prev, disqualificationNote: e.target.value }))}
+                                        value={qualificationModal.note}
+                                        onChange={(e) => setQualificationModal((prev) => ({ ...prev, note: e.target.value }))}
                                     />
                                 </div>
                             )}
@@ -2312,7 +2309,7 @@ export default function TasksPage() {
                             </button>
                             <button
                                 onClick={handleQualificationConfirm}
-                                disabled={qualificationModal.isSubmitting || qualificationModal.isQualified === null}
+                                disabled={qualificationModal.isSubmitting || qualificationModal.responseStatus === null}
                                 className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {qualificationModal.isSubmitting ? (
