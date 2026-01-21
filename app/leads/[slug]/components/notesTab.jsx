@@ -460,37 +460,37 @@ function NotesTab({ theme, leadId, leadName }) {
                                             <div className={`p-2.5 rounded-lg flex-shrink-0 ${theme === "dark" ? "bg-orange-500/20" : "bg-orange-100"}`}>
                                                 <StickyNote className={`w-5 h-5 ${theme === "dark" ? "text-orange-400" : "text-orange-600"}`} />
                                             </div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingNoteId(note.id);
-                                                        setEditNoteText(note.content);
-                                                    }}
-                                                    className={`p-1.5 rounded-lg transition-colors ${
-                                                        theme === "dark" 
-                                                            ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200" 
-                                                            : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                                                    }`}
-                                                    title="Edit note"
-                                                >
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingNoteId(note.id);
+                                                    setEditNoteText(note.content);
+                                                }}
+                                                className={`p-1.5 rounded-lg transition-colors ${
+                                                    theme === "dark" 
+                                                        ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200" 
+                                                        : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                                                }`}
+                                                title="Edit note"
+                                            >
                                                     <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteNote(note.id)}
-                                                    disabled={deletingNoteId === note.id}
-                                                    className={`p-1.5 rounded-lg transition-colors ${
-                                                        theme === "dark" 
-                                                            ? "hover:bg-red-900/20 text-gray-400 hover:text-red-400" 
-                                                            : "hover:bg-red-50 text-gray-500 hover:text-red-600"
-                                                    }`}
-                                                    title="Delete note"
-                                                >
-                                                    {deletingNoteId === note.id ? (
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteNote(note.id)}
+                                                disabled={deletingNoteId === note.id}
+                                                className={`p-1.5 rounded-lg transition-colors ${
+                                                    theme === "dark" 
+                                                        ? "hover:bg-red-900/20 text-gray-400 hover:text-red-400" 
+                                                        : "hover:bg-red-50 text-gray-500 hover:text-red-600"
+                                                }`}
+                                                title="Delete note"
+                                            >
+                                                {deletingNoteId === note.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
+                                                ) : (
                                                         <Trash2 className="w-4 h-4" />
-                                                    )}
-                                                </button>
+                                                )}
+                                            </button>
                                             </div>
                                         </div>
                                         

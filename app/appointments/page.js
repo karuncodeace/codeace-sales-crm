@@ -33,8 +33,10 @@ export default function BookingsPage() {
 
 
   // Map booking status to display status (bookings use "scheduled", appointments use "booked")
-  // Check is_rescheduled flag to detect rescheduled bookings
+  // Check completion and reschedule flags
   const getDisplayStatus = (booking) => {
+    const completion = String(booking.meeting_completion_status || "").toLowerCase();
+    if (completion === "completed") return "conducted";
     if (booking.is_rescheduled) return "rescheduled";
     if (booking.status === "scheduled") return "booked";
     return booking.status || "unknown";
@@ -44,6 +46,7 @@ export default function BookingsPage() {
   const statusCounts = {
     all: bookingsList.length,
     booked: bookingsList.filter((booking) => getDisplayStatus(booking) === "booked").length,
+    conducted: bookingsList.filter((booking) => getDisplayStatus(booking) === "conducted").length,
     rescheduled: bookingsList.filter((booking) => getDisplayStatus(booking) === "rescheduled").length,
     cancelled: bookingsList.filter((booking) => getDisplayStatus(booking) === "cancelled").length,
   };
@@ -51,11 +54,6 @@ export default function BookingsPage() {
   // Filter and sort bookings based on status
   const filteredBookings = React.useMemo(() => {
     let filtered = bookingsList;
-    
-    // Filter out completed bookings (meeting_completion_status = "Completed")
-    filtered = filtered.filter((booking) => {
-      return booking.meeting_completion_status !== "Completed";
-    });
     
     // Filter by status if not "all"
     if (statusFilter !== "all") {
@@ -101,6 +99,8 @@ export default function BookingsPage() {
   const getStatusBadge = (status) => {
     const baseClasses = "px-3 py-1 rounded-full text-xs font-medium";
     switch (status) {
+      case "conducted":
+        return `${baseClasses} ${isDark ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"}`;
       case "booked":
         return `${baseClasses} ${isDark ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"}`;
       case "rescheduled":
@@ -115,6 +115,8 @@ export default function BookingsPage() {
   // Get status icon
   const getStatusIcon = (status) => {
     switch (status) {
+      case "conducted":
+        return <CheckCircle2 className="w-4 h-4" />;
       case "booked":
         return <CheckCircle2 className="w-4 h-4" />;
       case "cancelled":
@@ -274,7 +276,7 @@ export default function BookingsPage() {
             Filter by Status:
           </span>
           <div className="flex gap-2">
-            {["all", "booked", "rescheduled", "cancelled"].map((status) => (
+            {["booked", "conducted", "rescheduled", "cancelled", "all"].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -413,24 +415,26 @@ export default function BookingsPage() {
                           </div>
                           {/* Status Badge and Mark Complete Button */}
                           <div className="flex items-center gap-2">
-                            {/* Mark as Completed Button (Top Right) */}
-                            <button
-                              onClick={() => handleMarkCompleted(booking)}
-                              disabled={isProcessing}
-                              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-                                isDark
-                                  ? "border-gray-600 bg-gray-800 hover:bg-gray-700"
-                                  : "border-gray-300 bg-gray-50 hover:bg-gray-100"
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title="Mark as completed"
-                            >
-                              <CheckCircle2
-                                className={`w-4 h-4 ${
-                                  isDark ? "text-gray-400" : "text-gray-500"
-                                }`}
-                                strokeWidth={2}
-                              />
-                            </button>
+                            {/* Mark as Completed Button (hide for cancelled or conducted) */}
+                            {displayStatus !== "cancelled" && displayStatus !== "conducted" && (
+                              <button
+                                onClick={() => handleMarkCompleted(booking)}
+                                disabled={isProcessing}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                                  isDark
+                                    ? "border-gray-600 bg-gray-800 hover:bg-gray-700"
+                                    : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title="Mark as completed"
+                              >
+                                <CheckCircle2
+                                  className={`w-4 h-4 ${
+                                    isDark ? "text-gray-400" : "text-gray-500"
+                                  }`}
+                                  strokeWidth={2}
+                                />
+                              </button>
+                            )}
                             <span className={getStatusBadge(displayStatus)}>
                               {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1) || "Unknown"}
                             </span>
@@ -505,7 +509,7 @@ export default function BookingsPage() {
                     </div>
 
                       {/* Action Buttons */}
-                      {booking.status === "scheduled" && (
+                      {displayStatus !== "conducted" && displayStatus !== "cancelled" && (
                         <div className={`mt-4 pt-4 flex justify-end border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
                           <div className="flex  gap-2">
                             <button
