@@ -7,7 +7,7 @@ import { useTheme } from "../../context/themeContext";
 import toast from "react-hot-toast";
 import { Copy, Check, Mail } from "lucide-react";
 import { supabaseBrowser } from "../../../lib/supabase/browserClient";
-import { generateTaskTitle, canCreateTaskForStage } from "../../../lib/utils/taskTitleGenerator";
+// REMOVED: Title generation imports - tasks now use exact titles provided by users
 
 import StatusDropdown from "../buttons/statusTooglebtn";
 import PriorityDropdown from "../buttons/priorityTooglebtn";
@@ -151,12 +151,13 @@ export default function LeadsTable() {
     leadId: null,
     newStatus: null,
     comment: "",
-    nextStageComments: "",
+    nextTask: "",
     connectThrough: "",
     dueDate: "",
     outcome: "Success",
     isSubmitting: false,
     showCalendar: false,
+    calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // For calendar navigation
   });
 
   // Revenue transaction modal state (for Won stage)
@@ -399,12 +400,13 @@ export default function LeadsTable() {
       leadId,
       newStatus,
       comment: "",
-      nextStageComments: "",
+      nextTask: "",
       connectThrough: "",
       dueDate: "",
       outcome: "Success",
       isSubmitting: false,
       showCalendar: false,
+      calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     });
   };
 
@@ -466,7 +468,7 @@ export default function LeadsTable() {
         leadId: leadId,
         newStatus: "Won",
         comment: "",
-        nextStageComments: "",
+        nextTask: "",
         connectThrough: "",
         dueDate: "",
         outcome: "Success",
@@ -496,36 +498,12 @@ export default function LeadsTable() {
     // Do NOT update status - user cancelled
   };
 
-  // Get task title and type based on status (for updating existing tasks)
-  const getTaskDetailsForStatus = (status, leadName) => {
-    const normalizedStatus = normalizeStatus(status);
-    
-    // Block task updates for Won stage
-    if (!normalizedStatus || !canCreateTaskForStage(normalizedStatus)) {
-      return null;
-    }
-    
-    try {
-      // Use utility function to generate title
-      const title = generateTaskTitle(normalizedStatus, leadName || "Client");
-      
-      // Set type based on status
-      let type = "Call";
-      if (normalizedStatus === "New") type = "Call";
-      else if (normalizedStatus === "Contacted") type = "Meeting";
-      else if (normalizedStatus === "Demo") type = "Meeting";
-      else if (normalizedStatus === "Proposal") type = "Follow-Up";
-      else if (normalizedStatus === "Follow-Up") type = "Call";
-      
-      return { title, type };
-    } catch (error) {
-      return null;
-    }
-  };
+  // REMOVED: getTaskDetailsForStatus function - no longer generating titles automatically
+  // Tasks now use the exact title provided by the user in the status change modal
 
   // Confirm status change with comment
   const handleConfirmStatusChange = async () => {
-    const { leadId, newStatus, comment, nextStageComments, connectThrough, dueDate, outcome } = statusChangeModal;
+    const { leadId, newStatus, comment, nextTask, connectThrough, dueDate, outcome } = statusChangeModal;
     
     if (!comment.trim()) {
       toast.error("Please add a comment before changing status");
@@ -535,7 +513,53 @@ export default function LeadsTable() {
     setStatusChangeModal((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      // First, post the comment to task_activities
+      // Get lead to get assigned salesperson
+      const lead = leadData.find((l) => l.id === leadId);
+      const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to;
+
+      // STEP 1: Save current stage comment as a NOTE in task_activities (general category)
+      // This will be visible in the Notes tab under "General Notes"
+      const noteRes = await fetch("/api/task-activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          activity: `Status changed to ${newStatus}`,
+          type: "note", // Save as note type - will appear in Notes tab
+          comments: comment, // Current stage comment
+          notes_type: "general", // General category for notes tab
+          connect_through: connectThrough || null,
+          source: "ui",
+          assigned_to: assignedSalespersonId, // Assign to lead's salesperson
+        }),
+      });
+
+      if (!noteRes.ok) {
+        throw new Error("Failed to save note");
+      }
+
+      // STEP 1b: Also save to lead_notes table
+      try {
+        const leadNotesRes = await fetch("/api/lead-notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            notes: comment, // Current stage comment
+            notes_type: "general", // Default to "general"
+          }),
+        });
+
+        if (!leadNotesRes.ok) {
+          // Don't fail if lead_notes save fails, but log it
+          console.warn("Failed to save to lead_notes table, but note was saved to task_activities");
+        }
+      } catch (leadNotesError) {
+        // Don't fail if lead_notes save fails
+        console.warn("Error saving to lead_notes table:", leadNotesError);
+      }
+
+      // STEP 2: Save activity log entry (separate from note)
       const activityRes = await fetch("/api/task-activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -544,33 +568,17 @@ export default function LeadsTable() {
           activity: `Status changed to ${newStatus}`,
           type: "status",
           comments: comment,
-          next_stage_comments: nextStageComments || null,
-          connect_through: connectThrough,
-          due_date: dueDate || null,
+          connect_through: connectThrough || null,
+          source: "ui",
         }),
       });
 
       if (!activityRes.ok) {
-        throw new Error("Failed to save activity comment");
+        // Don't fail if activity log fails, but log it
+        console.warn("Failed to save activity log, but note was saved");
       }
 
-      // Save to stage_notes table
-      const stageNotesRes = await fetch("/api/stage-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_id: leadId,
-          current_stage_notes: comment,
-          next_stage_notes: nextStageComments || null,
-          outcome: outcome,
-        }),
-      });
-
-      if (!stageNotesRes.ok) {
-        throw new Error("Failed to save stage notes");
-      }
-
-      // Update the lead: set status, current_stage, and next_stage_notes
+      // STEP 3: Update lead status
       const res = await fetch("/api/leads", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -578,7 +586,6 @@ export default function LeadsTable() {
           id: leadId, 
           status: newStatus,
           current_stage: newStatus,
-          next_stage_notes: nextStageComments || null,
         }),
       });
 
@@ -586,20 +593,67 @@ export default function LeadsTable() {
         throw new Error("Failed to update status");
       }
 
-      // Update the task based on new status
-      const lead = leadData.find((l) => l.id === leadId);
-      const taskDetails = getTaskDetailsForStatus(newStatus, lead?.name || "Lead");
-      
-      if (taskDetails) {
-        await fetch("/api/tasks", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+      // STEP 4: Create next task if nextTask description is provided
+      // This creates a task in tasks_table that can be completed without changing lead status
+      if (nextTask && nextTask.trim()) {
+        try {
+          const taskTitle = nextTask.trim();
+          
+          // DEBUG: Log what we're sending
+          console.log("🔵 Frontend - Sending task creation request with title:", taskTitle);
+          
+          const taskPayload = {
             lead_id: leadId,
-            title: taskDetails.title,
-            type: taskDetails.type,
-          }),
-        });
+            title: taskTitle,
+            type: "Follow-Up",
+            stage: newStatus, // Task stage matches new lead status
+            due_date: dueDate || null,
+            priority: "Medium",
+            sales_person_id: assignedSalespersonId, // Assign to lead's salesperson
+          };
+          
+          console.log("🔵 Frontend - Full task payload:", JSON.stringify(taskPayload, null, 2));
+          
+          const taskRes = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(taskPayload),
+          });
+          
+          if (taskRes.ok) {
+            const taskData = await taskRes.json();
+            console.log("🔵 Frontend - Task created, response:", taskData);
+            console.log("🔵 Frontend - Title in response:", taskData?.task?.title);
+          }
+          
+          if (!taskRes.ok) {
+            const errorData = await taskRes.json().catch(() => ({}));
+            console.warn("Failed to create next task:", errorData.error || "Unknown error");
+            // Don't fail status update if task creation fails
+          } else {
+            // Log task creation activity
+            try {
+              await fetch("/api/task-activities", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  lead_id: leadId,
+                  activity: `Task Created: ${taskTitle}`,
+                  type: "task",
+                  comments: `Next task created: ${taskTitle}`,
+                  source: "ui",
+                  assigned_to: assignedSalespersonId,
+                }),
+              });
+            } catch (activityError) {
+              // Don't fail if activity log fails
+              console.warn("Failed to log task creation activity:", activityError);
+            }
+          }
+        } catch (taskError) {
+          // Don't fail status update if task creation fails
+          console.warn("Error creating next task:", taskError);
+        }
       }
 
       // Optimistically update the UI
@@ -616,15 +670,17 @@ export default function LeadsTable() {
         leadId: null,
         newStatus: null,
         comment: "",
-        nextStageComments: "",
+        nextTask: "",
         connectThrough: "",
         dueDate: "",
         outcome: "Success",
         isSubmitting: false,
         showCalendar: false,
       });
+
+      toast.success("Status updated successfully");
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || "Failed to update status");
       setStatusChangeModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -636,12 +692,13 @@ export default function LeadsTable() {
       leadId: null,
       newStatus: null,
       comment: "",
-      nextStageComments: "",
+      nextTask: "",
       connectThrough: "",
       dueDate: "",
       outcome: "Success",
       isSubmitting: false,
       showCalendar: false,
+      calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     });
   };
 
@@ -1964,9 +2021,9 @@ export default function LeadsTable() {
                         <div className="flex-1 h-px bg-current"></div>
                       </div>
                       
-                      {/* Custom Date Input */}
+                      {/* Custom Date Calendar Picker */}
                       <div className={`p-3 rounded-xl border-2 border-dashed ${theme === "dark" ? "border-gray-700 bg-gray-800/30" : "border-gray-200 bg-gray-50"}`}>
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 mb-3">
                           <div className={`p-1.5 rounded-lg ${theme === "dark" ? "bg-orange-500/20" : "bg-orange-100"}`}>
                             <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1976,16 +2033,155 @@ export default function LeadsTable() {
                             Custom Date
                           </span>
                         </div>
-                        <input
-                          type="date"
-                          value={statusChangeModal.dueDate}
-                          onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, dueDate: e.target.value, showCalendar: false }))}
-                          className={`w-full p-3 rounded-lg border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 cursor-pointer ${
-                            theme === "dark"
-                              ? "bg-[#262626] border-gray-600 text-gray-200 hover:border-gray-500"
-                              : "bg-white border-gray-200 text-gray-900 hover:border-gray-300"
-                          }`}
-                        />
+                        
+                        {/* Calendar Component */}
+                        {(() => {
+                          // Initialize calendar month from dueDate or use current month
+                          const getInitialCalendarMonth = () => {
+                            if (statusChangeModal.dueDate) {
+                              const date = new Date(statusChangeModal.dueDate);
+                              return new Date(date.getFullYear(), date.getMonth(), 1);
+                            }
+                            return statusChangeModal.calendarMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                          };
+
+                          const calendarMonth = getInitialCalendarMonth();
+                          const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                          const daysOfWeek = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+                          const getDaysInMonth = (date) => {
+                            const year = date.getFullYear();
+                            const month = date.getMonth();
+                            const firstDay = new Date(year, month, 1);
+                            const lastDay = new Date(year, month + 1, 0);
+                            const daysInMonth = lastDay.getDate();
+                            const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
+                            return { daysInMonth, startingDayOfWeek };
+                          };
+
+                          const navigateMonth = (direction) => {
+                            const newDate = new Date(calendarMonth);
+                            newDate.setMonth(calendarMonth.getMonth() + direction);
+                            setStatusChangeModal((prev) => ({ ...prev, calendarMonth: newDate }));
+                          };
+
+                          const formatDateForInput = (day) => {
+                            const year = calendarMonth.getFullYear();
+                            const month = calendarMonth.getMonth() + 1;
+                            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          };
+
+                          const isDateSelected = (day) => {
+                            if (!statusChangeModal.dueDate) return false;
+                            return formatDateForInput(day) === statusChangeModal.dueDate;
+                          };
+
+                          const isDatePast = (day) => {
+                            const dateStr = formatDateForInput(day);
+                            const date = new Date(dateStr);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                          };
+
+                          const handleDateClick = (day) => {
+                            if (!isDatePast(day)) {
+                              const dateStr = formatDateForInput(day);
+                              setStatusChangeModal((prev) => ({ ...prev, dueDate: dateStr, showCalendar: false }));
+                            }
+                          };
+
+                          const { daysInMonth, startingDayOfWeek } = getDaysInMonth(calendarMonth);
+                          const monthName = months[calendarMonth.getMonth()];
+                          const year = calendarMonth.getFullYear();
+
+                          return (
+                            <div className={`w-full ${theme === "dark" ? "bg-[#262626]" : "bg-white"} p-4 rounded-xl`}>
+                              {/* Month Navigation */}
+                              <div className="flex items-center justify-between mb-4">
+                                <button
+                                  type="button"
+                                  onClick={() => navigateMonth(-1)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    theme === "dark"
+                                      ? "hover:bg-gray-700 text-gray-300"
+                                      : "hover:bg-gray-100 text-gray-600"
+                                  }`}
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <div className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                                  {monthName} {year}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => navigateMonth(1)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    theme === "dark"
+                                      ? "hover:bg-gray-700 text-gray-300"
+                                      : "hover:bg-gray-100 text-gray-600"
+                                  }`}
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Days of Week Header */}
+                              <div className="grid grid-cols-7 gap-1 mb-2">
+                                {daysOfWeek.map((day) => (
+                                  <div
+                                    key={day}
+                                    className={`text-xs font-semibold text-center py-1 ${
+                                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                                    }`}
+                                  >
+                                    {day}
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Calendar Grid */}
+                              <div className="grid grid-cols-7 gap-1">
+                                {/* Empty cells for days before month starts */}
+                                {Array.from({ length: startingDayOfWeek }).map((_, index) => (
+                                  <div key={`empty-${index}`} className="aspect-square" />
+                                ))}
+
+                                {/* Days of the month */}
+                                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+                                  const dateStr = formatDateForInput(day);
+                                  const isSelected = isDateSelected(day);
+                                  const isPast = isDatePast(day);
+
+                                  return (
+                                    <button
+                                      key={day}
+                                      type="button"
+                                      onClick={() => handleDateClick(day)}
+                                      disabled={isPast}
+                                      className={`
+                                        aspect-square flex items-center justify-center 
+                                        text-xs font-semibold transition-colors w-full
+                                        ${isSelected
+                                          ? 'bg-orange-500 text-white rounded-full'
+                                          : isPast
+                                          ? `${theme === "dark" ? "text-gray-600 cursor-not-allowed" : "text-gray-300 cursor-not-allowed"}`
+                                          : `${theme === "dark" ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"} cursor-pointer rounded-full`
+                                        }
+                                      `}
+                                    >
+                                      {day}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                       
                       {/* Clear button */}
@@ -2028,28 +2224,28 @@ export default function LeadsTable() {
                   autoFocus
                 />
                 <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                  This will be saved to the activity log.
+                  This will be saved as a note in the Notes tab (General category).
                 </p>
               </div>
 
-              {/* Next Stage Comments */}
+              {/* Next Task (Optional) - UPDATED: Creates a task in tasks_table */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                  Next Stage Comments
+                  Next Task (Optional)
                 </label>
                 <textarea
-                  placeholder="Add comments about the next stage..."
+                  placeholder="Describe the next task to be done (e.g., 'Schedule demo call with client')..."
                   className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
                     theme === "dark"
                       ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
                       : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
                   }`}
                   rows={3}
-                  value={statusChangeModal.nextStageComments}
-                  onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, nextStageComments: e.target.value }))}
+                  value={statusChangeModal.nextTask}
+                  onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, nextTask: e.target.value }))}
                 />
                 <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                  Optional comments about the next stage.
+                  If provided, a task will be created in the Tasks tab. Completing this task will NOT change lead status.
                 </p>
               </div>
 

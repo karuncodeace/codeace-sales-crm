@@ -551,73 +551,29 @@ export default function TasksPage() {
     const handleMarkComplete = async (task) => {
         if (task.status?.toLowerCase() === "completed") return;
 
-        // Get lead data to determine current status
-        const lead = leadsMap[task.lead_id];
-        let currentStatus = lead?.status || lead?.current_stage || "New";
-        
-        // Ensure currentStatus is never null/undefined
-        if (!currentStatus || currentStatus === "null" || currentStatus === "undefined" || currentStatus === null) {
-            currentStatus = "New";
-        }
-        
-        const leadName = lead?.name || task.leadName || "Lead";
-
-        // Check if this is the first task (Initial call from New stage)
-        // Try both lead status and task stage
-        const taskStage = task.stage || task.lead_stage;
-        const statusToCheck = taskStage || currentStatus;
-        
-        // Debug: Log to help diagnose issues (remove in production if needed)
-        console.log("Task completion check:", {
-            taskTitle: task.title,
-            taskStage: taskStage,
-            leadStatus: currentStatus,
-            statusToCheck: statusToCheck,
-            isFirstTask: isFirstTask(task, statusToCheck)
-        });
-
-        if (isFirstTask(task, statusToCheck)) {
-            console.log("Showing qualification modal");
-            setQualificationModal({
-                isOpen: true,
-                task: task,
-                leadId: task.lead_id,
-                leadName: leadName,
-                responseStatus: null,
-                note: "",
-                isSubmitting: false,
+        // Directly mark task as completed without showing any modal
+        try {
+            const res = await fetch("/api/tasks", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: task.id,
+                    status: "Completed",
+                }),
             });
-            return;
-        }
 
-        // Check if this is the special demo scenario
-        if (isDemoSchedulingTask(task, currentStatus)) {
-            setDemoOutcomeModal({
-                isOpen: true,
-                task: task,
-                leadId: task.lead_id,
-                leadName: leadName,
-                requiresSecondDemo: null,
-                isSubmitting: false,
-            });
-            return;
-        }
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to complete task");
+            }
 
-        // Otherwise, show normal completion modal
-        setTaskCompletionModal({
-            isOpen: true,
-            task: task,
-            leadId: task.lead_id,
-            leadName: leadName,
-            currentStatus: currentStatus,
-            comment: "",
-            nextStageComments: "",
-            connectThrough: "",
-            dueDate: "",
-            outcome: "Success",
-            isSubmitting: false,
-            showCalendar: false,
-        });
+            // Refresh tasks data
+            mutate("/api/tasks");
+            toast.success("Task marked as completed");
+        } catch (error) {
+            console.error("Error completing task:", error);
+            toast.error(error.message || "Failed to complete task");
+        }
     };
     
     // Confirm task completion with stage progression
@@ -1684,8 +1640,8 @@ export default function TasksPage() {
             </div>
             {/* End Footer */}
 
-            {/* Task Completion Modal */}
-            {taskCompletionModal.isOpen && taskCompletionModal.task && (
+            {/* Task Completion Modal - REMOVED: Tasks are now marked as completed directly without modal */}
+            {false && taskCompletionModal.isOpen && taskCompletionModal.task && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <div
                         className={`w-full max-w-md mx-auto my-auto rounded-2xl shadow-2xl transform transition-all ${

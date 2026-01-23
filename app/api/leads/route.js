@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../lib/supabase/serverClient";
+import { supabaseServer, supabaseAdmin } from "../../../lib/supabase/serverClient";
 import { getCrmUser, getFilteredQuery } from "../../../lib/crm/auth";
 import { updateDailyMetrics } from "../../../lib/sales-metrics/updateMetrics";
 
@@ -201,6 +201,156 @@ export async function POST(request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  // Automatically create initial task for new lead
+  // This replaces the previous database trigger-based approach
+  // Uses admin client to bypass RLS for system operations
+  try {
+    const leadId = data.id;
+    const leadName = data.lead_name || name;
+    const salesPersonId = data.assigned_to;
+
+    // Validate required data
+    if (!salesPersonId) {
+      console.warn("Cannot create initial task: lead has no assigned_to", { leadId, leadName });
+      // Continue without creating task - lead creation still succeeds
+    } else {
+      const taskTitle = `${leadName} -- Initial call`;
+      
+      // Use admin client for system operations (bypasses RLS)
+      const adminSupabase = supabaseAdmin();
+      
+      // Check if an initial task already exists for this lead (duplicate protection)
+      // Use a simple check: any pending task with "Initial call" in title for this lead
+      let hasExistingTask = false;
+      try {
+        const { data: existingTasks, error: checkError } = await adminSupabase
+          .from("tasks_table")
+          .select("id, title, status")
+          .eq("lead_id", leadId)
+          .ilike("title", "%Initial call%")
+          .eq("status", "Pending")
+          .limit(1);
+
+        if (checkError) {
+          console.warn("Error checking for existing initial task (will attempt creation anyway):", {
+            error: checkError.message,
+            code: checkError.code,
+            leadId,
+          });
+          // Continue to try creating task anyway (fail-safe)
+        } else {
+          hasExistingTask = existingTasks && existingTasks.length > 0;
+        }
+      } catch (checkException) {
+        console.warn("Exception during duplicate check (will attempt creation anyway):", checkException);
+        // Continue to try creating task anyway (fail-safe)
+      }
+      
+      // Only create task if no initial task exists
+      if (!hasExistingTask) {
+        // Calculate due date: current date + 1 day
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 1);
+        // Set time to start of day for consistency
+        dueDate.setHours(0, 0, 0, 0);
+        const dueDateISO = dueDate.toISOString();
+
+        // Create initial task
+        // Build task data - stage is optional in case schema doesn't require it
+        const taskData = {
+          lead_id: leadId,
+          sales_person_id: salesPersonId,
+          title: taskTitle,
+          type: "Call",
+          status: "Pending",
+          due_date: dueDateISO,
+        };
+        
+        // Add stage if it exists in schema (some schemas may not have this field)
+        // Try to include it, but if it causes an error, we'll handle it
+        taskData.stage = "New";
+
+        console.log("Attempting to create initial task:", {
+          leadId,
+          leadName,
+          salesPersonId,
+          taskTitle,
+          dueDateISO,
+          taskData,
+        });
+
+        const { data: createdTask, error: taskError } = await adminSupabase
+          .from("tasks_table")
+          .insert(taskData)
+          .select();
+
+        if (taskError) {
+          // Log detailed error but don't fail lead creation
+          console.error("❌ Failed to create initial task for lead:", {
+            leadId,
+            leadName,
+            salesPersonId,
+            taskData,
+            error: taskError.message,
+            code: taskError.code,
+            details: taskError.details,
+            hint: taskError.hint,
+          });
+          
+          // If error is about stage field, try without it
+          if (taskError.message && (taskError.message.includes("stage") || taskError.message.includes("column"))) {
+            console.log("Retrying task creation without stage field...");
+            const taskDataWithoutStage = { ...taskData };
+            delete taskDataWithoutStage.stage;
+            
+            const { data: retryTask, error: retryError } = await adminSupabase
+              .from("tasks_table")
+              .insert(taskDataWithoutStage)
+              .select();
+            
+            if (retryError) {
+              console.error("❌ Retry also failed:", retryError.message);
+            } else if (retryTask && retryTask.length > 0) {
+              console.log("✅ Successfully created initial task (without stage):", {
+                taskId: retryTask[0].id,
+                leadId,
+                title: retryTask[0].title,
+              });
+            }
+          }
+        } else if (createdTask && createdTask.length > 0) {
+          const task = Array.isArray(createdTask) ? createdTask[0] : createdTask;
+          console.log("✅ Successfully created initial task:", {
+            taskId: task.id,
+            leadId,
+            title: task.title,
+            stage: task.stage,
+            status: task.status,
+          });
+        } else {
+          console.warn("⚠️ Task creation returned no data and no error:", { 
+            leadId,
+            createdTask,
+            hasData: !!createdTask,
+            isArray: Array.isArray(createdTask),
+          });
+        }
+      } else {
+        console.log("⏭️ Skipping initial task creation - task already exists:", {
+          leadId,
+          existingTask: existingTasks[0],
+        });
+      }
+    }
+  } catch (taskCreationError) {
+    // Log error but don't fail lead creation
+    console.error("Error during initial task creation:", {
+      error: taskCreationError.message,
+      stack: taskCreationError.stack,
+      leadId: data.id,
+    });
+  }
+
   return Response.json({
     success: true,
     lead: {
@@ -332,11 +482,11 @@ export async function PATCH(request) {
 
     const updatedLead = data[0];
 
-    // Note: Task creation for "New" stage is handled by database trigger
+    // Note: Initial task creation for new leads is handled in POST handler
     // Frontend should NOT create tasks when status changes to "New"
     
     // Only create tasks for status changes to non-"New" stages (if needed)
-    // But skip "New" stage as it's handled by trigger
+    // Skip "New" stage as initial task is created during lead creation
     if (status !== undefined && previousStatus !== undefined && String(status).toLowerCase() !== String(previousStatus).toLowerCase()) {
       const s = String(status).toLowerCase();
       

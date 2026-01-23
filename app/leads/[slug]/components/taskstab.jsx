@@ -259,120 +259,57 @@ export default function TasksTab({ leadId, leadName }) {
   const toggleStatus = async (task) => {
     const currentStatus = String(task.status || "").toLowerCase();
     
-    // If marking as completed, check for special scenarios
-    if (currentStatus !== "completed") {
-      // Try multiple fields for lead status
-      const leadStatus = leadData?.status || leadData?.current_stage || "New";
-      
-      // Check if this is the first task (Initial call from New stage)
-      // Try both lead status and task stage
-      const taskStage = task.stage || task.lead_stage;
-      const statusToCheck = taskStage || leadStatus;
-      
-      // Debug: Log to help diagnose issues (remove in production if needed)
-      console.log("Task completion check:", {
-        taskTitle: task.title,
-        taskStage: taskStage,
-        leadStatus: leadStatus,
-        statusToCheck: statusToCheck,
-        isFirstTask: isFirstTask(task, statusToCheck)
-      });
-      
-      if (isFirstTask(task, statusToCheck)) {
-        console.log("Showing qualification modal");
-        setQualificationModal({
-          isOpen: true,
-          task: task,
-          responseStatus: null,
-          note: "",
-          isSubmitting: false,
-        });
-        return;
-      }
-      
-      // Check if this is the special demo scenario
-      if (isDemoSchedulingTask(task, leadStatus)) {
-        setDemoOutcomeModal({
-          isOpen: true,
-          task: task,
-          requiresSecondDemo: null,
-          isSubmitting: false,
-        });
-        return;
-      }
-      
-      // Otherwise, show normal completion modal
-      setTaskCompletionModal({
-        isOpen: true,
-        task: task,
-        comment: "",
-        nextStageComments: "",
-        connectThrough: "",
-        dueDate: "",
-        outcome: "Success",
-        isSubmitting: false,
-        showCalendar: false,
-      });
-      return;
-    }
+    // Directly toggle task status without showing any modal
+    const nextStatus = currentStatus === "completed" ? "Pending" : "Completed";
     
-    // If unmarking as completed, just update directly
-    const nextStatus = "Pending";
-    mutate(
-      (tasks) =>
-        Array.isArray(tasks)
-          ? tasks.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
-          : tasks,
-      false
-    );
     try {
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: task.id, status: nextStatus }),
+        body: JSON.stringify({
+          id: task.id,
+          status: nextStatus,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to update task");
-      await mutate();
-    } catch (err) {
-      await mutate(); // revert
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update task status");
+      }
+
+      // Refresh tasks data
+      mutate();
+      toast.success(nextStatus === "Completed" ? "Task marked as completed" : "Task marked as pending");
+    } catch (error) {
+      console.error("Error updating task status:", error);
+      toast.error(error.message || "Failed to update task status");
     }
   };
   
-  // Confirm task completion with stage progression
-  // IMPORTANT: This function follows a strict 3-step order to prevent duplicate task creation.
-  // Backend triggers handle task creation - frontend should NEVER create tasks directly.
+  // Confirm task completion - UPDATED: No longer updates lead status automatically
+  // Task completion now ONLY marks the task as completed and logs activity.
+  // Lead status changes must be done explicitly via status dropdown/button.
   const handleConfirmTaskCompletion = async () => {
-    const { task, comment, nextStageComments, connectThrough, dueDate, outcome } = taskCompletionModal;
+    const { task, comment, connectThrough, outcome } = taskCompletionModal;
     
     if (!comment.trim()) {
       toast.error("Please add a comment before completing the task");
       return;
     }
     
-    // Validate lead status
-    const currentLeadStatus = leadData?.status || leadData?.current_stage || "New";
-    if (!currentLeadStatus || currentLeadStatus === "null" || currentLeadStatus === "undefined") {
-      toast.error("Cannot complete task: Lead status is invalid. Please refresh the page.");
-      return;
-    }
-    
     setTaskCompletionModal((prev) => ({ ...prev, isSubmitting: true }));
     
     try {
-      const nextStage = getNextStage(currentLeadStatus);
-      
       // Get assigned salesperson_id from lead data (assigned_to field)
       const assignedSalespersonId = leadData?.assigned_to || null;
       
-      // STEP 1: Insert into task_activities
-      // This must happen FIRST before any other updates
-      // Note: reschedule_comments (next stage comment) is stored in leads_table.next_stage_notes in STEP 3
+      // STEP 1: Insert into task_activities - log the task completion
       const activityRes = await fetch("/api/task-activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lead_id: leadId,
-          activity: "Stage completed", // Activity description
+          activity: "Task completed", // Activity description
           type: "manual", // Type is 'manual' for UI-initiated task completions
           comments: comment, // Required: current stage comment
           connect_through: connectThrough || null, // Call / Email / WhatsApp / Meeting
@@ -401,66 +338,9 @@ export default function TasksTab({ leadId, leadName }) {
         throw new Error("Failed to complete task");
       }
       
-      // STEP 3: Update leads_table - move to next stage
-      // Only update if there's a valid next stage
-      if (nextStage && nextStage !== "null" && nextStage !== "undefined") {
-        const leadUpdateRes = await fetch("/api/leads", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: leadId,
-            current_stage: nextStage, // Move to next stage (Demo / Second Demo / Proposal / Won)
-            status: nextStage, // Also update status field for consistency
-            next_stage_notes: nextStageComments || null, // Optional next stage comment
-          }),
-        });
-        
-        if (!leadUpdateRes.ok) {
-          throw new Error("Failed to update lead status");
-        }
-        
-        // NOTE: Task creation for next stage is handled by PostgreSQL triggers.
-        // The trigger automatically creates the next task when current_stage is updated.
-        // Frontend should NEVER create tasks directly to avoid duplicates and rollback errors.
-        
-        // STEP 4: Update next task's due_date if provided
-        // Wait a bit for the trigger to create the task, then update its due_date
-        if (dueDate && dueDate.trim()) {
-          // Wait 500ms for the database trigger to create the task
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Fetch the newly created task for this lead and next stage
-          const nextTaskRes = await fetch(`/api/tasks?lead_id=${leadId}`);
-          if (nextTaskRes.ok) {
-            const nextTasksData = await nextTaskRes.json();
-            // Find the task with the next stage (most recently created pending task)
-            const nextTask = Array.isArray(nextTasksData) 
-              ? nextTasksData
-                  .filter(t => t.status?.toLowerCase() !== "completed" && (t.stage === nextStage || t.lead_stage === nextStage))
-                  .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-              : null;
-            
-            if (nextTask && nextTask.id) {
-              // Convert date to ISO format if needed
-              const dueDateISO = dueDate.includes('T') ? dueDate : `${dueDate}T00:00:00.000Z`;
-              
-              // Update the next task's due_date
-              const updateDueDateRes = await fetch("/api/tasks", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  id: nextTask.id,
-                  due_date: dueDateISO,
-                }),
-              });
-              
-              if (!updateDueDateRes.ok) {
-                console.warn("Failed to update next task due_date, but task completion succeeded");
-              }
-            }
-          }
-        }
-      }
+      // NOTE: Lead status is NOT updated automatically during task completion.
+      // Users must explicitly change lead status via status dropdown/button.
+      // This decouples task completion from lead status progression.
       
       // Save to stage_notes table (optional, for historical tracking)
       try {
@@ -470,7 +350,7 @@ export default function TasksTab({ leadId, leadName }) {
           body: JSON.stringify({
             lead_id: leadId,
             current_stage_notes: comment,
-            next_stage_notes: nextStageComments || null,
+            next_stage_notes: null, // No next stage notes during task completion
             outcome: outcome || "Success",
           }),
         });
@@ -493,10 +373,6 @@ export default function TasksTab({ leadId, leadName }) {
       });
       
       await mutate();
-      // Refresh lead data if available
-      if (window.location) {
-        window.location.reload();
-      }
       
       toast.success("Task completed successfully");
     } catch (error) {
@@ -520,8 +396,9 @@ export default function TasksTab({ leadId, leadName }) {
     });
   };
 
-  // Handle demo outcome confirmation
-  // IMPORTANT: Follows the same 3-step order - NO task creation from frontend
+  // Handle demo outcome confirmation - UPDATED: No longer updates lead status automatically
+  // Task completion only marks task as completed and logs activity.
+  // User must explicitly change lead status via status dropdown if needed.
   const handleDemoOutcomeConfirm = async () => {
     const { task, requiresSecondDemo } = demoOutcomeModal;
     
@@ -534,12 +411,6 @@ export default function TasksTab({ leadId, leadName }) {
 
     try {
       const assignedSalespersonId = leadData?.assigned_to || null;
-      const currentLeadStatus = leadData?.status || leadData?.current_stage || "New";
-      
-      if (requiresSecondDemo) {
-        // YES: Client needs a second demo
-        // Update current_stage to "Second Demo" - this triggers the backend to create the second demo task
-        // IMPORTANT: We MUST change the stage value (OLD ≠ NEW) for the trigger to fire
         
         // STEP 1: Insert into task_activities
         const activityRes = await fetch("/api/task-activities", {
@@ -547,9 +418,11 @@ export default function TasksTab({ leadId, leadName }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lead_id: leadId,
-            activity: "Stage completed",
+          activity: "Task completed",
             type: "manual",
-            comments: "Demo completed - scheduling second demo",
+          comments: requiresSecondDemo 
+            ? "Demo completed - client requires second demo" 
+            : "Demo completed - proceeding to next stage",
             connect_through: null,
             source: "ui",
             salesperson_id: assignedSalespersonId,
@@ -574,95 +447,9 @@ export default function TasksTab({ leadId, leadName }) {
           throw new Error("Failed to complete task");
         }
 
-        // STEP 3: Update leads_table.current_stage to "Second Demo"
-        // This stage change triggers the PostgreSQL trigger to create the "Second demo scheduled {client name}" task
-        // NOTE: The database trigger is the SINGLE SOURCE OF TRUTH for task creation.
-        // Frontend should NEVER create tasks directly - only update current_stage.
-        const leadUpdateRes = await fetch("/api/leads", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: leadId,
-            current_stage: STAGE_CONSTANTS.SECOND_DEMO, // Explicitly set to "Second Demo"
-            status: STAGE_CONSTANTS.SECOND_DEMO, // Also update status for consistency
-            // DO NOT send task title, task creation, or any tasks_table operations
-            // The backend trigger handles all task creation based on current_stage changes
-          }),
-        });
-        
-        if (!leadUpdateRes.ok) {
-          throw new Error("Failed to update lead status");
-        }
-        
-        await mutate();
-        
-        // Close modal
-        setDemoOutcomeModal({
-          isOpen: false,
-          task: null,
-          requiresSecondDemo: null,
-          isSubmitting: false,
-        });
-
-        toast.success("Task completed. Second demo will be scheduled by the system.");
-      } else {
-        // NO: Client does not need a second demo - proceed to Proposal stage
-        // Update current_stage to "Proposal" - this triggers the backend to create the proposal task
-        // IMPORTANT: We MUST change the stage value (OLD ≠ NEW) for the trigger to fire
-        
-        // STEP 1: Insert into task_activities
-        const activityRes = await fetch("/api/task-activities", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lead_id: leadId,
-            activity: "Stage completed",
-            type: "manual",
-            comments: "Demo completed - proceeding to next stage",
-            connect_through: null,
-            source: "ui",
-            salesperson_id: assignedSalespersonId,
-          }),
-        });
-
-        if (!activityRes.ok) {
-          throw new Error("Failed to save task activity");
-        }
-
-        // STEP 2: Mark task as completed
-        const taskRes = await fetch("/api/tasks", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: task.id,
-            status: "Completed",
-          }),
-        });
-        
-        if (!taskRes.ok) {
-          throw new Error("Failed to complete task");
-        }
-
-        // STEP 3: Update leads_table.current_stage to "Proposal"
-        // This stage change triggers the PostgreSQL trigger to create the "Proposal and follow up with {client name}" task
-        // NOTE: The database trigger is the SINGLE SOURCE OF TRUTH for task creation.
-        // Frontend should NEVER create tasks directly - only update current_stage.
-        const leadUpdateRes = await fetch("/api/leads", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: leadId,
-            current_stage: STAGE_CONSTANTS.PROPOSAL, // Explicitly set to "Proposal"
-            status: STAGE_CONSTANTS.PROPOSAL, // Also update status for consistency
-            next_stage_notes: null,
-            // DO NOT send task title, task creation, or any tasks_table operations
-            // The backend trigger handles all task creation based on current_stage changes
-          }),
-        });
-        
-        if (!leadUpdateRes.ok) {
-          throw new Error("Failed to update lead status");
-        }
+      // NOTE: Lead status is NOT updated automatically.
+      // If user wants to change status (e.g., to "Second Demo" or "Proposal"),
+      // they must do so explicitly via the status dropdown/button.
         
         // Save to stage_notes table (optional, for historical tracking)
         try {
@@ -671,7 +458,9 @@ export default function TasksTab({ leadId, leadName }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               lead_id: leadId,
-              current_stage_notes: "Demo completed - proceeding to next stage",
+            current_stage_notes: requiresSecondDemo 
+              ? "Demo completed - client requires second demo" 
+              : "Demo completed - proceeding to next stage",
               next_stage_notes: null,
               outcome: "Success",
             }),
@@ -690,13 +479,8 @@ export default function TasksTab({ leadId, leadName }) {
         });
         
         await mutate();
-        // Refresh lead data if available
-        if (window.location) {
-          window.location.reload();
-        }
         
-        toast.success("Task completed successfully");
-      }
+      toast.success("Task completed successfully. Update lead status manually if needed.");
     } catch (error) {
       toast.error(error.message);
       setDemoOutcomeModal((prev) => ({ ...prev, isSubmitting: false }));
@@ -726,7 +510,8 @@ export default function TasksTab({ leadId, leadName }) {
 
     try {
       if (responseStatus === "responded") {
-        // RESPONDED: Update response_status, proceed with normal flow (trigger next workflow)
+        // RESPONDED: Update response_status only, then show normal completion modal
+        // UPDATED: No longer automatically updates lead status
         await fetch("/api/leads", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -1212,322 +997,8 @@ export default function TasksTab({ leadId, leadName }) {
         </div>
       </div>
 
-      {/* Task Completion Modal */}
-      {taskCompletionModal.isOpen && taskCompletionModal.task && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6">
-          <div
-            className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl transform transition-all max-h-[90vh] overflow-y-auto ${
-              isDark ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
-            }`}
-          >
-            {/* Header */}
-            <div className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10 flex-shrink-0">
-                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base sm:text-lg font-semibold truncate">Complete Task</h2>
-                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"} truncate`}>
-                    {leadData?.status && getNextStage(leadData.status) && (
-                      <>Moving to: <span className="font-medium text-orange-500">{getNextStage(leadData.status)}</span></>
-                    )}
-                    {(!leadData?.status || !getNextStage(leadData.status)) && (
-                      <span className="font-medium text-orange-500">Completing task</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleCancelTaskCompletion}
-                className={`p-2 rounded-lg transition-colors ${
-                  isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
-                }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
+      {/* Task Completion Modal - REMOVED: Tasks are now marked as completed directly without modal */}
 
-            {/* Body */}
-            <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
-              {/* Connect Through */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Connect Through
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { id: "call", label: "Call", icon: "📞" },
-                    { id: "email", label: "Email", icon: "✉️" },
-                    { id: "meeting", label: "Meeting", icon: "🤝" },
-                    { id: "whatsapp", label: "WhatsApp", icon: "💬" },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setTaskCompletionModal((prev) => ({ ...prev, connectThrough: option.id }))}
-                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
-                        taskCompletionModal.connectThrough === option.id
-                          ? "border-orange-500 bg-orange-500/10 text-orange-500"
-                          : isDark
-                            ? "border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300"
-                            : "border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      <span className="text-base sm:text-lg">{option.icon}</span>
-                      <span className="text-xs font-medium">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Current Stage Comment */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Current Stage Comment <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  placeholder="Add a comment about completing this task..."
-                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
-                    isDark
-                      ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
-                      : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
-                  }`}
-                  rows={3}
-                  value={taskCompletionModal.comment}
-                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, comment: e.target.value }))}
-                  autoFocus
-                />
-                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  This will be saved to the activity log.
-                </p>
-              </div>
-
-              {/* Next Stage Comments */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Next Stage Comments
-                </label>
-                <textarea
-                  placeholder="Add comments about the next stage..."
-                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
-                    isDark
-                      ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
-                      : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
-                  }`}
-                  rows={3}
-                  value={taskCompletionModal.nextStageComments}
-                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, nextStageComments: e.target.value }))}
-                />
-                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  Optional comments about the next stage.
-                </p>
-              </div>
-
-              {/* Outcome */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Outcome
-                </label>
-                <select
-                  value={taskCompletionModal.outcome}
-                  onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, outcome: e.target.value }))}
-                  className={`w-full p-2.5 sm:p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
-                    isDark
-                      ? "bg-[#262626] border-gray-700 text-gray-200"
-                      : "bg-white border-gray-200 text-gray-900"
-                  }`}
-                >
-                  <option value="Success">Success</option>
-                  <option value="Reschedule">Reschedule</option>
-                  <option value="No response">No response</option>
-                </select>
-                <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  Select the outcome of this stage.
-                </p>
-              </div>
-
-              {/* Next Task Due Date */}
-              {leadData?.status && getNextStage(leadData.status) && (
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Next Task Due Date
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setTaskCompletionModal((prev) => ({ ...prev, showCalendar: !prev.showCalendar }))}
-                      className={`w-full flex items-center justify-between p-2.5 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
-                        taskCompletionModal.dueDate
-                          ? "border-orange-500 bg-orange-500/5"
-                          : isDark
-                            ? "border-gray-700 hover:border-gray-600"
-                            : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${taskCompletionModal.dueDate ? "bg-orange-500/20 text-orange-500" : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                        <span className={`text-xs sm:text-sm truncate ${taskCompletionModal.dueDate ? (isDark ? "text-gray-200" : "text-gray-900") : (isDark ? "text-gray-500" : "text-gray-400")}`}>
-                          {taskCompletionModal.dueDate 
-                            ? new Date(taskCompletionModal.dueDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                            : "Select due date for next task"
-                          }
-                        </span>
-                      </div>
-                      <svg className={`w-5 h-5 transition-transform ${taskCompletionModal.showCalendar ? "rotate-180" : ""} ${isDark ? "text-gray-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-
-                    {/* Calendar Dropdown */}
-                    {taskCompletionModal.showCalendar && (
-                      <div className={`absolute z-50 mt-2 w-full left-0 right-0 p-3 sm:p-4 rounded-2xl shadow-2xl border ${isDark ? "bg-[#1f1f1f] border-gray-700" : "bg-white border-gray-200"}`}>
-                        {/* Quick Select Options */}
-                        <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                          Quick Select
-                        </p>
-                        <div className="flex flex-wrap gap-2 mb-3 sm:mb-4">
-                          {[
-                            { label: "Today", days: 0 },
-                            { label: "Tomorrow", days: 1 },
-                            { label: "In 3 days", days: 3 },
-                            { label: "In a week", days: 7 },
-                          ].map((option) => {
-                            const date = new Date();
-                            date.setDate(date.getDate() + option.days);
-                            const dateStr = date.toISOString().split('T')[0];
-                            const isSelected = taskCompletionModal.dueDate === dateStr;
-                            return (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => setTaskCompletionModal((prev) => ({ ...prev, dueDate: dateStr, showCalendar: false }))}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                                  isSelected
-                                    ? "bg-orange-500 text-white"
-                                    : isDark
-                                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        
-                        {/* Divider */}
-                        <div className={`flex items-center gap-2 sm:gap-3 my-3 sm:my-4 ${isDark ? "text-gray-600" : "text-gray-300"}`}>
-                          <div className="flex-1 h-px bg-current"></div>
-                          <span className={`text-xs font-medium ${isDark ? "text-gray-500" : "text-gray-400"}`}>or pick a date</span>
-                          <div className="flex-1 h-px bg-current"></div>
-                        </div>
-                        
-                        {/* Custom Date Input */}
-                        <div className={`p-2.5 sm:p-3 rounded-xl border-2 border-dashed ${isDark ? "border-gray-700 bg-gray-800/30" : "border-gray-200 bg-gray-50"}`}>
-                          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-                            <div className={`p-1.5 rounded-lg flex-shrink-0 ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
-                              <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                            <span className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-600"}`}>
-                              Custom Date
-                            </span>
-                          </div>
-                          <input
-                            type="date"
-                            value={taskCompletionModal.dueDate}
-                            onChange={(e) => setTaskCompletionModal((prev) => ({ ...prev, dueDate: e.target.value, showCalendar: false }))}
-                            className={`w-full p-3 rounded-lg border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 cursor-pointer ${
-                              isDark
-                                ? "bg-[#262626] border-gray-600 text-gray-200 hover:border-gray-500"
-                                : "bg-white border-gray-200 text-gray-900 hover:border-gray-300"
-                            }`}
-                          />
-                        </div>
-                        
-                        {/* Clear button */}
-                        {taskCompletionModal.dueDate && (
-                          <button
-                            type="button"
-                            onClick={() => setTaskCompletionModal((prev) => ({ ...prev, dueDate: "" }))}
-                            className={`mt-3 w-full py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-2 ${
-                              isDark
-                                ? "text-red-400 hover:bg-red-500/10 border border-red-500/20"
-                                : "text-red-500 hover:bg-red-50 border border-red-200"
-                            }`}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Clear date
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className={`mt-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                    Optional: Set due date for the next task that will be created.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className={`flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-              <button
-                onClick={handleCancelTaskCompletion}
-                disabled={taskCompletionModal.isSubmitting}
-                className={`w-full sm:w-auto px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isDark
-                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                } disabled:opacity-50`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmTaskCompletion}
-                disabled={taskCompletionModal.isSubmitting || !taskCompletionModal.comment.trim()}
-                className="w-full sm:w-auto px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {taskCompletionModal.isSubmitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Completing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Complete Task
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Demo Outcome Confirmation Modal */}
       {demoOutcomeModal.isOpen && demoOutcomeModal.task && (

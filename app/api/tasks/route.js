@@ -97,6 +97,10 @@ export async function POST(request) {
 
   const { lead_id, salesperson_id, sales_person_id, priority, comments, type, title, due_date, stage } = body;
 
+  // DEBUG: Log the title being received
+  console.log("📝 Task Creation - Title received from frontend:", title);
+  console.log("📝 Task Creation - Full body:", JSON.stringify(body, null, 2));
+
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
 
   // Get lead to determine stage if not provided
@@ -148,8 +152,68 @@ export async function POST(request) {
 
   // Add optional fields
   if (finalSalesPersonId) insertData.sales_person_id = finalSalesPersonId;
-  if (title) insertData.title = title;
+  // Always use the provided title - do NOT generate titles, use exactly what user provided
+  if (title && title.trim()) {
+    insertData.title = title.trim();
+    // DEBUG: Log the title being inserted
+    console.log("📝 Task Creation - Title being inserted:", insertData.title);
+  } else {
+    // If no title provided, return error (title should always be provided)
+    console.error("❌ Task Creation - No title provided!");
+    return Response.json({ error: "Task title is required" }, { status: 400 });
+  }
   if (due_date) insertData.due_date = due_date;
+
+  // Check for existing task with same lead_id, stage, and title (to avoid unique constraint violation)
+  // The uq_task_per_stage constraint includes lead_id, stage, and title
+  // Use case-insensitive comparison and trim whitespace for title matching
+  // IMPORTANT: Don't filter by status - check ALL tasks regardless of status
+  const titleToMatch = insertData.title.trim().toLowerCase();
+  
+  console.log("🔍 Task Creation - Checking for duplicates:", {
+    lead_id,
+    stage: taskStage,
+    title: insertData.title,
+    titleToMatch
+  });
+  
+  const { data: existingTasks, error: checkError } = await supabase
+    .from("tasks_table")
+    .select("id, title, status, stage")
+    .eq("lead_id", lead_id)
+    .eq("stage", taskStage);
+    // NOTE: Not filtering by status - check ALL tasks (Pending, Completed, etc.)
+
+  if (checkError) {
+    console.error("❌ Task Creation - Error checking for duplicates:", checkError);
+    // Continue with insert even if check fails
+  }
+
+  // Check if any existing task has the same title (case-insensitive, trimmed)
+  const existingTask = existingTasks?.find(
+    (task) => task.title?.trim().toLowerCase() === titleToMatch
+  );
+
+  if (existingTask) {
+    console.warn("⚠️ Task Creation - Task already exists for this lead, stage, and title:", {
+      lead_id,
+      stage: taskStage,
+      title: insertData.title,
+      existingTask: existingTask,
+      allMatchingTasks: existingTasks
+    });
+    // Return the existing task instead of creating a duplicate
+    return Response.json({ 
+      success: true, 
+      task: existingTask,
+      message: "Task already exists for this stage and title"
+    });
+  }
+  
+  console.log("✅ Task Creation - No duplicate found, proceeding with insert");
+
+  // DEBUG: Log the full insert data
+  console.log("📝 Task Creation - Full insertData:", JSON.stringify(insertData, null, 2));
 
   const { data, error } = await supabase
     .from("tasks_table")
@@ -157,7 +221,68 @@ export async function POST(request) {
     .select()
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("❌ Task Creation - Database error:", error);
+    // Check if it's a duplicate key error
+    if (error.code === '23505' || error.message.includes('duplicate key') || error.message.includes('uq_task_per_stage')) {
+      console.error("❌ Task Creation - Duplicate key constraint violation:", {
+        errorCode: error.code,
+        errorMessage: error.message,
+        lead_id,
+        stage: taskStage,
+        title: insertData.title
+      });
+      
+      // Try to fetch the existing task (matching lead_id, stage, and title)
+      // Use case-insensitive comparison for title
+      // IMPORTANT: Don't filter by status - check ALL tasks
+      const titleToMatch = insertData.title.trim().toLowerCase();
+      
+      const { data: existingTasksData, error: fetchError } = await supabase
+        .from("tasks_table")
+        .select("*")
+        .eq("lead_id", lead_id)
+        .eq("stage", taskStage);
+        // NOTE: Not filtering by status - check ALL tasks
+      
+      if (fetchError) {
+        console.error("❌ Task Creation - Error fetching existing task after duplicate error:", fetchError);
+      }
+      
+      // Find task with matching title (case-insensitive)
+      const existingTaskData = existingTasksData?.find(
+        (task) => task.title?.trim().toLowerCase() === titleToMatch
+      );
+      
+      if (existingTaskData) {
+        console.warn("⚠️ Task Creation - Duplicate key error, returning existing task:", {
+          lead_id,
+          stage: taskStage,
+          title: insertData.title,
+          existingTask: existingTaskData,
+          allMatchingTasks: existingTasksData
+        });
+        return Response.json({ 
+          success: true, 
+          task: existingTaskData,
+          message: "Task already exists for this stage and title"
+        });
+      } else {
+        // Couldn't find the existing task - this shouldn't happen, but log it
+        console.error("❌ Task Creation - Duplicate key error but couldn't find existing task:", {
+          lead_id,
+          stage: taskStage,
+          title: insertData.title,
+          allTasksForLeadStage: existingTasksData
+        });
+      }
+    }
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  // DEBUG: Log what was returned from database
+  console.log("📝 Task Creation - Task returned from database:", JSON.stringify(data, null, 2));
+  console.log("📝 Task Creation - Title in returned task:", data?.title);
 
   // Create corresponding task_activity record with assigned sales_person_id
   if (data && finalSalesPersonId) {
