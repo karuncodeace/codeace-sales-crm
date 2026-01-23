@@ -36,7 +36,7 @@ export default function ProspectsTable() {
         type: "",
     });
     const handleLeadClick = (prospectId) => {
-        router.push(`/prospects/${prospectId}`);
+        router.push(`/leads/${prospectId}`);
     };
 
     // Fetch prospects from API (leads with total_score > 20)
@@ -322,8 +322,12 @@ export default function ProspectsTable() {
                                 </tr>
                             ) : (
                                 paginatedProspects.map((prospect) => (
-                                    <tr key={prospect.id} className={`${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}>
-                                        <td className="size-px whitespace-nowrap">
+                                    <tr 
+                                        key={prospect.id} 
+                                        onClick={() => handleLeadClick(prospect.id)}
+                                        className={`cursor-pointer transition-colors ${theme === "dark" ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}
+                                    >
+                                        <td className="size-px whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                             <div className="ps-6 py-2">
                                                 <label
                                                     htmlFor={`prospect-${prospect.id}`}
@@ -340,7 +344,7 @@ export default function ProspectsTable() {
                                                 </label>
                                             </div>
                                         </td>
-                                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(prospect.id)}>
+                                        <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <div className="flex items-center gap-x-3">
 
@@ -358,15 +362,11 @@ export default function ProspectsTable() {
                             </div>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(prospect.id)}>
+                        <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <div className="flex items-center gap-x-3">
-
-                              <div 
-                                className="flex flex-col cursor-pointer"
-                                
-                              >
-                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
+                              <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
                                   {prospect.name || "—"}
                                 </span>
                                 <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
@@ -376,7 +376,7 @@ export default function ProspectsTable() {
                             </div>
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap cursor-pointer">
+                        <td className="size-px whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <div className="px-6 py-2">
                             <div className="flex flex-col ">
                               {prospect.phone ? (
@@ -406,7 +406,7 @@ export default function ProspectsTable() {
                           </div>
                         </td>
                                       
-                                        <td className="size-px whitespace-nowrap">
+                                        <td className="size-px whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                             <div className="px-6 py-2">
                                                 <StatusDropdown
                                                     value={prospect.status}
@@ -424,7 +424,7 @@ export default function ProspectsTable() {
                                         </td>
                                        
                                         
-                                        <td className="size-px whitespace-nowrap">
+                                        <td className="size-px whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                             <div className="px-6 py-2">
                                                 <PriorityDropdown
                                                     value={prospect.priority}
@@ -464,7 +464,7 @@ export default function ProspectsTable() {
                                                 })()}
                                             </div>
                                         </td>
-                                        <td className="size-px whitespace-nowrap">
+                                        <td className="size-px whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                             <div className="px-6 py-2">
                                                 <div
                                                     className="relative"
@@ -473,7 +473,10 @@ export default function ProspectsTable() {
                                                     <button
                                                         type="button"
                                                         aria-label="Open actions menu"
-                                                        onClick={() => handleToggleActions(prospect.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleToggleActions(prospect.id);
+                                                        }}
                                                         className={`inline-flex items-center justify-center rounded-full border p-2 focus:outline-hidden ${theme === "dark"
                                                             ? "border-gray-700 text-gray-400 hover:text-gray-200"
                                                             : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
