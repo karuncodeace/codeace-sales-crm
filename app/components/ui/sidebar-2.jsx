@@ -114,6 +114,7 @@ export default function Sidebar2() {
             ),
             isDropdown: true,
             dropdownOptions: [
+                { label: "All leads", filter: "filter=all_leads" },
                 { label: "New leads", filter: "filter=new_leads" },
                 { label: "Responded", filter: "filter=responded" },
                 { label: "Not responded", filter: "filter=not_responded" },
@@ -294,7 +295,7 @@ export default function Sidebar2() {
         if (filter) {
             router.push(`${path}?${filter}`);
         } else {
-            router.push(path);
+        router.push(path);
         }
         setLeadsDropdownOpen(false);
     };
@@ -385,16 +386,16 @@ export default function Sidebar2() {
                                             className={`w-full p-3 rounded-lg gap-3 flex items-center justify-between transition-all duration-200 cursor-pointer ${
                                                 active || (isLeadsItem && leadsDropdownOpen)
                                                     ? "bg-orange-600 text-white shadow-md"
-                                                    : theme === "dark"
-                                                        ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                                                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                            : theme === "dark"
+                                                ? "text-gray-400 hover:bg-gray-800 hover:text-white"
+                                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                             }`}>
                                             <div className="flex items-center gap-3">
                                                 <div className="flex-shrink-0">{item.icon}</div>
-                                                <div>
-                                                    <span className="font-medium">{item.label}</span>
-                                                </div>
-                                            </div>
+                                        <div>
+                                            <span className="font-medium">{item.label}</span>
+                                        </div>
+                                    </div>
                                             {isLeadsItem && (
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -406,7 +407,7 @@ export default function Sidebar2() {
                                                     strokeWidth="2.5"
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
-                                                    className={`transition-transform duration-200 ${leadsDropdownOpen ? "rotate-180" : ""}`}
+                                                    className={`transition-transform duration-300 ease-in-out ${leadsDropdownOpen ? "rotate-180" : "rotate-0"}`}
                                                 >
                                                     <path d="M6 9l6 6 6-6" />
                                                 </svg>
@@ -414,10 +415,13 @@ export default function Sidebar2() {
                                         </div>
                                         
                                         {/* Dropdown Menu */}
-                                        {isLeadsItem && leadsDropdownOpen && !isCollapsed && (
+                                        {isLeadsItem && !isCollapsed && (
                                             <div 
-                                                className={`mt-2 
-                                                     rounded-lg overflow-hidden transition-all duration-200 animate-in fade-in slide-in-from-top-2 ${
+                                                className={`mt-2  rounded-lg overflow-hidden ${
+                                                    leadsDropdownOpen 
+                                                        ? "opacity-100 max-h-96 translate-y-0 scale-100" 
+                                                        : "opacity-0 max-h-0 -translate-y-2 scale-95 pointer-events-none"
+                                                } transition-all duration-300 ease-out ${
                                                     theme === "dark" 
                                                         ? "bg-[#262626] border border-gray-700 shadow-xl" 
                                                         : "bg-white border border-gray-200 shadow-lg"
@@ -434,7 +438,7 @@ export default function Sidebar2() {
                                                         <div
                                                             key={index}
                                                             onClick={() => handleMenuClick(item.path, option.filter)}
-                                                            className={`px-4 py-3 text-sm cursor-pointer transition-all duration-150 relative ${
+                                                            className={`px-4 py-3 text-sm cursor-pointer transition-all duration-200 ease-in-out relative transform ${
                                                                 index !== item.dropdownOptions.length - 1 
                                                                     ? `border-b ${theme === "dark" ? "border-gray-700/50" : "border-gray-200"}`
                                                                     : ""
@@ -444,8 +448,8 @@ export default function Sidebar2() {
                                                                         ? "bg-orange-500/20 text-orange-400"
                                                                         : "bg-orange-50 text-orange-600"
                                                                     : theme === "dark"
-                                                                        ? "text-gray-300 hover:bg-gray-700/50 hover:text-orange-400"
-                                                                        : "text-gray-700 hover:bg-orange-50/50 hover:text-orange-600"
+                                                                        ? "text-gray-300 hover:bg-gray-700/50 hover:text-orange-400 hover:translate-x-1"
+                                                                        : "text-gray-700 hover:bg-orange-50/50 hover:text-orange-600 hover:translate-x-1"
                                                             }`}
                                                         >
                                                             {isActiveOption && (

@@ -258,9 +258,20 @@ export default function LeadsTable({ initialFilter = null }) {
       switch (advancedFilters.filter) {
         case "new_leads":
           // Filter leads that have not done the first call
-          // Handle multiple formats: null, false, "", "false", 0
+          // Match: first_call_done = 'Not Done' (case insensitive)
+          // Also handle: null, false, "", "false", 0, undefined
           result = result.filter((lead) => {
             const firstCallDone = lead.first_call_done;
+            
+            // Check for "Not Done" (case insensitive)
+            if (firstCallDone) {
+              const normalized = String(firstCallDone).trim().toLowerCase();
+              if (normalized === "not done" || normalized === "'not done'::text") {
+                return true;
+              }
+            }
+            
+            // Also include null, false, empty, undefined values
             return (
               firstCallDone === null ||
               firstCallDone === false ||
@@ -303,10 +314,13 @@ export default function LeadsTable({ initialFilter = null }) {
           });
           break;
         case "not_responded":
-          // Filter by response_status = "Not responded"
+          // Filter by response_status = "Not Responded" (case insensitive)
           result = result.filter((lead) => {
             const responseStatus = lead.response_status;
-            return responseStatus && String(responseStatus) === "Not responded";
+            if (!responseStatus) return false;
+            const normalizedStatus = String(responseStatus).trim();
+            // Match "Not Responded" (case insensitive)
+            return normalizedStatus.toLowerCase() === "not responded";
           });
           break;
         case "demo_scheduled":
