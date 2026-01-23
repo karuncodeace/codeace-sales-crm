@@ -1,12 +1,10 @@
 "use client";
 import AddLeadModal from "../components/buttons/addLeadModal";
 import LeadsTable from "../components/tables/leadsTable";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-
-
-export default function LeadsPage() {
+function LeadsPageContent() {
   const [openAddLead, setOpenAddLead] = useState(false);
   const searchParams = useSearchParams();
   const [initialFilter, setInitialFilter] = useState(null);
@@ -68,5 +66,25 @@ export default function LeadsPage() {
      </div>
     </div>
     </>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="pl-5 md:pl-0 2xl:pl-0 w-full">
+        <div className="mt-8 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Leads Management</h1>
+        </div>
+        <div className="mt-4">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <LeadsPageContent />
+    </Suspense>
   );
 }

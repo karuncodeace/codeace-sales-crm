@@ -5,9 +5,11 @@ const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState("light");
+  const [mounted, setMounted] = useState(false);
 
   // Load saved theme on mount, default to light
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem("theme");
     if (saved && saved === "dark") {
       setTheme("dark");
@@ -29,7 +31,7 @@ export function ThemeProvider({ children }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Phone, Mail, MessageSquare, MoreHorizontal, ArrowLeft, MapPin, User, Target, IndianRupee, Flame, Calendar, Clock, CheckCircle2, Circle, FileText, TrendingUp, Building2, Loader2, Copy, Check, Plus, Edit2, Trash2, StickyNote, ChevronDown } from "lucide-react";
@@ -21,7 +21,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json());
 
 // Notes Tab Component
 
-export default function LeadDetailPage() {
+function LeadDetailPageContent() {
     const router = useRouter();
     const params = useParams();
     const searchParams = useSearchParams();
@@ -771,5 +771,22 @@ export default function LeadDetailPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function LeadDetailPage() {
+    return (
+        <Suspense fallback={
+            <div className="pl-5 md:pl-0 2xl:pl-0 w-full">
+                <div className="mt-8">
+                    <div className="animate-pulse">
+                        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+                        <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        }>
+            <LeadDetailPageContent />
+        </Suspense>
     );
 }

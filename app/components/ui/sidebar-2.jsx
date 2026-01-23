@@ -25,10 +25,13 @@ export default function Sidebar2() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const { theme } = useTheme();
+    const { theme, mounted } = useTheme();
     const [userRole, setUserRole] = useState(null);
     const [leadsDropdownOpen, setLeadsDropdownOpen] = useState(false);
     const leadsDropdownRef = useRef(null);
+    
+    // Use default theme during SSR to prevent hydration mismatch
+    const effectiveTheme = mounted ? theme : "light";
 
     useEffect(() => {
         const fetchUserRole = async () => {
@@ -315,13 +318,13 @@ export default function Sidebar2() {
     return (
         <div
             className={`fixed left-0 top-0 h-full transition-all duration-300  ${isCollapsed ? "w-20" : "w-56"
-                } ${theme === "dark" ? "bg-[#1a1a1a]" : "bg-white"} border-r ${theme === "dark" ? "border-gray-800" : "border-gray-200"
+                } ${effectiveTheme === "dark" ? "bg-[#1a1a1a]" : "bg-white"} border-r ${effectiveTheme === "dark" ? "border-gray-800" : "border-gray-200"
                 } flex flex-col z-40`}
         >
 
             {/* Logo Section */}
             <div
-                className={`flex items-center border-b p-10 ${theme === "dark" ? "border-gray-800" : "border-gray-200"
+                className={`flex items-center border-b p-10 ${effectiveTheme === "dark" ? "border-gray-800" : "border-gray-200"
                     } h-18 relative overflow-hidden`}
             >
                 {/* Full Logo (shown when expanded) */}
@@ -371,7 +374,7 @@ export default function Sidebar2() {
                                             <div  onClick={() => !isLeadsItem && handleMenuClick(item.path)}
                                                 className={`w-full h-12  rounded-lg p-1   gap-3 transition-colors flex items-center justify-center cursor-pointer ${active
                                                     ? "bg-orange-600 text-white"
-                                                    : theme === "dark"
+                                                    : effectiveTheme === "dark"
                                                         ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                                     }`}>
@@ -386,7 +389,7 @@ export default function Sidebar2() {
                                             className={`w-full p-3 rounded-lg gap-3 flex items-center justify-between transition-all duration-200 cursor-pointer ${
                                                 active || (isLeadsItem && leadsDropdownOpen)
                                                     ? "bg-orange-600 text-white shadow-md"
-                                            : theme === "dark"
+                                            : effectiveTheme === "dark"
                                                 ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                             }`}>
@@ -422,7 +425,7 @@ export default function Sidebar2() {
                                                         ? "opacity-100 max-h-96 translate-y-0 scale-100" 
                                                         : "opacity-0 max-h-0 -translate-y-2 scale-95 pointer-events-none"
                                                 } transition-all duration-300 ease-out ${
-                                                    theme === "dark" 
+                                                    effectiveTheme === "dark" 
                                                         ? "bg-[#262626] border border-gray-700 shadow-xl" 
                                                         : "bg-white border border-gray-200 shadow-lg"
                                                 }`}
@@ -440,20 +443,20 @@ export default function Sidebar2() {
                                                             onClick={() => handleMenuClick(item.path, option.filter)}
                                                             className={`px-4 py-3 text-sm cursor-pointer transition-all duration-200 ease-in-out relative transform ${
                                                                 index !== item.dropdownOptions.length - 1 
-                                                                    ? `border-b ${theme === "dark" ? "border-gray-700/50" : "border-gray-200"}`
+                                                                    ? `border-b ${effectiveTheme === "dark" ? "border-gray-700/50" : "border-gray-200"}`
                                                                     : ""
                                                             } ${
                                                                 isActiveOption
-                                                                    ? theme === "dark"
+                                                                    ? effectiveTheme === "dark"
                                                                         ? "bg-orange-500/20 text-orange-400"
                                                                         : "bg-orange-50 text-orange-600"
-                                                                    : theme === "dark"
+                                                                    : effectiveTheme === "dark"
                                                                         ? "text-gray-300 hover:bg-gray-700/50 hover:text-orange-400 hover:translate-x-1"
                                                                         : "text-gray-700 hover:bg-orange-50/50 hover:text-orange-600 hover:translate-x-1"
                                                             }`}
                                                         >
                                                             {isActiveOption && (
-                                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${theme === "dark" ? "bg-orange-500" : "bg-orange-500"}`}></div>
+                                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${effectiveTheme === "dark" ? "bg-orange-500" : "bg-orange-500"}`}></div>
                                                             )}
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`font-medium ${isActiveOption ? "" : ""}`}>{option.label}</span>
@@ -472,14 +475,14 @@ export default function Sidebar2() {
 
 
                 {/* Collapse Button in Menu Section */}
-                <div className={`mt-auto pt-4 border-t ${theme === "dark" ? "border-gray-800" : "border-gray-200"
+                <div className={`mt-auto pt-4 border-t ${effectiveTheme === "dark" ? "border-gray-800" : "border-gray-200"
                     }`}>
                     {isCollapsed ? (
                         <TooltipIcon label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
                             <button
                                 data-action="toggle-sidebar"
                                 onClick={() => setIsCollapsed(!isCollapsed)}
-                                className={`w-full p-3 rounded-lg flex items-center justify-center transition-colors ${theme === "dark"
+                                className={`w-full p-3 rounded-lg flex items-center justify-center transition-colors ${effectiveTheme === "dark"
                                     ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                     }`}
@@ -509,7 +512,7 @@ export default function Sidebar2() {
                     ) : (
                         <button
                             onClick={() => setIsCollapsed(!isCollapsed)}
-                            className={`w-full p-3 rounded-lg flex items-center gap-3 transition-colors ${theme === "dark"
+                            className={`w-full p-3 rounded-lg flex items-center gap-3 transition-colors ${effectiveTheme === "dark"
                                 ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                 }`}

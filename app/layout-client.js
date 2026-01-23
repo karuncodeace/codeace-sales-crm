@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { usePathname } from "next/navigation";
 import TopBar2 from "./components/ui/top-bar-2";
 import Sidebar2 from "./components/ui/sidebar-2";
@@ -32,9 +32,12 @@ function MainContent({ children }) {
 }
 
 function LayoutStructure({ children, fonts }) {
-  const { theme } = useTheme();
+  const { theme, mounted } = useTheme();
   const { manrope, geistMono, dynaPuff, instrumentSerif } = fonts;
   const pathname = usePathname();
+  
+  // Use default theme during SSR to prevent hydration mismatch
+  const effectiveTheme = mounted ? theme : "light";
 
   const isLoginPage = pathname === "/login";
   const isLogoutPage = pathname === "/logout";
@@ -56,9 +59,9 @@ function LayoutStructure({ children, fonts }) {
   }, []);
 
   return (
-    <html lang="en" className={`${manrope.variable} ${theme}`}>
+    <html lang="en" className={`${manrope.variable} ${effectiveTheme}`}>
       <body
-        className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable} ${instrumentSerif.variable}  ${theme === "dark" ? "dark" : "light"} antialiased`}
+        className={`${manrope.variable} ${geistMono.variable} ${dynaPuff.variable} ${instrumentSerif.variable}  ${effectiveTheme === "dark" ? "dark" : "light"} antialiased`}
         suppressHydrationWarning
       >
         <Toaster
@@ -66,9 +69,9 @@ function LayoutStructure({ children, fonts }) {
           toastOptions={{
             duration: 3000,
             style: {
-              background: theme === "dark" ? "#1f1f1f" : "#fff",
-              color: theme === "dark" ? "#e5e7eb" : "#111827",
-              border: theme === "dark" ? "1px solid #374151" : "1px solid #e5e7eb",
+              background: effectiveTheme === "dark" ? "#1f1f1f" : "#fff",
+              color: effectiveTheme === "dark" ? "#e5e7eb" : "#111827",
+              border: effectiveTheme === "dark" ? "1px solid #374151" : "1px solid #e5e7eb",
             },
             success: {
               iconTheme: {
@@ -89,7 +92,9 @@ function LayoutStructure({ children, fonts }) {
         ) : (
           <SidebarProvider>
             <div className="flex flex-col h-screen">
-              <Sidebar2 />
+              <Suspense fallback={<div className="fixed left-0 top-0 h-full w-56 bg-[#1a1a1a] border-r border-gray-800" />}>
+                <Sidebar2 />
+              </Suspense>
               <TopBar2 />
               <MainContent>{children}</MainContent>
               <ChatBot />

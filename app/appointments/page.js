@@ -7,10 +7,12 @@ import { useTheme } from "../context/themeContext";
 import toast from "react-hot-toast";
 import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
+import { useRouter } from "next/navigation";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function BookingsPage() {
+  const router = useRouter();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [statusFilter, setStatusFilter] = useState("all");
@@ -393,7 +395,8 @@ export default function BookingsPage() {
                   return (
                     <div
                       key={booking.id}
-                      className={`p-6 rounded-lg border transition-all hover:shadow-lg ${
+                      onClick={() => router.push(`/appointments/${booking.id}`)}
+                      className={`p-6 rounded-lg border transition-all hover:shadow-lg cursor-pointer ${
                         isDark
                           ? "bg-[#262626] border-gray-700 hover:border-gray-600"
                           : "bg-white border-gray-200 hover:border-gray-300"
@@ -414,7 +417,7 @@ export default function BookingsPage() {
                             </div>
                           </div>
                           {/* Status Badge and Mark Complete Button */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {/* Mark as Completed Button (hide for cancelled or conducted) */}
                             {displayStatus !== "cancelled" && displayStatus !== "conducted" && (
                               <button
@@ -510,7 +513,7 @@ export default function BookingsPage() {
 
                       {/* Action Buttons */}
                       {displayStatus !== "conducted" && displayStatus !== "cancelled" && (
-                        <div className={`mt-4 pt-4 flex justify-end border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                        <div className={`mt-4 pt-4 flex justify-end border-t ${isDark ? "border-gray-700" : "border-gray-200"}`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex  gap-2">
                             <button
                               type="button"
