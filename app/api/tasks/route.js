@@ -103,10 +103,10 @@ export async function POST(request) {
 
   if (!lead_id) return Response.json({ error: "lead_id is required" }, { status: 400 });
 
-  // Get lead to determine stage if not provided
+  // Get lead to determine stage and priority if not provided
   const { data: lead, error: leadError } = await supabase
     .from("leads_table")
-    .select("status, current_stage, assigned_to")
+    .select("status, current_stage, assigned_to, priority")
     .eq("id", lead_id)
     .single();
 
@@ -146,7 +146,7 @@ export async function POST(request) {
     lead_id,
     stage: taskStage, // CRITICAL: Always include stage
     type: type || "Call",
-    priority: priority || "Medium",
+    priority: priority || lead.priority || "Medium", // Use lead's priority if not provided
     comments: comments || null,
   };
 

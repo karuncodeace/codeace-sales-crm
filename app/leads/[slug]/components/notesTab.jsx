@@ -17,11 +17,27 @@ function NotesTab({ theme, leadId, leadName }) {
     const [newNoteType, setNewNoteType] = useState("general");
     const [activeTab, setActiveTab] = useState("general");
 
-    // Fetch notes from API (filter activities by type "note")
-    const { data: activitiesData, error, isLoading, mutate } = useSWR(
+    // Fetch notes from both APIs
+    const { data: activitiesData, error: activitiesError, isLoading: isLoadingActivities, mutate: mutateActivities } = useSWR(
         leadId ? `/api/task-activities?lead_id=${leadId}` : null,
         fetcher
     );
+    
+    // Fetch notes from leads_notes table
+    const { data: leadNotesData, error: leadNotesError, isLoading: isLoadingLeadNotes, mutate: mutateLeadNotes } = useSWR(
+        leadId ? `/api/lead-notes?lead_id=${leadId}` : null,
+        fetcher
+    );
+    
+    // Combine loading states
+    const isLoading = isLoadingActivities || isLoadingLeadNotes;
+    const error = activitiesError || leadNotesError;
+    
+    // Mutate function to refresh both data sources
+    const mutate = () => {
+        mutateActivities();
+        mutateLeadNotes();
+    };
 
     // Format timestamp for display (using Asia/Calcutta timezone)
     const formatNoteDate = (dateString) => {
@@ -98,7 +114,7 @@ function NotesTab({ theme, leadId, leadName }) {
 
     // Filter notes from activities
     const activitiesList = Array.isArray(activitiesData) ? activitiesData : [];
-    const notes = activitiesList
+    const activityNotes = activitiesList
         .filter(act => act.type === "note")
         .map(act => ({
             id: act.id,
@@ -109,12 +125,29 @@ function NotesTab({ theme, leadId, leadName }) {
             dateTime: formatNoteDate(act.created_at),
             relativeTime: formatRelativeTime(act.created_at),
             notesType: (act.notes_type || "general").toLowerCase(),
-        }))
-        .sort((a, b) => {
-            const dateA = new Date(a.createdAt || 0);
-            const dateB = new Date(b.createdAt || 0);
-            return dateB.getTime() - dateA.getTime(); // Most recent first
-        });
+            source: "task_activities", // Track source for editing/deleting
+        }));
+    
+    // Get notes from leads_notes table
+    const leadNotesList = Array.isArray(leadNotesData) ? leadNotesData : [];
+    const leadNotes = leadNotesList.map(note => ({
+        id: note.id,
+        content: note.notes || "",
+        user: "User", // Default user for leads_notes
+        userInitials: "US",
+        createdAt: note.created_at,
+        dateTime: formatNoteDate(note.created_at),
+        relativeTime: formatRelativeTime(note.created_at),
+        notesType: (note.notes_type || "general").toLowerCase(),
+        source: "leads_notes", // Track source for editing/deleting
+    }));
+    
+    // Combine all notes and sort by date (most recent first)
+    const notes = [...activityNotes, ...leadNotes].sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime(); // Most recent first
+    });
 
     const noteTabs = [
         { id: "general", label: "General Notes" },
@@ -137,13 +170,14 @@ function NotesTab({ theme, leadId, leadName }) {
     );
     typeCounts.general = notes.length;
 
-    // Handle add note
+    // Handle add note - save to both task_activities and leads_notes
     const handleAddNote = async () => {
         if (!newNote.trim()) return;
         
         setIsSubmitting(true);
         try {
-            const response = await fetch('/api/task-activities', {
+            // Save to task_activities (for backward compatibility)
+            const activityResponse = await fetch('/api/task-activities', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -156,49 +190,93 @@ function NotesTab({ theme, leadId, leadName }) {
                 }),
             });
             
-            if (response.ok) {
+            // Also save to leads_notes table
+            const leadNotesResponse = await fetch('/api/lead-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lead_id: leadId,
+                    notes: newNote.trim(),
+                    notes_type: newNoteType,
+                }),
+            });
+            
+            if (activityResponse.ok || leadNotesResponse.ok) {
                 setNewNote("");
                 setNewNoteType("general");
                 setShowAddNote(false);
                 mutate(); // Refresh the notes list
+                if (activityResponse.ok && leadNotesResponse.ok) {
+                    toast.success("Note saved successfully");
+                } else if (leadNotesResponse.ok) {
+                    toast.success("Note saved to leads_notes");
+                } else if (activityResponse.ok) {
+                    toast.success("Note saved to task_activities");
+                }
+            } else {
+                toast.error("Failed to save note");
             }
         } catch (error) {
-            // Silently handle error
+            toast.error("Error saving note");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Handle edit note
+    // Handle edit note - update based on source
     const handleEditNote = async (noteId) => {
         if (!editNoteText.trim()) return;
         
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+        
         setIsSubmitting(true);
         try {
-            const response = await fetch('/api/task-activities', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: noteId,
-                    comments: editNoteText.trim(),
-                    activity: "Note Updated",
-                }),
-            });
+            let response;
+            if (note.source === "leads_notes") {
+                // Update in leads_notes table
+                response = await fetch('/api/lead-notes', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: noteId,
+                        notes: editNoteText.trim(),
+                        notes_type: note.notesType,
+                    }),
+                });
+            } else {
+                // Update in task_activities
+                response = await fetch('/api/task-activities', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: noteId,
+                        comments: editNoteText.trim(),
+                        activity: "Note Updated",
+                    }),
+                });
+            }
             
             if (response.ok) {
                 setEditingNoteId(null);
                 setEditNoteText("");
                 mutate();
+                toast.success("Note updated successfully");
+            } else {
+                toast.error("Failed to update note");
             }
         } catch (error) {
-            // Silently handle error
+            toast.error("Error updating note");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Handle delete note
+    // Handle delete note - delete based on source
     const handleDeleteNote = async (noteId) => {
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+        
         toast(
             (t) => (
                 <div className="flex flex-col gap-2">
@@ -215,9 +293,19 @@ function NotesTab({ theme, leadId, leadName }) {
                                 toast.dismiss(t.id);
                                 setDeletingNoteId(noteId);
                                 try {
-                                    const response = await fetch(`/api/task-activities?id=${noteId}`, {
-                                        method: "DELETE",
-                                    });
+                                    let response;
+                                    if (note.source === "leads_notes") {
+                                        // Delete from leads_notes table
+                                        response = await fetch(`/api/lead-notes?id=${noteId}`, {
+                                            method: "DELETE",
+                                        });
+                                    } else {
+                                        // Delete from task_activities
+                                        response = await fetch(`/api/task-activities?id=${noteId}`, {
+                                            method: "DELETE",
+                                        });
+                                    }
+                                    
                                     if (!response.ok) {
                                         throw new Error("Failed to delete note");
                                     }

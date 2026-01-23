@@ -295,8 +295,9 @@ export default function LeadDetailPage() {
                 try {
                     const taskTitle = nextTask.trim();
                     
-                    // Get lead's assigned salesperson for task assignment
+                    // Get lead's assigned salesperson and priority for task assignment
                     const assignedSalespersonId = lead?.assigned_to || lead?.assignedTo;
+                    const leadPriority = lead?.priority || "Medium"; // Get lead's priority, default to Medium if not set
                     
                     const taskRes = await fetch("/api/tasks", {
                         method: "POST",
@@ -307,7 +308,7 @@ export default function LeadDetailPage() {
                             type: "Follow-Up",
                             stage: newStatus, // Task stage matches new lead status
                             due_date: dueDate || null,
-                            priority: "Medium",
+                            priority: leadPriority, // Use lead's priority instead of defaulting to Medium
                             sales_person_id: assignedSalespersonId, // Assign to lead's salesperson
                         }),
                     });

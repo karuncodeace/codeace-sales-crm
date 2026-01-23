@@ -148,3 +148,114 @@ export async function POST(request) {
   
   return Response.json({ success: true, note: data });
 }
+
+/**
+ * PATCH - Update an existing note in leads_notes table
+ */
+export async function PATCH(request) {
+  const supabase = await supabaseServer();
+  
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
+  const body = await request.json();
+  const { id, notes, notes_type } = body;
+  
+  if (!id) {
+    return Response.json(
+      { error: "id is required" },
+      { status: 400 }
+    );
+  }
+  
+  if (!notes || !notes.trim()) {
+    return Response.json(
+      { error: "notes is required" },
+      { status: 400 }
+    );
+  }
+  
+  // Build update data
+  const updateData = {
+    notes: notes.trim(),
+  };
+  
+  if (notes_type) {
+    updateData.notes_type = notes_type;
+  }
+  
+  // Use admin client to bypass RLS
+  const adminSupabase = supabaseAdmin();
+  
+  const { data, error } = await adminSupabase
+    .from("leads_notes")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error("❌ Lead Notes API - Update error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      updateData
+    });
+    return Response.json({ 
+      error: error.message || "Failed to update note",
+      code: error.code,
+      details: error.details || error.hint || "Check database schema and column names"
+    }, { status: 500 });
+  }
+  
+  return Response.json({ success: true, note: data });
+}
+
+/**
+ * DELETE - Delete a note from leads_notes table
+ */
+export async function DELETE(request) {
+  const supabase = await supabaseServer();
+  
+  const crmUser = await getCrmUser();
+  if (!crmUser) {
+    return Response.json({ error: "Not authorized for CRM" }, { status: 403 });
+  }
+  
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  
+  if (!id) {
+    return Response.json(
+      { error: "id is required" },
+      { status: 400 }
+    );
+  }
+  
+  // Use admin client to bypass RLS
+  const adminSupabase = supabaseAdmin();
+  
+  const { error } = await adminSupabase
+    .from("leads_notes")
+    .delete()
+    .eq("id", id);
+  
+  if (error) {
+    console.error("❌ Lead Notes API - Delete error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
+    return Response.json({ 
+      error: error.message || "Failed to delete note",
+      code: error.code,
+      details: error.details || error.hint || "Check database schema and column names"
+    }, { status: 500 });
+  }
+  
+  return Response.json({ success: true, message: "Note deleted successfully" });
+}

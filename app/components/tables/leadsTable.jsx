@@ -513,9 +513,10 @@ export default function LeadsTable() {
     setStatusChangeModal((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      // Get lead to get assigned salesperson
+      // Get lead to get assigned salesperson and priority
       const lead = leadData.find((l) => l.id === leadId);
       const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to;
+      const leadPriority = lead?.priority || "Medium"; // Get lead's priority, default to Medium if not set
 
       // STEP 1: Save current stage comment as a NOTE in task_activities (general category)
       // This will be visible in the Notes tab under "General Notes"
@@ -608,7 +609,7 @@ export default function LeadsTable() {
             type: "Follow-Up",
             stage: newStatus, // Task stage matches new lead status
             due_date: dueDate || null,
-            priority: "Medium",
+            priority: leadPriority, // Use lead's priority instead of defaulting to Medium
             sales_person_id: assignedSalespersonId, // Assign to lead's salesperson
           };
           

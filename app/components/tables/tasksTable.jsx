@@ -439,6 +439,7 @@ export default function TasksPage() {
                 salesperson_id: task.salesperson_id || task.sales_person_id,
                 leadName: lead?.name || task.lead_id || "—",
                 phone: lead?.phone || "—",
+                email: lead?.email || "—",
                 due_datetime: calculatedDueDate.toISOString(),
                 dueDisplay: formatDue(calculatedDueDate),
                 dueFullDate: calculatedDueDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
@@ -1359,10 +1360,10 @@ export default function TasksPage() {
 
             {/* Table */}
             <div className="flex-1 overflow-y-auto overflow-x-auto">
-                <table className={`min-w-full divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+                <table className={`w-full table-fixed divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                     <thead className={`${theme === "dark" ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
                         <tr>
-                            <th scope="col" className="ps-6 py-3 text-start">
+                            <th scope="col" className="w-12 ps-6 py-3 text-start">
                                 <label htmlFor="task-select-all" className="flex">
                                     <input
                                         type="checkbox"
@@ -1374,15 +1375,11 @@ export default function TasksPage() {
 
                             {[
                                 "Task",
-                                "Type",
-                                "Phone",
+                                "Contact Info",
                                 "Due",
                                 "Status",
-                                ...(userRole !== "sales" ? ["Assigned To"] : []),
+                                ...(userRole !== "sales" && userRole !== null ? ["Assigned To"] : []),
                                 "Priority",
-
-                                
-                                
                             ].map((column) => (
                                 <th
                                     key={column}
@@ -1395,8 +1392,6 @@ export default function TasksPage() {
                                         </span>
                                     </div>
                                 </th>
-
-
                             ))}
                         </tr>
                     </thead>
@@ -1430,7 +1425,7 @@ export default function TasksPage() {
                         ) : filteredTasks.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={12}
+                                    colSpan={8}
                                     className={`px-6 py-10 text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                                 >
                                     <div className="flex flex-col items-center gap-2">
@@ -1476,15 +1471,15 @@ export default function TasksPage() {
                                             </label>
                                         </div>
                                     </td>
-                                    <td className="size-px">
+                                    <td className="overflow-hidden">
                                         <div className="px-6 py-2">
                                             <div className="flex flex-col">
-                                                <span className={`text-sm font-medium block truncate max-w-md ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`} title={task.title} style={{ maxWidth: '400px' }}>
+                                                <span className={`text-sm font-medium block truncate ${task.status?.toLowerCase() === "completed" ? "line-through" : ""} ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`} title={task.title}>
                                                     {(() => {
                                                         if (!task.title) return '';
                                                         const words = task.title.trim().split(/\s+/);
-                                                        if (words.length > 5) {
-                                                            return words.slice(0, 5).join(' ') + '...';
+                                                        if (words.length > 0) {
+                                                            return words.slice(0, 10).join(' ') + '...';
                                                         }
                                                         return task.title;
                                                     })()}
@@ -1494,36 +1489,50 @@ export default function TasksPage() {
                                                     <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
                                                         {task.id}
                                                     </span> 
-                                                <span className="text-xs text-gray-500">|</span>
-                                                <span className={`text-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                                        {task.lead_id}
-                                                    </span> 
+                                                    <span className="text-xs text-gray-500">|</span>
+                                                    <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
+                                                {task.lead_id || "—"}
+                                            </span>
+
+                                               
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="size-px whitespace-nowrap">
+                                    
+                                    <td className="overflow-hidden">
                                         <div className="px-6 py-2">
-                                            <div className="flex items-center gap-2">
-                                                {getTypeIcon(task.type)}
-                                                <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                                    {task.type}
-                                                </span>
+                                            <div className="flex flex-col ">
+                                               
+                                                <div className="flex flex-col ">
+                                                    {task.phone && task.phone !== "—" ? (
+                                                        <a
+                                                            href={`tel:${task.phone.replace(/[^0-9+]/g, "")}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={`text-sm font-medium hover:underline ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
+                                                        >
+                                                            {task.phone}
+                                                        </a>
+                                                    ) : (
+                                                        <span className={`text-sm ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>—</span>
+                                                    )}
+                                                    {task.email && task.email !== "—" ? (
+                                                        <a
+                                                            href={`mailto:${task.email}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={`text-sm font-medium hover:underline truncate ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900/50 hover:text-orange-800"}`}
+                                                            title={task.email}
+                                                        >
+                                                            {task.email.length > 20 ? task.email.substring(0, 20) + "..." : task.email}
+                                                        </a>
+                                                    ) : (
+                                                        <span className={`text-sm ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>—</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
-                                  
-                                    <td className="size-px whitespace-nowrap">
-                                        <div className="px-6 py-2">
-                                            <a
-                                                href={`tel:${task.phone?.replace(/[^0-9+]/g, "")}`}
-                                                className={`text-sm font-medium ${theme === "dark" ? "text-gray-300 hover:text-orange-400" : "text-gray-900 hover:text-orange-800"}`}
-                                            >
-                                                {task.phone}
-                                            </a>
-                                        </div>
-                                    </td>
-                                    <td className="size-px whitespace-nowrap">
+                                    <td className="overflow-hidden whitespace-nowrap">
                                         <div className="px-6 py-2">
                                             <div className="flex flex-col gap-1">
                                                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold w-fit ${dueStyles[task.due]?.[theme === "dark" ? "dark" : "light"] || dueStyles.upcoming.light
@@ -1540,7 +1549,7 @@ export default function TasksPage() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="size-px whitespace-nowrap">
+                                    <td className="overflow-hidden whitespace-nowrap">
                                         <div className="px-6 py-2">
                                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[task.status]?.[theme === "dark" ? "dark" : "light"] || statusStyles.Pending.light
                                                 }`}>
@@ -1549,7 +1558,7 @@ export default function TasksPage() {
                                         </div>
                                     </td>
                                     {userRole !== "sales" && (
-                                        <td className="size-px whitespace-nowrap">
+                                        <td className="overflow-hidden whitespace-nowrap">
                                             <div className="px-6 py-2">
                                                 <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
                                                     {task.assignedTo}
@@ -1557,7 +1566,7 @@ export default function TasksPage() {
                                             </div>
                                         </td>
                                     )}
-                                    <td className="size-px whitespace-nowrap">
+                                    <td className="overflow-hidden whitespace-nowrap">
                                         <div className="px-6 py-2" onClick={(e) => e.stopPropagation()}>
                                             <PriorityDropdown
                                                 value={task.priority}
