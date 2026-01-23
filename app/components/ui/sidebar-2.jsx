@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useTheme } from "../../context/themeContext";
 import { useSidebar } from "../../context/sidebarContext";
@@ -24,8 +24,11 @@ export default function Sidebar2() {
     const { isCollapsed, setIsCollapsed } = useSidebar();
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { theme } = useTheme();
     const [userRole, setUserRole] = useState(null);
+    const [leadsDropdownOpen, setLeadsDropdownOpen] = useState(false);
+    const leadsDropdownRef = useRef(null);
 
     useEffect(() => {
         const fetchUserRole = async () => {
@@ -43,6 +46,23 @@ export default function Sidebar2() {
         };
         fetchUserRole();
     }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (leadsDropdownRef.current && !leadsDropdownRef.current.contains(event.target)) {
+                setLeadsDropdownOpen(false);
+            }
+        };
+
+        if (leadsDropdownOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [leadsDropdownOpen]);
 
     const menuItems = [
         {
@@ -92,6 +112,16 @@ export default function Sidebar2() {
                     />
                 </svg>
             ),
+            isDropdown: true,
+            dropdownOptions: [
+                { label: "New leads", filter: "filter=new_leads" },
+                { label: "Responded", filter: "filter=responded" },
+                { label: "Not responded", filter: "filter=not_responded" },
+                { label: "Demo Scheduled", filter: "filter=demo_scheduled" },
+                { label: "Demo Completed", filter: "filter=demo_completed" },
+                { label: "Converted", filter: "filter=converted" },
+                { label: "Junk lead", filter: "filter=junk_lead" },
+            ],
         },
         {
             label: "Prospects",
@@ -260,8 +290,18 @@ export default function Sidebar2() {
         },
     ];
 
-    const handleMenuClick = (path) => {
-        router.push(path);
+    const handleMenuClick = (path, filter = null) => {
+        if (filter) {
+            router.push(`${path}?${filter}`);
+        } else {
+            router.push(path);
+        }
+        setLeadsDropdownOpen(false);
+    };
+
+    const handleLeadsDropdownToggle = (e) => {
+        e.stopPropagation();
+        setLeadsDropdownOpen(!leadsDropdownOpen);
     };
 
     const isActive = (path) => {
@@ -320,12 +360,14 @@ export default function Sidebar2() {
                 <div className="space-y-5 md:space-y-3 2xl:space-y-3 flex-1 ">
                     {menuItems.map((item) => {
                         const active = isActive(item.path);
+                        const isLeadsItem = item.label === "Leads" && item.isDropdown;
+                        
                         return (
-                            <div key={item.path}>
+                            <div key={item.path} className="relative" ref={isLeadsItem ? leadsDropdownRef : null}>
                                 {isCollapsed ? (
                                     <TooltipIcon label={item.label}>
                                         <div>
-                                            <div  onClick={() => handleMenuClick(item.path)}
+                                            <div  onClick={() => !isLeadsItem && handleMenuClick(item.path)}
                                                 className={`w-full h-12  rounded-lg p-1   gap-3 transition-colors flex items-center justify-center cursor-pointer ${active
                                                     ? "bg-orange-600 text-white"
                                                     : theme === "dark"
@@ -337,21 +379,87 @@ export default function Sidebar2() {
                                         </div>
                                     </TooltipIcon>
                                 ) : (
-                                    <div  onClick={() => handleMenuClick(item.path)}
-                                        className={`w-full p-3 rounded-lg  gap-3 flex items-center transition-colors cursor-pointer ${active
-                                            ? "bg-orange-600 text-white"
-                                            : theme === "dark"
-                                                ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                    <>
+                                        <div  
+                                            onClick={isLeadsItem ? handleLeadsDropdownToggle : () => handleMenuClick(item.path)}
+                                            className={`w-full p-3 rounded-lg gap-3 flex items-center justify-between transition-all duration-200 cursor-pointer ${
+                                                active || (isLeadsItem && leadsDropdownOpen)
+                                                    ? "bg-orange-600 text-white shadow-md"
+                                                    : theme === "dark"
+                                                        ? "text-gray-400 hover:bg-gray-800 hover:text-white"
+                                                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                                             }`}>
-                                        <div className="flex items-center ">
-                                            <div className=" flex-shrink-0">{item.icon}</div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-shrink-0">{item.icon}</div>
+                                                <div>
+                                                    <span className="font-medium">{item.label}</span>
+                                                </div>
+                                            </div>
+                                            {isLeadsItem && (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    width="16"
+                                                    height="16"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={`transition-transform duration-200 ${leadsDropdownOpen ? "rotate-180" : ""}`}
+                                                >
+                                                    <path d="M6 9l6 6 6-6" />
+                                                </svg>
+                                            )}
                                         </div>
-                                        <div>
-                                            <span className="font-medium">{item.label}</span>
-                                        </div>
-                                    </div>
-
+                                        
+                                        {/* Dropdown Menu */}
+                                        {isLeadsItem && leadsDropdownOpen && !isCollapsed && (
+                                            <div 
+                                                className={`mt-2 
+                                                     rounded-lg overflow-hidden transition-all duration-200 animate-in fade-in slide-in-from-top-2 ${
+                                                    theme === "dark" 
+                                                        ? "bg-[#262626] border border-gray-700 shadow-xl" 
+                                                        : "bg-white border border-gray-200 shadow-lg"
+                                                }`}
+                                            >
+                                                {item.dropdownOptions.map((option, index) => {
+                                                    const filterValue = option.filter.split("=")[1];
+                                                    const currentFilter = searchParams?.get("filter");
+                                                    
+                                                    const isActiveOption = pathname.startsWith(item.path) && 
+                                                        currentFilter === filterValue;
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            onClick={() => handleMenuClick(item.path, option.filter)}
+                                                            className={`px-4 py-3 text-sm cursor-pointer transition-all duration-150 relative ${
+                                                                index !== item.dropdownOptions.length - 1 
+                                                                    ? `border-b ${theme === "dark" ? "border-gray-700/50" : "border-gray-200"}`
+                                                                    : ""
+                                                            } ${
+                                                                isActiveOption
+                                                                    ? theme === "dark"
+                                                                        ? "bg-orange-500/20 text-orange-400"
+                                                                        : "bg-orange-50 text-orange-600"
+                                                                    : theme === "dark"
+                                                                        ? "text-gray-300 hover:bg-gray-700/50 hover:text-orange-400"
+                                                                        : "text-gray-700 hover:bg-orange-50/50 hover:text-orange-600"
+                                                            }`}
+                                                        >
+                                                            {isActiveOption && (
+                                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${theme === "dark" ? "bg-orange-500" : "bg-orange-500"}`}></div>
+                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-medium ${isActiveOption ? "" : ""}`}>{option.label}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         );

@@ -71,6 +71,9 @@ export async function GET() {
         : "",
       lastActivity: formatLastActivity(lead.last_activity),
       totalScore: totalScore,
+      first_call_done: lead.first_call_done,
+      meeting_status: lead.meeting_status,
+      response_status: lead.response_status,
     };
   });
 

@@ -99,7 +99,7 @@ const priorityStyles = {
 
 
 
-export default function LeadsTable() {
+export default function LeadsTable({ initialFilter = null }) {
   const router = useRouter();
   
   // SWR for cached data fetching - data persists across navigations
@@ -143,6 +143,9 @@ export default function LeadsTable() {
     assignedTo: "",
     priority: "",
     type: "",
+    response_status: "",
+    meeting_status: "",
+    filter: "", // New filter type for sidebar dropdown
   });
   
   // Status change modal state
@@ -181,6 +184,16 @@ export default function LeadsTable() {
     isSubmitting: false,
   });
   
+
+  // Apply initial filter from URL query params
+  useEffect(() => {
+    if (initialFilter && initialFilter.type === "filter") {
+      setAdvancedFilters((prev) => ({
+        ...prev,
+        filter: initialFilter.value,
+      }));
+    }
+  }, [initialFilter]);
 
   const handleApplyFilters = (filters) => {
     setAdvancedFilters(filters);
@@ -240,25 +253,157 @@ export default function LeadsTable() {
   const filteredLeads = useMemo(() => {
     let result = leadData;
 
-    // Exclude junk leads and disqualified leads from the table
-    result = result.filter((lead) => 
-      lead.status !== "Junk Lead" && 
-      lead.status !== "Disqualified" &&
-      lead.status !== "Junk"
-    );
+    // Apply sidebar filter first (if set)
+    if (advancedFilters.filter) {
+      switch (advancedFilters.filter) {
+        case "new_leads":
+          // Filter leads that have not done the first call
+          // Handle multiple formats: null, false, "", "false", 0
+          result = result.filter((lead) => {
+            const firstCallDone = lead.first_call_done;
+            return (
+              firstCallDone === null ||
+              firstCallDone === false ||
+              firstCallDone === "" ||
+              firstCallDone === "false" ||
+              firstCallDone === 0 ||
+              firstCallDone === undefined
+            );
+          });
+          break;
+        case "responded":
+          // Filter by response_status = "Responded" or "responded" (case insensitive)
+          // Debug: Log all leads with response_status before filtering
+          const allLeadsBeforeFilter = [...result];
+          const leadsWithResponseStatus = allLeadsBeforeFilter.filter(lead => lead.response_status);
+          console.log("🔍 Responded Filter Debug - BEFORE:", {
+            totalLeads: allLeadsBeforeFilter.length,
+            leadsWithResponseStatus: leadsWithResponseStatus.length,
+            sampleLeads: allLeadsBeforeFilter.slice(0, 5).map(lead => ({
+              id: lead.id,
+              name: lead.name,
+              response_status: lead.response_status,
+              response_status_type: typeof lead.response_status,
+            })),
+            allUniqueResponseStatuses: [...new Set(allLeadsBeforeFilter.map(l => l.response_status).filter(Boolean))],
+          });
+          
+          result = result.filter((lead) => {
+            const responseStatus = lead.response_status;
+            if (!responseStatus) return false;
+            // Handle multiple formats: "Responded", "responded", "RESPONDED", etc.
+            const normalizedStatus = String(responseStatus).trim().toLowerCase();
+            return normalizedStatus === "responded";
+          });
+          
+          console.log("✅ Responded Filter Debug - AFTER:", {
+            filteredCount: result.length,
+            filteredLeadIDs: result.map(l => l.id),
+            filteredLeadNames: result.map(l => l.name),
+          });
+          break;
+        case "not_responded":
+          // Filter by response_status = "Not responded"
+          result = result.filter((lead) => {
+            const responseStatus = lead.response_status;
+            return responseStatus && String(responseStatus) === "Not responded";
+          });
+          break;
+        case "demo_scheduled":
+          // Filter by meeting_status = "Scheduled" (case insensitive)
+          result = result.filter((lead) => {
+            const meetingStatus = lead.meeting_status;
+            return meetingStatus && String(meetingStatus).trim().toLowerCase() === "scheduled";
+          });
+          break;
+        case "demo_completed":
+          // Filter by meeting_status = "Completed" (case insensitive)
+          // First, log all leads with meeting_status for debugging
+          const leadsWithMeetingStatus = result.filter(lead => lead.meeting_status);
+          console.log("🔍 Demo Completed Filter Debug:", {
+            totalLeads: result.length,
+            leadsWithMeetingStatus: leadsWithMeetingStatus.length,
+            sampleLeads: leadsWithMeetingStatus.slice(0, 5).map(lead => ({
+              id: lead.id,
+              name: lead.name,
+              meeting_status: lead.meeting_status,
+              meeting_status_type: typeof lead.meeting_status,
+            })),
+          });
+          
+          result = result.filter((lead) => {
+            const meetingStatus = lead.meeting_status;
+            if (!meetingStatus) return false;
+            const normalizedStatus = String(meetingStatus).trim().toLowerCase();
+            return normalizedStatus === "completed";
+          });
+          
+          console.log("✅ Filtered leads count:", result.length);
+          break;
+        case "converted":
+          // Filter by status = "Won"
+          result = result.filter((lead) => lead.status === "Won");
+          break;
+        case "junk_lead":
+          // Filter by status = "Junk lead" or "Junk Lead" or "Junk"
+          result = result.filter((lead) => 
+            lead.status === "Junk lead" || 
+            lead.status === "Junk Lead" || 
+            lead.status === "Junk"
+          );
+          break;
+        default:
+          // No filter applied - show all leads (except junk by default)
+          result = result.filter((lead) => 
+            lead.status !== "Junk Lead" && 
+            lead.status !== "Disqualified" &&
+            lead.status !== "Junk" &&
+            lead.status !== "Junk lead"
+          );
+          break;
+      }
+    } else {
+      // By default, show all leads (excluding junk leads for cleaner view)
+      result = result.filter((lead) => 
+        lead.status !== "Junk Lead" && 
+        lead.status !== "Disqualified" &&
+        lead.status !== "Junk" &&
+        lead.status !== "Junk lead"
+      );
+    }
 
-    // Apply advanced filters
-    if (advancedFilters.source) {
-      result = result.filter((lead) => lead.source === advancedFilters.source);
+    // Apply response_status filter (for backward compatibility with other filters)
+    // Note: This is only used when sidebar filter is NOT active
+    if (advancedFilters.response_status && !advancedFilters.filter) {
+      if (advancedFilters.response_status === "Responded") {
+        result = result.filter((lead) => 
+          lead.response_status && 
+          String(lead.response_status).trim().toLowerCase() === "responded"
+        );
+      } else if (advancedFilters.response_status === "Not Responded") {
+        result = result.filter((lead) => 
+          lead.response_status === "Not Responded" || !lead.response_status
+        );
+      }
     }
-    if (advancedFilters.status) {
-      result = result.filter((lead) => lead.status === advancedFilters.status);
-    }
-    if (advancedFilters.assignedTo) {
-      result = result.filter((lead) => lead.assignedTo === advancedFilters.assignedTo);
-    }
-    if (advancedFilters.priority) {
-      result = result.filter((lead) => lead.priority === advancedFilters.priority);
+
+    // Apply advanced filters (but skip if sidebar filter is active to avoid conflicts)
+    if (!advancedFilters.filter) {
+      if (advancedFilters.source) {
+        result = result.filter((lead) => lead.source === advancedFilters.source);
+      }
+      if (advancedFilters.status) {
+        result = result.filter((lead) => lead.status === advancedFilters.status);
+      }
+      if (advancedFilters.assignedTo) {
+        result = result.filter((lead) => lead.assignedTo === advancedFilters.assignedTo);
+      }
+      if (advancedFilters.priority) {
+        result = result.filter((lead) => lead.priority === advancedFilters.priority);
+      }
+      if (advancedFilters.meeting_status) {
+        result = result.filter((lead) => lead.meeting_status === advancedFilters.meeting_status);
+      }
     }
 
     // Apply search

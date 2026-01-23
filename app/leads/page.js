@@ -1,12 +1,26 @@
 "use client";
 import AddLeadModal from "../components/buttons/addLeadModal";
 import LeadsTable from "../components/tables/leadsTable";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 
 
 export default function LeadsPage() {
   const [openAddLead, setOpenAddLead] = useState(false);
+  const searchParams = useSearchParams();
+  const [initialFilter, setInitialFilter] = useState(null);
+
+  useEffect(() => {
+    // Parse query parameters from URL
+    const filter = searchParams.get("filter");
+    
+    if (filter) {
+      setInitialFilter({ type: "filter", value: filter });
+    } else {
+      setInitialFilter(null);
+    }
+  }, [searchParams]);
 
   return (
     <>
@@ -50,7 +64,7 @@ export default function LeadsPage() {
       </div>
 
      <div>
-      <LeadsTable />
+      <LeadsTable initialFilter={initialFilter} />
      </div>
     </div>
     </>
