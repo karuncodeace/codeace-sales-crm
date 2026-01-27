@@ -24,7 +24,7 @@ export async function POST(request) {
     }
 
     // Forward request to Flask backend
-    const flaskResponse = await fetch('http://127.0.0.1:5001/ai-insights', {
+    const flaskResponse = await fetch('http://139.59.22.22/ai-insights', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

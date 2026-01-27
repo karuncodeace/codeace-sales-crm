@@ -42,21 +42,21 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
     return null;
   }
 
-  // Modern, punchy palette
-  const colors = [
-    "#6366F1", // indigo-500
-    "#22D3EE", // cyan-400
+  // Single primary color for all charts
+  const primaryColor = "#F97316"; // orange-500 (brand color)
+  
+  // For pie charts, use variations of the primary color
+  const pieColors = [
     "#F97316", // orange-500
-    "#10B981", // emerald-500
-    "#E11D48", // rose-600
-    "#84CC16", // lime-500
-    "#A855F7", // purple-500
-    "#0EA5E9", // sky-500
+    "#FB923C", // orange-400
+    "#FDBA74", // orange-300
+    "#FED7AA", // orange-200
+    "#FFEDD5", // orange-100
   ];
 
   // Common chart props
   const textColor = isDark ? "#e5e7eb" : "#1f2937";
-  const gridColor = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)";
+  const gridColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)";
   const tooltipBg = isDark ? "#1f2937" : "#ffffff";
   const tooltipBorder = isDark ? "#374151" : "#e5e7eb";
 
@@ -66,7 +66,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
       case "line":
         return (
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 16, right: 32, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis
                 dataKey={x_axis}
@@ -85,6 +85,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                   border: `1px solid ${tooltipBorder}`,
                   borderRadius: "8px",
                   color: textColor,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                 }}
                 labelStyle={{ color: textColor }}
               />
@@ -95,10 +96,10 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
               <Line
                 type="monotone"
                 dataKey={y_axis}
-                stroke={colors[0]}
-                strokeWidth={2}
-                dot={{ fill: colors[0], r: 4 }}
-                activeDot={{ r: 6 }}
+                stroke={primaryColor}
+                strokeWidth={2.5}
+                dot={{ fill: primaryColor, r: 4, strokeWidth: 0 }}
+                activeDot={{ r: 6, fill: primaryColor }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -107,7 +108,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
       case "bar":
         return (
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={data} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis
                 dataKey={x_axis}
@@ -126,6 +127,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                   border: `1px solid ${tooltipBorder}`,
                   borderRadius: "8px",
                   color: textColor,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                 }}
                 labelStyle={{ color: textColor }}
               />
@@ -134,8 +136,11 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
               />
               <Bar
                 dataKey={y_axis}
-                fill={colors[0]}
+                fill={primaryColor}
                 radius={[8, 8, 0, 0]}
+                stroke={isDark ? "rgba(249, 115, 22, 0.3)" : "rgba(249, 115, 22, 0.2)"}
+                strokeWidth={1}
+                maxBarSize={50}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -154,11 +159,13 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                   `${name}: ${(percent * 100).toFixed(0)}%`
                 }
                 outerRadius={120}
-                fill="#8884d8"
+                innerRadius={0}
                 dataKey={y_axis}
+                stroke={isDark ? "#1f2937" : "#ffffff"}
+                strokeWidth={2}
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
                 ))}
               </Pie>
               <Tooltip
@@ -167,6 +174,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                   border: `1px solid ${tooltipBorder}`,
                   borderRadius: "8px",
                   color: textColor,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                 }}
                 labelStyle={{ color: textColor }}
                 formatter={(value, name) => [value, y_axis]}
@@ -202,10 +210,10 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
         </h3>
       )}
       <div
-        className={`rounded-2xl p-4 border shadow-lg transition-all ${
+        className={`rounded-xl p-6 border shadow-md transition-all ${
           isDark
-            ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-gray-700"
-            : "bg-gradient-to-br from-white via-slate-50 to-white border-gray-200"
+            ? "bg-gray-900 border-gray-700"
+            : "bg-white border-gray-200"
         }`}
       >
         {renderChart()}
