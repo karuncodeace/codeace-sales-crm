@@ -5,6 +5,7 @@ import { useTheme } from "../../context/themeContext";
 import { MessageSquare, X, Send, Sparkles, Minimize2, Trash2, History, Settings, HelpCircle } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
+import AnalyticsChart from "./AnalyticsChart";
 
 export default function ChatBot({ isFullPage = false }) {
   const { theme } = useTheme();
@@ -302,28 +303,75 @@ export default function ChatBot({ isFullPage = false }) {
 
       const data = await response.json();
 
-      // Debug logging
-      console.log("API Response:", {
+      // Debug logging - show full response structure
+      console.log("API Response (Full):", data);
+      console.log("API Response (Summary):", {
         hasAnswer: !!data.answer,
         answerLength: data.answer?.length,
         answerPreview: data.answer?.substring(0, 50),
-        intent: data.intent
+        intent: data.intent,
+        isAnalytics: data.intent === "analytics_visual",
+        chart_type: data.chart_type,
+        hasChartData: !!data.data,
+        chartDataLength: data.data?.length,
+        hasTitle: !!data.title,
+        hasXAxis: !!data.x_axis,
+        hasYAxis: !!data.y_axis
       });
+
+      // Check if this is an analytics visualization response
+      // Support both explicit intent OR presence of chart data fields
+      const hasChartFields = data.chart_type && data.data && Array.isArray(data.data) && data.data.length > 0;
+      const isAnalyticsVisual = data.intent === "analytics_visual" || hasChartFields;
+      
+      if (hasChartFields && data.intent !== "analytics_visual") {
+        console.warn("Chart data detected but intent is not 'analytics_visual':", data.intent);
+      }
 
       // Extract answer with safe fallback support
       // Flask returns: { "intent": "...", "answer": "..." }
       // Support fallbacks: data.response || data.answer || data.message
       const answerText = data.response || data.answer || data.message;
 
-      if (answerText) {
+      if (answerText || isAnalyticsVisual) {
+        // Build chart data object if this is an analytics response
+        let chartData = null;
+        if (isAnalyticsVisual) {
+          chartData = {
+            intent: data.intent,
+            chart_type: data.chart_type,
+            title: data.title,
+            x_axis: data.x_axis,
+            y_axis: data.y_axis,
+            data: data.data
+          };
+          console.log("Chart data prepared:", {
+            intent: chartData.intent,
+            chart_type: chartData.chart_type,
+            title: chartData.title,
+            x_axis: chartData.x_axis,
+            y_axis: chartData.y_axis,
+            dataLength: chartData.data?.length,
+            sampleData: chartData.data?.slice(0, 2)
+          });
+        }
+
         const botMessage = {
           id: Date.now() + 1,
-          text: answerText,
+          text: answerText || "", // Empty text if it's only a chart
           sender: "bot",
           timestamp: new Date(),
           isList: false,
           isTypingComplete: false, // Mark for typing animation
+          chartData: chartData
         };
+        
+        console.log("Bot message created:", {
+          hasText: !!botMessage.text,
+          hasChartData: !!botMessage.chartData,
+          chartIntent: botMessage.chartData?.intent
+        });
+        
         setMessages((prev) => [...prev, botMessage]);
       } 
       // Handle error response (no answer field found)
@@ -335,6 +383,7 @@ export default function ChatBot({ isFullPage = false }) {
           timestamp: new Date(),
           isList: false,
           isTypingComplete: false, // Mark for typing animation
+          chartData: null
         };
         setMessages((prev) => [...prev, errorMessage]);
       }
@@ -616,32 +665,43 @@ export default function ChatBot({ isFullPage = false }) {
                           )}
                         </div>
                         <div className="relative flex-1 overflow-hidden min-w-0">
-                          <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
-                            {message.isList ? (
-                              <div className="whitespace-pre-line font-medium">
-                                {message.isTypingComplete || !typingMessages[message.id]
-                                  ? message.text
-                                  : typingMessages[message.id]?.displayedText || ""}
-                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="whitespace-pre-wrap">
-                                {message.isTypingComplete || !typingMessages[message.id]
-                                  ? message.text
-                                  : typingMessages[message.id]?.displayedText || ""}
-                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                                )}
-                              </p>
-                            )}
-                          </div>
+                          {/* Render chart if analytics_visual intent */}
+                          {message.chartData && message.chartData.intent === "analytics_visual" && (
+                            <div className="mb-4">
+                              <AnalyticsChart chartData={message.chartData} isDark={isDark} />
+                            </div>
+                          )}
+                          
+                          {/* Render text content if present */}
+                          {message.text && (
+                            <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
+                              {message.isList ? (
+                                <div className="whitespace-pre-line font-medium">
+                                  {message.isTypingComplete || !typingMessages[message.id]
+                                    ? message.text
+                                    : typingMessages[message.id]?.displayedText || ""}
+                                  {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                    <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="whitespace-pre-wrap">
+                                  {message.isTypingComplete || !typingMessages[message.id]
+                                    ? message.text
+                                    : typingMessages[message.id]?.displayedText || ""}
+                                  {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                    <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          
                           {message.timestamp && (
                             <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                               {formatTime(message.timestamp)}
                             </p>
-                        )}
+                          )}
                         </div>
                       </div>
                     </div>
@@ -819,24 +879,36 @@ export default function ChatBot({ isFullPage = false }) {
                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
                     }`}
                 >
-                  {message.isList ? (
-                    <div className="text-sm leading-relaxed whitespace-pre-line">
-                      {message.isTypingComplete || !typingMessages[message.id]
-                        ? message.text
-                        : typingMessages[message.id]?.displayedText || ""}
-                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                      )}
+                  {/* Render chart if analytics_visual intent */}
+                  {message.chartData && message.chartData.intent === "analytics_visual" && (
+                    <div className="mb-3">
+                      <AnalyticsChart chartData={message.chartData} isDark={isDark} />
                     </div>
-                  ) : (
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.isTypingComplete || !typingMessages[message.id]
-                        ? message.text
-                        : typingMessages[message.id]?.displayedText || ""}
-                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                  )}
+                  
+                  {/* Render text content if present */}
+                  {message.text && (
+                    <>
+                      {message.isList ? (
+                        <div className="text-sm leading-relaxed whitespace-pre-line">
+                          {message.isTypingComplete || !typingMessages[message.id]
+                            ? message.text
+                            : typingMessages[message.id]?.displayedText || ""}
+                          {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                            <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {message.isTypingComplete || !typingMessages[message.id]
+                            ? message.text
+                            : typingMessages[message.id]?.displayedText || ""}
+                          {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                            <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                          )}
+                        </p>
                       )}
-                    </p>
+                    </>
                   )}
                   <p
                     className={`text-[10px] mt-1.5 ${message.sender === "user"
