@@ -279,7 +279,8 @@ export default function ChatBot({ isFullPage = false }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/loria-ai/query', {
+      // Call the AI Insights proxy endpoint (which forwards to Flask backend)
+      const response = await fetch('/api/ai-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userQuestion })
@@ -303,51 +304,21 @@ export default function ChatBot({ isFullPage = false }) {
 
       // Debug logging
       console.log("API Response:", {
-        hasData: data.data !== undefined,
-        dataLength: data.data?.length,
         hasAnswer: !!data.answer,
         answerLength: data.answer?.length,
-        answerPreview: data.answer?.substring(0, 50)
+        answerPreview: data.answer?.substring(0, 50),
+        intent: data.intent
       });
 
-      // Handle response with data array (list queries)
-      // Check if it's a list query response (has data array, even if empty)
-      if (data.data !== undefined && Array.isArray(data.data)) {
-        let displayText;
-        if (data.data.length > 0) {
-          // Format the list as bullet points
-          displayText = formatListData(data.data);
-          // If formatting returns empty, use the answer field
-          if (!displayText || displayText.trim().length === 0) {
-            displayText = data.answer || "No records found matching the specified criteria.";
-          }
-        } else {
-          // Use the answer if provided, otherwise show no records message
-          displayText = data.answer || "No records found matching the specified criteria.";
-        }
-        
-        // Ensure we have something to display
-        if (!displayText || displayText.trim().length === 0) {
-          displayText = "No records found matching the specified criteria.";
-        }
-        
-        console.log("Display text for list:", displayText);
-        
+      // Extract answer with safe fallback support
+      // Flask returns: { "intent": "...", "answer": "..." }
+      // Support fallbacks: data.response || data.answer || data.message
+      const answerText = data.response || data.answer || data.message;
+
+      if (answerText) {
         const botMessage = {
           id: Date.now() + 1,
-          text: displayText,
-          sender: "bot",
-          timestamp: new Date(),
-          isList: data.data.length > 0, // Only mark as list if there are items
-          isTypingComplete: false, // Mark for typing animation
-        };
-        setMessages((prev) => [...prev, botMessage]);
-      } 
-      // Handle text answer (aggregate, field_lookup, record_lookup, or conversational)
-      else if (data.answer) {
-        const botMessage = {
-          id: Date.now() + 1,
-          text: data.answer,
+          text: answerText,
           sender: "bot",
           timestamp: new Date(),
           isList: false,
@@ -355,7 +326,7 @@ export default function ChatBot({ isFullPage = false }) {
         };
         setMessages((prev) => [...prev, botMessage]);
       } 
-      // Handle error response
+      // Handle error response (no answer field found)
       else {
         const errorMessage = {
           id: Date.now() + 1,
