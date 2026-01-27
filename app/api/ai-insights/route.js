@@ -23,14 +23,54 @@ export async function POST(request) {
       );
     }
 
-    // Forward request to Flask backend
-    const flaskResponse = await fetch('http://139.59.22.22:5001/ai-insights', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ question })
-    });
+    // Forward request to Flask backend with fallback
+    // Try remote server first, then fallback to localhost
+    const endpoints = [
+      'http://139.59.22.22:5001/ai-insights',
+      'http://localhost:5001/ai-insights'
+    ];
+
+    let flaskResponse = null;
+    let lastError = null;
+
+    // Try each endpoint until one succeeds
+    for (const endpoint of endpoints) {
+      try {
+        flaskResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ question }),
+          // Add timeout to fail faster if endpoint is unreachable
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+
+        // If we get a response (even if not ok), use it
+        if (flaskResponse) {
+          console.log(`✅ Successfully connected to: ${endpoint}`);
+          break;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to connect to ${endpoint}:`, error.message);
+        lastError = error;
+        flaskResponse = null;
+        // Continue to next endpoint
+        continue;
+      }
+    }
+
+    // If all endpoints failed
+    if (!flaskResponse) {
+      return Response.json(
+        {
+          error: "backend_unavailable",
+          message: "AI service is currently unavailable. Tried both remote and local servers.",
+          details: lastError?.message || "All endpoints failed"
+        },
+        { status: 503 }
+      );
+    }
 
     // Check if Flask backend responded successfully
     if (!flaskResponse.ok) {
