@@ -31,7 +31,20 @@ import {
  * @param {Array} chartData.data - Array of data objects
  */
 export default function AnalyticsChart({ chartData, isDark = false }) {
+  // Debug logging
+  console.log("AnalyticsChart received chartData:", {
+    hasChartData: !!chartData,
+    intent: chartData?.intent,
+    chart_type: chartData?.chart_type,
+    title: chartData?.title,
+    x_axis: chartData?.x_axis,
+    y_axis: chartData?.y_axis,
+    dataLength: chartData?.data?.length,
+    sampleData: chartData?.data?.slice(0, 2)
+  });
+
   if (!chartData || chartData.intent !== "analytics_visual") {
+    console.warn("AnalyticsChart: Invalid chartData or wrong intent", chartData?.intent);
     return null;
   }
 
@@ -39,19 +52,38 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
 
   // Validate required fields
   if (!chart_type || !data || !Array.isArray(data) || data.length === 0) {
+    console.warn("AnalyticsChart: Missing required fields", {
+      chart_type,
+      hasData: !!data,
+      isArray: Array.isArray(data),
+      dataLength: data?.length
+    });
     return null;
   }
+
+  console.log("AnalyticsChart rendering with:", {
+    chart_type,
+    title,
+    x_axis,
+    y_axis,
+    data: data.slice(0, 3) // Log first 3 items
+  });
 
   // Single primary color for all charts
   const primaryColor = "#F97316"; // orange-500 (brand color)
   
-  // For pie charts, use variations of the primary color
+  // Vibrant multi-color palette for pie charts
   const pieColors = [
     "#F97316", // orange-500
-    "#FB923C", // orange-400
-    "#FDBA74", // orange-300
-    "#FED7AA", // orange-200
-    "#FFEDD5", // orange-100
+    "#6366F1", // indigo-500
+    "#10B981", // emerald-500
+    "#E11D48", // rose-600
+    "#8B5CF6", // violet-500
+    "#0EA5E9", // sky-500
+    "#F59E0B", // amber-500
+    "#EC4899", // pink-500
+    "#14B8A6", // teal-500
+    "#F43F5E", // rose-500
   ];
 
   // Common chart props
@@ -100,6 +132,9 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                 strokeWidth={2.5}
                 dot={{ fill: primaryColor, r: 4, strokeWidth: 0 }}
                 activeDot={{ r: 6, fill: primaryColor }}
+                animationBegin={0}
+                animationDuration={800}
+                animationEasing="ease-out"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -141,6 +176,9 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                 stroke={isDark ? "rgba(249, 115, 22, 0.3)" : "rgba(249, 115, 22, 0.2)"}
                 strokeWidth={1}
                 maxBarSize={50}
+                animationBegin={0}
+                animationDuration={800}
+                animationEasing="ease-out"
               />
             </BarChart>
           </ResponsiveContainer>
@@ -158,14 +196,25 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
                 label={({ [x_axis]: name, [y_axis]: value, percent }) =>
                   `${name}: ${(percent * 100).toFixed(0)}%`
                 }
-                outerRadius={120}
-                innerRadius={0}
+                outerRadius={130}
+                innerRadius={50}
+                paddingAngle={2}
                 dataKey={y_axis}
                 stroke={isDark ? "#1f2937" : "#ffffff"}
                 strokeWidth={2}
+                animationBegin={0}
+                animationDuration={800}
+                animationEasing="ease-out"
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={pieColors[index % pieColors.length]}
+                    style={{ 
+                      filter: isDark ? 'brightness(0.9)' : 'brightness(1)',
+                      transition: 'all 0.3s ease'
+                    }}
+                  />
                 ))}
               </Pie>
               <Tooltip
@@ -182,6 +231,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
               <Legend
                 wrapperStyle={{ color: textColor }}
                 formatter={(value) => value}
+                iconType="circle"
               />
             </PieChart>
           </ResponsiveContainer>
@@ -199,10 +249,10 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
   };
 
   return (
-    <div className={`w-full ${isDark ? "text-gray-100" : "text-gray-900"}`}>
+    <div className={`w-full animate-in fade-in slide-in-from-bottom-4 duration-500 ${isDark ? "text-gray-100" : "text-gray-900"}`}>
       {title && (
         <h3
-          className={`text-lg font-semibold mb-3 ${
+          className={`text-lg font-semibold mb-3 animate-in fade-in slide-in-from-left-2 duration-300 ${
             isDark ? "text-gray-100" : "text-gray-900"
           }`}
         >
@@ -210,7 +260,7 @@ export default function AnalyticsChart({ chartData, isDark = false }) {
         </h3>
       )}
       <div
-        className={`rounded-xl p-6 border shadow-md transition-all ${
+        className={`rounded-xl p-6 border shadow-md transition-all animate-in fade-in zoom-in-95 duration-500 ${
           isDark
             ? "bg-gray-900 border-gray-700"
             : "bg-white border-gray-200"

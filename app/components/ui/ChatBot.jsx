@@ -7,6 +7,48 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import AnalyticsChart from "./AnalyticsChart";
 
+// Chart Loading Skeleton Component
+function ChartLoadingSkeleton({ isDark = false }) {
+  return (
+    <div className={`w-full animate-in fade-in slide-in-from-bottom-4 duration-300 ${isDark ? "text-gray-100" : "text-gray-900"}`}>
+      {/* Title skeleton */}
+      <div className={`h-6 w-48 mb-3 rounded-lg animate-pulse ${
+        isDark ? "bg-gray-700" : "bg-gray-200"
+      }`} />
+      
+      {/* Chart container skeleton */}
+      <div className={`rounded-xl p-6 border shadow-md ${
+        isDark
+          ? "bg-gray-900 border-gray-700"
+          : "bg-white border-gray-200"
+      }`}>
+        <div className="relative w-full h-[400px] flex items-center justify-center">
+          {/* Animated spinner */}
+          <div className="flex flex-col items-center gap-4">
+            <div className={`w-16 h-16 rounded-full border-4 ${
+              isDark 
+                ? "border-gray-700 border-t-orange-500" 
+                : "border-gray-200 border-t-orange-500"
+            } animate-spin`} />
+            <p className={`text-sm font-medium ${
+              isDark ? "text-gray-400" : "text-gray-500"
+            }`}>
+              Generating chart...
+            </p>
+          </div>
+          
+          {/* Skeleton chart shape */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-20">
+            <div className={`w-64 h-64 rounded-full border-8 ${
+              isDark ? "border-gray-700" : "border-gray-200"
+            } animate-pulse`} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatBot({ isFullPage = false }) {
   const { theme } = useTheme();
   const router = useRouter();
@@ -672,6 +714,13 @@ export default function ChatBot({ isFullPage = false }) {
                             </div>
                           )}
                           
+                          {/* Show chart loading skeleton while chart is being generated */}
+                          {isLoading && message.chartData === undefined && (
+                            <div className="mb-4">
+                              <ChartLoadingSkeleton isDark={isDark} />
+                            </div>
+                          )}
+                          
                           {/* Render text content if present */}
                           {message.text && (
                             <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
@@ -707,21 +756,28 @@ export default function ChatBot({ isFullPage = false }) {
                     </div>
                   ))}
                   {isLoading && (
-                    <div className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}>
-                      <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
-                        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
-                            <Sparkles className="w-5 h-5 text-white" />
+                    <>
+                      <div className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}>
+                        <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
+                          <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
+                              <Sparkles className="w-5 h-5 text-white" />
+                            </div>
                           </div>
-                        </div>
-                        <div className="relative flex-1 overflow-hidden flex items-center">
-                          <div className="flex items-center gap-3">
-                            
-                            <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
+                          <div className="relative flex-1 overflow-hidden flex items-center">
+                            <div className="flex items-center gap-3">
+                              <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                      {/* Show chart loading skeleton while generating */}
+                      <div className="w-full">
+                        <div className="max-w-3xl mx-auto px-6">
+                          <ChartLoadingSkeleton isDark={isDark} />
+                        </div>
+                      </div>
+                    </>
                   )}
                 </>
               )}

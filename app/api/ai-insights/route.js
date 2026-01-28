@@ -95,13 +95,28 @@ export async function POST(request) {
     // Flask returns: { "answer": "...", "chart": { "intent": "analytics_visual", "chart_type": "...", etc. } }
     // OR: { "intent": "...", "answer": "...", "chart_type": "...", etc. } (flat structure)
     
-    // Check if chart object exists with analytics_visual intent (prioritize nested chart object)
+    // Check if chart object exists (prioritize nested chart object)
     const hasChartObject = data.chart && typeof data.chart === 'object';
     const chartHasAnalyticsIntent = hasChartObject && data.chart.intent === "analytics_visual";
     
-    // Use chart object data if it exists and has analytics_visual intent, otherwise use root level
+    // Use chart object data if it exists, otherwise use root level
     const chartData = hasChartObject ? data.chart : data;
-    const isAnalyticsVisual = chartHasAnalyticsIntent || (data.intent === "analytics_visual");
+    
+    // Check if this is an analytics visualization response
+    // If chart object exists with chart_type, treat it as analytics_visual
+    const hasChartType = chartData.chart_type && chartData.chart_type.length > 0;
+    const hasChartDataArrays = chartData.x_axis_data && chartData.y_axis_data && 
+                                Array.isArray(chartData.x_axis_data) && Array.isArray(chartData.y_axis_data);
+    const isAnalyticsVisual = chartHasAnalyticsIntent || hasChartType || hasChartDataArrays || (data.intent === "analytics_visual");
+    
+    console.log("Chart detection:", {
+      hasChartObject,
+      chartHasAnalyticsIntent,
+      hasChartType,
+      hasChartDataArrays,
+      isAnalyticsVisual,
+      rootIntent: data.intent
+    });
     
     const response = {
       answer: data.answer || data.response || data.message,
@@ -113,23 +128,47 @@ export async function POST(request) {
     if (isAnalyticsVisual && chartData.chart_type) {
       response.chart_type = chartData.chart_type;
       response.title = chartData.title;
-      response.x_axis = chartData.x_axis;
-      response.y_axis = chartData.y_axis;
       
-      // Transform data array to match expected keys (x_axis and y_axis)
-      // Backend may send { "label": "...", "value": ... } or already use correct keys
-      const rawData = chartData.data || [];
-      response.data = rawData.map(item => {
-        // If data uses "label" and "value" keys, transform to x_axis and y_axis keys
-        if (item.label !== undefined && item.value !== undefined) {
-          return {
-            [chartData.x_axis]: item.label,
-            [chartData.y_axis]: item.value
-          };
-        }
-        // If data already uses correct keys, return as-is
-        return item;
-      });
+      // Handle different backend response formats
+      // Format 1: x_axis_label and y_axis_label with separate arrays
+      if (chartData.x_axis_label && chartData.y_axis_label && chartData.x_axis_data && chartData.y_axis_data) {
+        response.x_axis = chartData.x_axis_label;
+        response.y_axis = chartData.y_axis_label;
+        
+        // Combine x_axis_data and y_axis_data arrays into data objects
+        response.data = chartData.x_axis_data.map((label, index) => ({
+          [chartData.x_axis_label]: label,
+          [chartData.y_axis_label]: chartData.y_axis_data[index]
+        }));
+        
+        console.log("✅ Transformed chart data from arrays:", {
+          x_axis_label: chartData.x_axis_label,
+          y_axis_label: chartData.y_axis_label,
+          x_axis_data: chartData.x_axis_data,
+          y_axis_data: chartData.y_axis_data,
+          transformedData: response.data
+        });
+      }
+      // Format 2: x_axis and y_axis with data array
+      else if (chartData.x_axis && chartData.y_axis) {
+        response.x_axis = chartData.x_axis;
+        response.y_axis = chartData.y_axis;
+        
+        // Transform data array to match expected keys (x_axis and y_axis)
+        // Backend may send { "label": "...", "value": ... } or already use correct keys
+        const rawData = chartData.data || [];
+        response.data = rawData.map(item => {
+          // If data uses "label" and "value" keys, transform to x_axis and y_axis keys
+          if (item.label !== undefined && item.value !== undefined) {
+            return {
+              [chartData.x_axis]: item.label,
+              [chartData.y_axis]: item.value
+            };
+          }
+          // If data already uses correct keys, return as-is
+          return item;
+        });
+      }
       
       console.log("Chart data extracted from:", hasChartObject ? "nested 'chart' object" : "root level");
       console.log("Chart data extracted:", {
