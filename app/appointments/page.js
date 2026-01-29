@@ -189,8 +189,8 @@ export default function BookingsPage() {
     );
   };
 
-  // Handle mark as completed
-  const handleMarkCompleted = async (booking) => {
+  // Internal helper to call API for marking as completed
+  const completeBooking = async (booking, isEmailRequired) => {
     setIsProcessing(true);
     try {
       const response = await fetch(`/api/bookings`, {
@@ -199,6 +199,7 @@ export default function BookingsPage() {
         body: JSON.stringify({
           bookingId: booking.id,
           meeting_completion_status: "Completed",
+          is_email_required: isEmailRequired,
         }),
       });
 
@@ -210,12 +211,61 @@ export default function BookingsPage() {
 
       // Refresh bookings list
       mutate();
-      toast.success("Meeting marked as completed!");
+
+      if (isEmailRequired) {
+        toast.success("Meeting marked as completed and email will be sent.");
+      } else {
+        toast.success("Meeting marked as completed without sending email.");
+      }
     } catch (error) {
       toast.error(error.message || "Failed to mark booking as completed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Handle mark as completed with confirmation about email
+  const handleMarkCompleted = (booking) => {
+    toast(
+      (t) => (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium">
+            Mark this meeting as completed and send follow-up email?
+          </p>
+          <p className="text-xs text-gray-500">
+            You can choose whether an email should be sent to the attendee.
+          </p>
+          <div className="flex gap-2 justify-end mt-1">
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                await completeBooking(booking, false);
+              }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
+                isDark
+                  ? "border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              } transition-colors`}
+            >
+              No, just complete
+            </button>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                await completeBooking(booking, true);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+            >
+              Yes, send email
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: Infinity,
+        position: "top-center",
+      }
+    );
   };
 
   // Handle reschedule booking

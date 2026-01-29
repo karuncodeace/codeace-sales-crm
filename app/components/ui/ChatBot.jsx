@@ -368,7 +368,7 @@ export default function ChatBot({ isFullPage = false }) {
       
       if (hasChartFields && data.intent !== "analytics_visual") {
         console.warn("Chart data detected but intent is not 'analytics_visual':", data.intent);
-      }
+          }
 
       // Extract answer with safe fallback support
       // Flask returns: { "intent": "...", "answer": "..." }
@@ -723,54 +723,54 @@ export default function ChatBot({ isFullPage = false }) {
                           
                           {/* Render text content if present */}
                           {message.text && (
-                            <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
-                              {message.isList ? (
-                                <div className="whitespace-pre-line font-medium">
-                                  {message.isTypingComplete || !typingMessages[message.id]
-                                    ? message.text
-                                    : typingMessages[message.id]?.displayedText || ""}
-                                  {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                                    <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="whitespace-pre-wrap">
-                                  {message.isTypingComplete || !typingMessages[message.id]
-                                    ? message.text
-                                    : typingMessages[message.id]?.displayedText || ""}
-                                  {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                                    <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                                  )}
-                                </p>
-                              )}
-                            </div>
+                          <div className={`text-sm md:text-base leading-relaxed ${isDark ? "text-gray-100" : "text-gray-900"}`}>
+                            {message.isList ? (
+                              <div className="whitespace-pre-line font-medium">
+                                {message.isTypingComplete || !typingMessages[message.id]
+                                  ? message.text
+                                  : typingMessages[message.id]?.displayedText || ""}
+                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="whitespace-pre-wrap">
+                                {message.isTypingComplete || !typingMessages[message.id]
+                                  ? message.text
+                                  : typingMessages[message.id]?.displayedText || ""}
+                                {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                                  <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                                )}
+                              </p>
+                            )}
+                          </div>
                           )}
                           
                           {message.timestamp && (
                             <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                               {formatTime(message.timestamp)}
                             </p>
-                          )}
+                        )}
                         </div>
                       </div>
                     </div>
                   ))}
                   {isLoading && (
                     <>
-                      <div className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}>
-                        <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
-                          <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
-                              <Sparkles className="w-5 h-5 text-white" />
-                            </div>
+                    <div className={`w-full ${isDark ? "hover:bg-white/2" : "hover:bg-gray-50/50"} transition-colors`}>
+                      <div className="max-w-3xl mx-auto py-6 px-6 flex gap-4">
+                        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/20">
+                            <Sparkles className="w-5 h-5 text-white" />
                           </div>
-                          <div className="relative flex-1 overflow-hidden flex items-center">
-                            <div className="flex items-center gap-3">
-                              <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
-                            </div>
+                        </div>
+                        <div className="relative flex-1 overflow-hidden flex items-center">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Loria is thinking...</span>
                           </div>
                         </div>
                       </div>
+                    </div>
                       {/* Show chart loading skeleton while generating */}
                       <div className="w-full">
                         <div className="max-w-3xl mx-auto px-6">
@@ -945,24 +945,24 @@ export default function ChatBot({ isFullPage = false }) {
                   {/* Render text content if present */}
                   {message.text && (
                     <>
-                      {message.isList ? (
-                        <div className="text-sm leading-relaxed whitespace-pre-line">
-                          {message.isTypingComplete || !typingMessages[message.id]
-                            ? message.text
-                            : typingMessages[message.id]?.displayedText || ""}
-                          {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                            <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {message.isTypingComplete || !typingMessages[message.id]
-                            ? message.text
-                            : typingMessages[message.id]?.displayedText || ""}
-                          {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
-                            <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
-                          )}
-                        </p>
+                  {message.isList ? (
+                    <div className="text-sm leading-relaxed whitespace-pre-line">
+                      {message.isTypingComplete || !typingMessages[message.id]
+                        ? message.text
+                        : typingMessages[message.id]?.displayedText || ""}
+                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                      )}
+                    </div>
+                  ) : (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.isTypingComplete || !typingMessages[message.id]
+                        ? message.text
+                        : typingMessages[message.id]?.displayedText || ""}
+                      {!message.isTypingComplete && typingMessages[message.id] && !typingMessages[message.id].isComplete && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-orange-500 animate-pulse">|</span>
+                      )}
+                    </p>
                       )}
                     </>
                   )}

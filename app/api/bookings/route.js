@@ -104,14 +104,17 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { bookingId, meeting_completion_status } = body;
+    const { bookingId, meeting_completion_status, is_email_required } = body;
 
     if (!bookingId) {
       return NextResponse.json({ error: "bookingId is required" }, { status: 400 });
     }
 
-    if (!meeting_completion_status) {
-      return NextResponse.json({ error: "meeting_completion_status is required" }, { status: 400 });
+    // At least one field must be provided for update
+    if (meeting_completion_status === undefined && is_email_required === undefined) {
+      return NextResponse.json({ 
+        error: "At least one of 'meeting_completion_status' or 'is_email_required' must be provided" 
+      }, { status: 400 });
     }
 
     // Use admin client to update booking
@@ -120,7 +123,7 @@ export async function PATCH(request) {
     // First, get the booking to find the lead_id
     const { data: existingBooking, error: fetchError } = await supabase
       .from("bookings")
-      .select("id, lead_id, meeting_completion_status")
+      .select("id, lead_id, meeting_completion_status, is_email_required")
       .eq("id", bookingId)
       .single();
 
@@ -129,10 +132,23 @@ export async function PATCH(request) {
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
+    // Build update payload
+    const updateData = {};
+
+    // Update meeting_completion_status if provided
+    if (meeting_completion_status !== undefined) {
+      updateData.meeting_completion_status = meeting_completion_status;
+    }
+
+    // Update is_email_required if explicitly provided (true/false)
+    if (typeof is_email_required === "boolean") {
+      updateData.is_email_required = is_email_required;
+    }
+
     // Update the booking
     const { data, error } = await supabase
       .from("bookings")
-      .update({ meeting_completion_status: meeting_completion_status })
+      .update(updateData)
       .eq("id", bookingId)
       .select()
       .single();
