@@ -13,10 +13,12 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     email: "",
     phone: "",
     lead_id: "",
+    is_email_required: false,
   });
   const [leadSearchTerm, setLeadSearchTerm] = useState("");
   const [isLeadDropdownOpen, setIsLeadDropdownOpen] = useState(false);
   const leadDropdownRef = useRef(null);
+  const isTypingRef = useRef(false);
 
   // Fetch leads for dropdown
   const { data: leadsData, error: leadsError, isLoading: leadsLoading } = useSWR("/api/leads", fetcher);
@@ -48,18 +50,31 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
   // Filter leads based on search term
   const filteredLeads = useMemo(() => {
-    if (!leadSearchTerm.trim()) return leads;
+    if (!leadSearchTerm.trim()) {
+      // Show all leads when search is empty
+      return leads;
+    }
     
-    const searchLower = leadSearchTerm.toLowerCase();
+    const searchLower = leadSearchTerm.toLowerCase().trim();
     return leads.filter((lead) => {
-      const leadId = (lead.id || "").toLowerCase();
-      const leadName = ((lead.name || lead.lead_name || "")).toLowerCase();
-      const contactName = ((lead.contactName || lead.contact_name || "")).toLowerCase();
+      // Get all searchable fields
+      const leadId = String(lead.id || "").toLowerCase();
+      const leadName = String(lead.name || lead.lead_name || "").toLowerCase();
+      const contactName = String(lead.contactName || lead.contact_name || "").toLowerCase();
+      const email = String(lead.email || "").toLowerCase();
+      const phone = String(lead.phone || "").toLowerCase();
       
+      // Create combined search text (matches the display format)
+      const combinedDisplay = `${leadId}, ${contactName}, ${leadName}`.toLowerCase();
+      
+      // Search across all fields including combined display
       return (
         leadId.includes(searchLower) ||
         leadName.includes(searchLower) ||
-        contactName.includes(searchLower)
+        contactName.includes(searchLower) ||
+        email.includes(searchLower) ||
+        phone.includes(searchLower) ||
+        combinedDisplay.includes(searchLower)
       );
     });
   }, [leads, leadSearchTerm]);
@@ -145,16 +160,31 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
   };
 
   // Update search term when formData.lead_id changes (e.g., from external source)
+  // Use a ref to track if user is actively typing to prevent interference
   useEffect(() => {
+    // Don't update if user is currently typing
+    if (isTypingRef.current) return;
+    
     if (formData.lead_id && leads.length > 0) {
       const selectedLead = leads.find(lead => lead.id === formData.lead_id);
       if (selectedLead) {
         const formatted = formatLeadDisplay(selectedLead);
-        // Only update if the search term doesn't already match
-        setLeadSearchTerm((prev) => prev !== formatted ? formatted : prev);
+        // Only update if search term is empty or matches the formatted display
+        setLeadSearchTerm((prev) => {
+          if (!prev || prev === formatted) {
+            return formatted;
+          }
+          return prev;
+        });
       }
     } else if (!formData.lead_id) {
-      setLeadSearchTerm("");
+      // Only clear if no lead is selected and user is not typing
+      setLeadSearchTerm((prev) => {
+        if (!isTypingRef.current) {
+          return "";
+        }
+        return prev;
+      });
     }
   }, [formData.lead_id, leads]);
 
@@ -222,6 +252,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           },
           lead_id: formData.lead_id || null,
           invitiee_contact_name: contactName,
+          is_email_required: formData.is_email_required,
         }),
       });
 
@@ -237,6 +268,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         email: "",
         phone: "",
         lead_id: "",
+        is_email_required: false,
       });
       setErrors({});
       setSubmitError(null);
@@ -317,15 +349,50 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
                 id="lead_search"
                 value={leadSearchTerm}
                 onChange={(e) => {
-                  setLeadSearchTerm(e.target.value);
+                  const value = e.target.value;
+                  
+                  // Mark that user is typing
+                  isTypingRef.current = true;
+                  
+                  // Update search term immediately
+                  setLeadSearchTerm(value);
                   setIsLeadDropdownOpen(true);
-                  if (!e.target.value) {
+                  
+                  // Clear lead_id if user is typing something different from the selected lead
+                  if (formData.lead_id) {
+                    const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+                    if (selectedLead) {
+                      const formatted = formatLeadDisplay(selectedLead);
+                      // If typed value doesn't match the selected lead's display, clear the selection
+                      if (value !== formatted) {
+                        setFormData((prev) => ({ ...prev, lead_id: "" }));
+                      }
+                    }
+                  }
+                  
+                  // Clear lead_id if search is empty
+                  if (!value.trim()) {
                     setFormData((prev) => ({ ...prev, lead_id: "" }));
                   }
+                  
+                  // Reset typing flag after a short delay
+                  setTimeout(() => {
+                    isTypingRef.current = false;
+                  }, 300);
                 }}
-                onFocus={() => setIsLeadDropdownOpen(true)}
+                onFocus={(e) => {
+                  setIsLeadDropdownOpen(true);
+                  // If a lead is selected and search term is empty, populate it
+                  if (formData.lead_id && !leadSearchTerm) {
+                    const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+                    if (selectedLead) {
+                      const formatted = formatLeadDisplay(selectedLead);
+                      setLeadSearchTerm(formatted);
+                    }
+                  }
+                }}
                 disabled={leadsLoading || !selectedSlot}
-                placeholder={leadsLoading ? "Loading leads..." : "Search by lead no, contact name, or lead name"}
+                placeholder={leadsLoading ? "Loading leads..." : "Search by lead ID, name, contact, email, or phone"}
                 className={`
                   w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
                   ${
@@ -361,7 +428,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
               }`}>
                 {filteredLeads.length === 0 ? (
                   <div className={`px-4 py-3 text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
-                    No leads found
+                    {leadSearchTerm.trim() ? "No leads found matching your search" : "No leads available"}
                   </div>
                 ) : (
                   filteredLeads.map((lead) => (
@@ -461,6 +528,44 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           {errors.phone && (
             <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.phone}</p>
           )}
+        </div>
+
+        {/* Email Confirmation Checkbox */}
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="is_email_required"
+            name="is_email_required"
+            checked={formData.is_email_required}
+            onChange={(e) => {
+              setFormData((prev) => ({ ...prev, is_email_required: e.target.checked }));
+            }}
+            disabled={!selectedSlot}
+            className={`
+              w-4 h-4 rounded border-2 focus:ring-2 focus:ring-orange-500
+              ${
+                !selectedSlot
+                  ? "opacity-50 cursor-not-allowed"
+                  : theme === "light"
+                  ? "border-gray-300 text-orange-600 focus:ring-orange-500"
+                  : "border-gray-600 text-orange-600 bg-[#262626] focus:ring-orange-500"
+              }
+            `}
+          />
+          <label
+            htmlFor="is_email_required"
+            className={`ml-2 text-sm font-medium ${
+              !selectedSlot
+                ? theme === "light"
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-gray-500 cursor-not-allowed"
+                : theme === "light"
+                ? "text-gray-700 cursor-pointer"
+                : "text-white cursor-pointer"
+            }`}
+          >
+            Send confirmation email to the attendee
+          </label>
         </div>
 
         {submitError && (

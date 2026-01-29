@@ -4,15 +4,11 @@ import { useEffect, useState } from "react";
 import { useTheme } from "../../../context/themeContext";
 export default function Success({ bookingData, eventType, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   const { theme } = useTheme();
   useEffect(() => {
     if (bookingData) {
       // Trigger animation by setting isOpen after a brief delay
       setTimeout(() => setIsOpen(true), 10);
-      // Show email confirmation dialog after modal opens
-      setTimeout(() => setShowEmailConfirmation(true), 300);
     }
   }, [bookingData]);
 
@@ -33,33 +29,6 @@ export default function Success({ bookingData, eventType, onClose }) {
       minute: "2-digit",
       hour12: true,
     }).format(new Date(isoString));
-  };
-
-  const handleEmailChoice = async (sendEmail) => {
-    setIsUpdating(true);
-    try {
-      const response = await fetch("/api/bookings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId: bookingData.id,
-          is_email_required: sendEmail,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update booking");
-      }
-
-      setShowEmailConfirmation(false);
-    } catch (error) {
-      console.error("Failed to update booking email preference:", error);
-      // Still close the confirmation dialog even if update fails
-      setShowEmailConfirmation(false);
-    } finally {
-      setIsUpdating(false);
-    }
   };
 
   const handleClose = () => {
@@ -199,53 +168,11 @@ export default function Success({ bookingData, eventType, onClose }) {
               </div>
             </div>
 
-            {!showEmailConfirmation && (
-              <p className={`text-sm ${theme === "light" ? "text-gray-500" : "text-gray-500"} text-center`}>
-                {bookingData.is_email_required 
-                  ? "A confirmation email will be sent shortly."
-                  : "Booking confirmed successfully."}
-              </p>
-            )}
-
-            {/* Email Confirmation Dialog */}
-            {showEmailConfirmation && (
-              <div className={`mt-4 p-4 rounded-lg border ${theme === "light" ? "bg-gray-50 border-gray-200" : "bg-[#1f1f1f] border-gray-700"}`}>
-                <p className={`text-sm font-medium ${theme === "light" ? "text-gray-800" : "text-white"} mb-2`}>
-                  Send confirmation email to the attendee?
-                </p>
-                <p className={`text-xs ${theme === "light" ? "text-gray-500" : "text-gray-400"} mb-3`}>
-                  You can choose whether an email should be sent to the attendee.
-                </p>
-                <div className="flex gap-2 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleEmailChoice(false)}
-                    disabled={isUpdating}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                      isUpdating
-                        ? "opacity-50 cursor-not-allowed"
-                        : theme === "light"
-                        ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                        : "border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700"
-                    }`}
-                  >
-                    No, don't send
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleEmailChoice(true)}
-                    disabled={isUpdating}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      isUpdating
-                        ? "opacity-50 cursor-not-allowed bg-orange-500 text-white"
-                        : "bg-orange-600 text-white hover:bg-orange-700"
-                    }`}
-                  >
-                    {isUpdating ? "Updating..." : "Yes, send email"}
-                  </button>
-                </div>
-              </div>
-            )}
+            <p className={`text-sm ${theme === "light" ? "text-gray-500" : "text-gray-500"} text-center`}>
+              {bookingData.is_email_required 
+                ? "A confirmation email will be sent shortly."
+                : "Booking confirmed successfully."}
+            </p>
           </div>
 
           {/* Footer */}
@@ -253,12 +180,7 @@ export default function Success({ bookingData, eventType, onClose }) {
             <button
               type="button"
               onClick={handleClose}
-              disabled={showEmailConfirmation}
-              className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent ${
-                showEmailConfirmation
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              } ${theme === "light" ? "bg-orange-600 text-white hover:bg-orange-700 focus:outline-none focus:bg-orange-700 disabled:opacity-50 disabled:pointer-events-none" : "bg-[#262626] text-white hover:bg-[#262626] focus:outline-none focus:bg-[#262626] disabled:opacity-50 disabled:pointer-events-none"}`}
+              className={`py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent ${theme === "light" ? "bg-orange-600 text-white hover:bg-orange-700 focus:outline-none focus:bg-orange-700 disabled:opacity-50 disabled:pointer-events-none" : "bg-[#262626] text-white hover:bg-[#262626] focus:outline-none focus:bg-[#262626] disabled:opacity-50 disabled:pointer-events-none"}`}
             >
               Done
             </button>
