@@ -13,69 +13,21 @@ export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
     );
   }
 
-  // Working hours constants (local time)
-  const WORK_START_MINUTES = 10 * 60; // 10:00 AM
-  const WORK_END_MINUTES = 17 * 60;   // 5:00 PM
-  const SLOT_DURATION = 30;           // minutes
-
   // Get user's local timezone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Check if slot is within working hours (using local time)
-  const isWithinWorkingHours = (isoString) => {
-    // Parse the UTC ISO string
-    const utcDate = new Date(isoString);
-    
-    // Use Intl to get hours and minutes in user's timezone (24-hour format)
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: userTimeZone,
-      hour: "numeric",  // Use numeric instead of 2-digit for better compatibility
-      minute: "2-digit",
-      hour12: false,
-    });
-    
-    const parts = formatter.formatToParts(utcDate);
-    const hourPart = parts.find(p => p.type === "hour");
-    const minutePart = parts.find(p => p.type === "minute");
-    
-    if (!hourPart || !minutePart) {
-      // Fallback: manually calculate time in user's timezone
-      // Create a formatter that gives us the time components
-      const timeFormatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: userTimeZone,
-        hour: "numeric",
-        minute: "numeric",
-        hour12: false,
-      });
-      const timeString = timeFormatter.format(utcDate);
-      const [hours, minutes] = timeString.split(":").map(Number);
-      const totalMinutes = hours * 60 + minutes;
-      return (
-        totalMinutes >= WORK_START_MINUTES &&
-        totalMinutes + SLOT_DURATION <= WORK_END_MINUTES
-      );
-    }
-    
-    const hours = parseInt(hourPart.value, 10);
-    const minutes = parseInt(minutePart.value, 10);
-    const totalMinutes = hours * 60 + minutes;
-
-    // Check if slot start and end are within working hours
-    const isValid = (
-      totalMinutes >= WORK_START_MINUTES &&
-      totalMinutes + SLOT_DURATION <= WORK_END_MINUTES
-    );
-    
-    return isValid;
-  };
-
-  // Filter slots by working hours BEFORE grouping
-  // TODO: Set ENABLE_WORKING_HOURS_FILTER to false to temporarily disable filter for debugging
-  const ENABLE_WORKING_HOURS_FILTER = true;
+  // CRITICAL FIX: Removed hardcoded working hours filter
+  // The backend already handles:
+  // - Working hours from database (start_time/end_time in UTC)
+  // - Past slot filtering
+  // - Booked slot filtering
+  // - Timezone conversion
+  // Frontend should trust the backend and display all slots it provides
+  // 
+  // Previous bug: WORK_END_MINUTES = 17 * 60 (5:00 PM) was filtering out slots after 4:30 PM IST
+  // Backend generates slots until 15:30 UTC (9:00 PM IST), so frontend should display them all
   
-  const filteredSlots = ENABLE_WORKING_HOURS_FILTER 
-    ? slots.filter(slot => isWithinWorkingHours(slot.start))
-    : slots;
+  const filteredSlots = slots; // Display all slots from backend - no frontend filtering
 
   // Get local date key for grouping (YYYY-MM-DD format in user's timezone)
   const getLocalDateKey = (isoString) => {
@@ -123,11 +75,11 @@ export default function SlotPicker({ slots, selectedSlot, onSelectSlot }) {
     return selectedSlot && selectedSlot.start === slot.start;
   };
 
-  // Show message if slots exist but all are filtered out
-  if (slots.length > 0 && filteredSlots.length === 0) {
+  // Show message if no slots at all (shouldn't happen if backend is working correctly)
+  if (slots.length === 0) {
     return (
       <p className={`${theme === "light" ? "text-gray-500" : "text-gray-500"} text-sm py-4`}>
-        No slots available within working hours (10:00 AM - 5:00 PM).
+        No time slots available.
       </p>
     );
   }

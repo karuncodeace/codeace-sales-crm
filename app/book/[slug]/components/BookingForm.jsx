@@ -235,33 +235,92 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       const leadName = selectedLead.name || selectedLead.lead_name || "Guest";
       const contactName = selectedLead.contactName || selectedLead.contact_name || null;
 
+      const bookingPayload = {
+        eventTypeId: eventType.id,
+        start: selectedSlot.start,
+        end: selectedSlot.end,
+        timezone: timezone,
+        invitee: {
+          name: leadName,
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+        },
+        lead_id: formData.lead_id || null,
+        invitiee_contact_name: contactName,
+        is_email_required: formData.is_email_required,
+      };
+
+      // Log booking details before sending
+      const formattedStartTime = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(new Date(selectedSlot.start));
+
+      console.log("📅 Booking Request Details:", {
+        eventType: eventType.title || eventType.name || "N/A",
+        eventTypeId: eventType.id,
+        selectedSlot: {
+          start: selectedSlot.start,
+          end: selectedSlot.end,
+          formattedStart: formattedStartTime,
+        },
+        invitee: {
+          name: leadName,
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+          contactName: contactName,
+        },
+        lead: {
+          lead_id: formData.lead_id,
+          leadName: leadName,
+        },
+        emailConfirmation: formData.is_email_required,
+        timezone: timezone,
+        fullPayload: bookingPayload,
+      });
+
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          eventTypeId: eventType.id,
-          start: selectedSlot.start,
-          end: selectedSlot.end,
-          timezone: timezone,
-          invitee: {
-            name: leadName,
-            email: formData.email.trim(),
-            phone: formData.phone.trim() || null,
-          },
-          lead_id: formData.lead_id || null,
-          invitiee_contact_name: contactName,
-          is_email_required: formData.is_email_required,
-        }),
+        body: JSON.stringify(bookingPayload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("❌ Booking Error:", errorData);
         throw new Error(errorData.error || "Failed to create booking");
       }
 
       const bookingData = await response.json();
+      
+      // Log booking response details
+      console.log("✅ Booking Created Successfully:", {
+        bookingId: bookingData.id,
+        eventTypeId: bookingData.event_type_id,
+        startTime: bookingData.start_time,
+        endTime: bookingData.end_time,
+        timezone: bookingData.timezone,
+        status: bookingData.status,
+        invitee: {
+          name: bookingData.invitee_name,
+          email: bookingData.invitee_email,
+          phone: bookingData.invitee_phone,
+          contactName: bookingData.invitiee_contact_name,
+        },
+        leadId: bookingData.lead_id,
+        emailRequired: bookingData.is_email_required,
+        googleCalendarEventId: bookingData.google_calendar_event_id,
+        meetLink: bookingData.meet_link,
+        fullBookingData: bookingData,
+      });
       
       // Reset form after successful booking
       setFormData({
