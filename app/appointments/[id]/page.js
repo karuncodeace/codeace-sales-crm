@@ -228,10 +228,13 @@ export default function BookingDetailPage() {
                 </div>
                 <div>
                   <h1 className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                    Booking Details
+                    Meeting with {(() => {
+                      const name = booking.invitiee_contact_name || booking.invitee_name || "Guest";
+                      return name.length > 1 ? name.substring(0, 1) + "..." : name;
+                    })()}
                   </h1>
                   <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                    ID: {booking.id}
+                    Booking ID: {booking.id}
                   </p>
                 </div>
               </div>

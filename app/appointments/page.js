@@ -49,7 +49,10 @@ export default function BookingsPage() {
   // Calculate counts for each status
   const statusCounts = {
     all: bookingsList.length,
-    booked: bookingsList.filter((booking) => getDisplayStatus(booking) === "booked").length,
+    booked: bookingsList.filter((booking) => {
+      const status = getDisplayStatus(booking);
+      return status === "booked" || status === "rescheduled";
+    }).length,
     conducted: bookingsList.filter((booking) => getDisplayStatus(booking) === "conducted").length,
     rescheduled: bookingsList.filter((booking) => getDisplayStatus(booking) === "rescheduled").length,
     cancelled: bookingsList.filter((booking) => getDisplayStatus(booking) === "cancelled").length,
@@ -63,21 +66,35 @@ export default function BookingsPage() {
     if (statusFilter !== "all") {
       filtered = filtered.filter((booking) => {
         const displayStatus = getDisplayStatus(booking);
+        // When "booked" is selected, also show rescheduled meetings
+        if (statusFilter === "booked") {
+          return displayStatus === "booked" || displayStatus === "rescheduled";
+        }
         return displayStatus === statusFilter;
       });
-    } else {
-      // When "all" is selected, sort so scheduled/booked bookings appear first
-      filtered = [...filtered].sort((a, b) => {
-        const aStatus = getDisplayStatus(a);
-        const bStatus = getDisplayStatus(b);
-        if (aStatus === "booked" && bStatus !== "booked") return -1;
-        if (aStatus !== "booked" && bStatus === "booked") return 1;
-        // For same status, sort by start_time (most recent first)
-        const aTime = a.start_time ? new Date(a.start_time).getTime() : 0;
-        const bTime = b.start_time ? new Date(b.start_time).getTime() : 0;
-        return bTime - aTime;
-      });
     }
+    
+    // Sort: Upcoming meetings first, then sort by date
+    filtered = [...filtered].sort((a, b) => {
+      const now = new Date().getTime();
+      const aTime = a.start_time ? new Date(a.start_time).getTime() : 0;
+      const bTime = b.start_time ? new Date(b.start_time).getTime() : 0;
+      
+      const aIsFuture = aTime > now;
+      const bIsFuture = bTime > now;
+      
+      // Upcoming meetings first
+      if (aIsFuture && !bIsFuture) return -1;
+      if (!aIsFuture && bIsFuture) return 1;
+      
+      // If both are future, sort by closest upcoming first (ascending)
+      if (aIsFuture && bIsFuture) {
+        return aTime - bTime;
+      }
+      
+      // If both are past, sort by most recent first (descending)
+      return bTime - aTime;
+    });
     
     return filtered;
   }, [bookingsList, statusFilter]);
@@ -464,7 +481,10 @@ export default function BookingsPage() {
                             </div>
                             <div>
                               <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                                Meeting with {booking.lead_id || "N/A"}
+                                Meeting with {(() => {
+                                  const name = booking.invitiee_contact_name || booking.invitee_name || "N/A";
+                                  return name.length > 15 ? name.substring(0, 15) + "..." : name;
+                                })()}
                               </h3>
                             </div>
                           </div>
