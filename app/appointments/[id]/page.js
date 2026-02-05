@@ -76,8 +76,10 @@ export default function BookingDetailPage() {
   // Get display status
   const getDisplayStatus = (booking) => {
     if (!booking) return "unknown";
-    const completion = String(booking.meeting_completion_status || "").toLowerCase();
-    if (completion === "completed") return "conducted";
+    // Check if meeting_completion_status is true (boolean) or "completed" (legacy text)
+    const completion = booking.meeting_completion_status === true || 
+                       String(booking.meeting_completion_status || "").toLowerCase() === "completed";
+    if (completion) return "conducted";
     if (booking.is_rescheduled) return "rescheduled";
     if (booking.status === "scheduled") return "booked";
     return booking.status || "unknown";

@@ -158,8 +158,9 @@ export async function PATCH(request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If meeting is marked as "Completed", update the lead's meeting_status
-    if (meeting_completion_status === "Completed" && existingBooking?.lead_id) {
+    // If meeting is marked as completed (true boolean or "Completed" text for legacy), update the lead's meeting_status
+    const isCompleted = meeting_completion_status === true || meeting_completion_status === "Completed";
+    if (isCompleted && existingBooking?.lead_id) {
       try {
         const { error: leadUpdateError } = await supabase
           .from("leads_table")

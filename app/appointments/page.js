@@ -37,8 +37,10 @@ export default function BookingsPage() {
   // Map booking status to display status (bookings use "scheduled", appointments use "booked")
   // Check completion and reschedule flags
   const getDisplayStatus = (booking) => {
-    const completion = String(booking.meeting_completion_status || "").toLowerCase();
-    if (completion === "completed") return "conducted";
+    // Check if meeting_completion_status is true (boolean) or "completed" (legacy text)
+    const completion = booking.meeting_completion_status === true || 
+                       String(booking.meeting_completion_status || "").toLowerCase() === "completed";
+    if (completion) return "conducted";
     if (booking.is_rescheduled) return "rescheduled";
     if (booking.status === "scheduled") return "booked";
     return booking.status || "unknown";
@@ -198,7 +200,7 @@ export default function BookingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId: booking.id,
-          meeting_completion_status: "Completed",
+          meeting_completion_status: true,
           is_email_required: isEmailRequired,
         }),
       });
