@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 import WeeklyLineChart from "../components/charts/weeklylinecharts";
 import RevenueLineChart from "../components/charts/revenuelinechart";
@@ -12,6 +12,7 @@ import RevenueAreaChart from "../components/charts/areachart";
 import Header from "../components/ui/header";
 import { fetcher } from "../../lib/swr/fetcher";
 import DashboardHeader from "../components/ui/dashboardHeader";
+import UpcomingMeetingsTable from "../components/tables/UpcomingMeetingsTable";
 
 // Dashboard API endpoints to pre-fetch
 const dashboardEndpoints = [
@@ -26,6 +27,27 @@ const dashboardEndpoints = [
 
 export default function DashboardPage() {
   const { mutate } = useSWRConfig();
+  const [userRole, setUserRole] = useState(null);
+  const [isLoadingRole, setIsLoadingRole] = useState(true);
+
+  // Check user role on mount
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const response = await fetch("/api/user/role");
+        if (response.ok) {
+          const data = await response.json();
+          setUserRole(data.role); // "admin" or "sales"
+        }
+      } catch (error) {
+        console.error("Failed to fetch user role:", error);
+      } finally {
+        setIsLoadingRole(false);
+      }
+    };
+
+    checkUserRole();
+  }, []);
 
   // Pre-fetch all dashboard data on mount to populate cache
   useEffect(() => {
@@ -52,31 +74,74 @@ export default function DashboardPage() {
     preloadData();
   }, [mutate]);
 
+  if (isLoadingRole) {
+    return (
+      <div className="w-full flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          <p className="mt-4 text-sm text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="w-full">
          <div className="mt-8">
           <DashboardHeader />
          </div>
-        <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-2 xl:mt-2">
-          <div className="">
-            <WeeklyLineChart />
-          </div>
-          <div className="">
-            <RevenueLineChart/>
-          </div>
-          <div className="lg:col-span-2 xl:col-span-1">
-            <DonutChart />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-2 gap-4 mt-10 pb-5">
-          <div>
-            <BarChart />
-          </div>
-          <div>
-            <SalesPersonComparisonChart />
-          </div>
-        </div>
+
+        {/* For Sales Person: Show Upcoming Meetings + Lead Source side by side */}
+        {userRole === "sales" ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2 xl:mt-2">
+              <div className="h-[430px] md:h-[300px] 2xl:h-[410px]">
+                <UpcomingMeetingsTable />
+              </div>
+              <div className="">
+                <DonutChart />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-2 gap-4 mt-10 pb-5">
+              <div>
+                <BarChart />
+              </div>
+              <div>
+                <SalesPersonComparisonChart />
+              </div>
+            </div>
+          </>
+        ) : (
+          /* For Admin: Show all charts including Weekly Sales and Revenue */
+          <>
+            <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-2 xl:mt-2">
+              <div className="">
+                <WeeklyLineChart />
+              </div>
+              <div className="">
+                <RevenueLineChart/>
+              </div>
+              <div className="lg:col-span-2 xl:col-span-1">
+                <DonutChart />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-2 gap-4 mt-10 pb-5">
+              <div>
+                <BarChart />
+              </div>
+              <div>
+                <SalesPersonComparisonChart />
+              </div>
+            </div>
+
+            {/* Upcoming Meetings Table */}
+            <div className="mt-10 pb-5">
+              <UpcomingMeetingsTable />
+            </div>
+          </>
+        )}
       </div>
     </>
   );

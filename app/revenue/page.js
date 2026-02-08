@@ -7,6 +7,7 @@ import TargetSetupPanel from "./components/TargetSetupPanel";
 import RevenueKPICards from "./components/RevenueKPICards";
 import RevenueCharts from "./components/RevenueCharts";
 import { useTheme } from "../context/themeContext";
+import UpcomingMeetingsTable from "../components/tables/UpcomingMeetingsTable";
 
 export default function RevenuePage() {
   const router = useRouter();
@@ -131,6 +132,11 @@ export default function RevenuePage() {
           month={selectedMonth}
           quarter={selectedQuarter}
         />
+      </div>
+
+      {/* Upcoming Meetings Table */}
+      <div className="mb-6">
+        <UpcomingMeetingsTable />
       </div>
     </div>
   );
