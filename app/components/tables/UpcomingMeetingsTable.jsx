@@ -40,7 +40,7 @@ export default function UpcomingMeetingsTable() {
       const bTime = b.start_time ? new Date(b.start_time).getTime() : 0;
       return aTime - bTime;
     })
-    .slice(0, 5); // Show only next 5 meetings
+    ; // Keep full list; we'll display the next 5 with a scrollable container
 
   // Format date and time
   const formatDateTime = (dateString) => {
@@ -139,7 +139,7 @@ export default function UpcomingMeetingsTable() {
             </p>
           </div>
         ) : (
-          <div className="w-full overflow-hidden">
+          <div className="w-full overflow-hidden max-h-[260px] overflow-y-auto">
           <table className="w-full min-w-full table-fixed">
             <thead>
               <tr className="text-xs font-medium uppercase tracking-wider">
@@ -177,8 +177,8 @@ export default function UpcomingMeetingsTable() {
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y overflow-x-auto ${isDark ? "divide-gray-700" : "divide-gray-200"}`}>
-              {upcomingMeetings.map((booking) => {
+            <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-200"}`}>
+              {upcomingMeetings.slice(0, 5).map((booking) => {
                 const startTime = formatDateTime(booking.start_time);
                 return (
                   <tr

@@ -74,16 +74,7 @@ export default function DashboardPage() {
     preloadData();
   }, [mutate]);
 
-  if (isLoadingRole) {
-    return (
-      <div className="w-full flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          <p className="mt-4 text-sm text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+ 
 
   return (
     <>
@@ -117,13 +108,10 @@ export default function DashboardPage() {
           /* For Admin: Show all charts including Weekly Sales and Revenue */
           <>
             <div className="grid  grid-cols-1 lg:grid-cols-2 xl:grid-cols-3  gap-4 mt-2 xl:mt-2">
-              <div className="">
-                <WeeklyLineChart />
+              <div className="lg:col-span-2">
+                <UpcomingMeetingsTable />
               </div>
-              <div className="">
-                <RevenueLineChart/>
-              </div>
-              <div className="lg:col-span-2 xl:col-span-1">
+              <div className="lg:col-span-1">
                 <DonutChart />
               </div>
             </div>
@@ -136,10 +124,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Upcoming Meetings Table */}
-            <div className="mt-10 pb-5">
-              <UpcomingMeetingsTable />
-            </div>
+          
           </>
         )}
       </div>
