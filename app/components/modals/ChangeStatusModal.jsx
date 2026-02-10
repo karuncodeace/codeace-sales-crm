@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import DatePicker from "react-datepicker";
 import { Edit2 } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
 
@@ -70,12 +73,21 @@ export default function ChangeStatusModal({
 
           <div>
             <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>Due Date (Optional)</label>
-            <input
-              type="date"
-              value={dueDate || ""}
-              onChange={(e) => onChange("dueDate", e.target.value)}
-              className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 ${theme === "dark" ? "bg-[#262626] border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-900"}`}
-            />
+            <div>
+              <DatePicker
+                selected={dueDate ? new Date(dueDate) : null}
+                onChange={(date) => {
+                  if (!date) return onChange("dueDate", "");
+                  const yyyy = date.getFullYear();
+                  const mm = String(date.getMonth() + 1).padStart(2, "0");
+                  const dd = String(date.getDate()).padStart(2, "0");
+                  onChange("dueDate", `${yyyy}-${mm}-${dd}`);
+                }}
+                dateFormat="yyyy-MM-dd"
+                className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 ${theme === "dark" ? "bg-[#262626] border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-900"}`}
+                placeholderText="Select a date"
+              />
+            </div>
           </div>
 
           <div>
