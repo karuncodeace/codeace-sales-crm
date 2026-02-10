@@ -345,11 +345,14 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
                 onChange={(e) => updateField("status", e.target.value)}
               >
                 <option value="New">New</option>
-                <option value="Contacted">Contacted</option>
-                <option value="Follow-up">Follow-up</option>
-                <option value="Qualified">Qualified</option>
-                <option value="Proposal">Proposal</option>
-                <option value="Noresponse">No Response</option>
+                <option value="Responded">Responded</option>
+                <option value="Not Responded">Not Responded</option>
+                <option value="Demo Scheduled">Demo Scheduled</option>
+                <option value="Demo Completed">Demo Completed</option>
+                <option value="SRS">SRS</option>
+                <option value="Converted">Converted</option>
+                <option value="Lost Lead">Lost Lead</option>
+                <option value="Junk Lead">Junk Lead</option>
               </select>
             </div>
 

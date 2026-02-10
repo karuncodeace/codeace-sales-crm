@@ -117,14 +117,16 @@ export default function Sidebar2() {
             ),
             isDropdown: true,
             dropdownOptions: [
-                { label: "All leads", filter: "filter=all_leads" },
-                { label: "New leads", filter: "filter=new_leads" },
+                { label: "All Leads", filter: "filter=all_leads" },
+                { label: "New", filter: "filter=new_leads" },
                 { label: "Responded", filter: "filter=responded" },
-                { label: "Not responded", filter: "filter=not_responded" },
+                { label: "Not Responded", filter: "filter=not_responded" },
                 { label: "Demo Scheduled", filter: "filter=demo_scheduled" },
                 { label: "Demo Completed", filter: "filter=demo_completed" },
+                { label: "SRS", filter: "filter=srs" },
                 { label: "Converted", filter: "filter=converted" },
-                { label: "Junk lead", filter: "filter=junk_lead" },
+                { label: "Lost Lead", filter: "filter=lost_lead" },
+                { label: "Junk Lead", filter: "filter=junk_lead" },
             ],
         },
         {
@@ -420,15 +422,16 @@ export default function Sidebar2() {
                                         {/* Dropdown Menu */}
                                         {isLeadsItem && !isCollapsed && (
                                             <div 
-                                                className={`mt-2  rounded-lg overflow-hidden ${
+                                                className={`mt-2 rounded-lg overflow-hidden ${
                                                     leadsDropdownOpen 
-                                                        ? "opacity-100 max-h-96 translate-y-0 scale-100" 
+                                                        ? "opacity-100 max-h-96 translate-y-0 scale-100 overflow-y-auto" 
                                                         : "opacity-0 max-h-0 -translate-y-2 scale-95 pointer-events-none"
                                                 } transition-all duration-300 ease-out ${
                                                     effectiveTheme === "dark" 
                                                         ? "bg-[#262626] border border-gray-700 shadow-xl" 
                                                         : "bg-white border border-gray-200 shadow-lg"
                                                 }`}
+                                                style={{ WebkitOverflowScrolling: "touch" }}
                                             >
                                                 {item.dropdownOptions.map((option, index) => {
                                                     const filterValue = option.filter.split("=")[1];

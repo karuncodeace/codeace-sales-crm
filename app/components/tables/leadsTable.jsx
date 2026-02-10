@@ -23,14 +23,14 @@ const fetchLeads = async () => {
   return res.json();
 };
 
-// Task title mapping based on lead status
+// Task title mapping based on lead status (use new labels)
 const taskTitles = {
-  "New":        (name) => `Contact ${name} for the first time`,
-  "Contacted":  (name) => `Qualify the needs of ${name}`,
-  "Demo":       (name) => `Follow up with ${name} after the demo`,
-  "Proposal":   (name) => `Discuss proposal details with ${name}`,
-  "Follow-Up":  (name) => `Follow up with ${name} for decision update`,
-  "Won":        (name) => `Begin onboarding process for ${name}`,
+  "New":             (name) => `Contact ${name} for the first time`,
+  "Responded":       (name) => `Qualify the needs of ${name}`,
+  "Demo Scheduled":  (name) => `Prepare and conduct demo with ${name}`,
+  "Demo Completed":  (name) => `Follow up with ${name} after the demo`,
+  "SRS":             (name) => `Prepare SRS for ${name}`,
+  "Converted":       (name) => `Begin onboarding process for ${name}`,
 };
 
 // Helper function to normalize status to match taskTitles keys
@@ -38,12 +38,13 @@ function normalizeStatus(status) {
   if (!status) return null;
   const s = String(status).toLowerCase().trim();
   
-  if (s === "new") return "New";
-  if (s === "contacted") return "Contacted";
-  if (s === "demo") return "Demo";
-  if (s === "proposal") return "Proposal";
-  if (s === "follow-up" || s === "follow_up" || s === "follow up") return "Follow-Up";
-  if (s === "won") return "Won";
+  if (s === "new" || s === "new leads") return "New";
+  if (s === "contacted" || s === "responded" || s === "responded lead") return "Responded";
+  if (s === "not responded" || s === "no response" || s === "not_responded") return "Not Responded";
+  if (s === "demo" || s === "demo scheduled") return "Demo Scheduled";
+  if (s === "demo completed") return "Demo Completed";
+  if (s === "srs" || s === "proposal") return "SRS";
+  if (s === "won" || s === "converted") return "Converted";
   
   return null;
 }
@@ -54,27 +55,35 @@ const statusStyles = {
     light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
     dark: "text-orange-500 bg-orange-900/40 ring-1 ring-inset ring-orange-700",
   },
-  Contacted: {
+  Responded: {
     light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
     dark: "text-amber-500 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
   },
-  "Follow-Up": {
-    light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
-    dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
-  },
-  Qualified: {
-    light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
-    dark: "text-emerald-500 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
-  },
-  Proposal: {
-    light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
-    dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
-  },
-  Noresponse: {
+  "Not Responded": {
     light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-200",
     dark: "text-gray-300 bg-gray-900/40 ring-1 ring-inset ring-gray-700",
   },
-  Disqualified: {
+  "Demo Scheduled": {
+    light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
+    dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
+  },
+  "Demo Completed": {
+    light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
+    dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
+  },
+  SRS: {
+    light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
+    dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
+  },
+  Converted: {
+    light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
+    dark: "text-emerald-500 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
+  },
+  "Lost Lead": {
+    light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-200",
+    dark: "text-red-400 bg-red-900/40 ring-1 ring-inset ring-red-700",
+  },
+  "Junk Lead": {
     light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-200",
     dark: "text-red-400 bg-red-900/40 ring-1 ring-inset ring-red-700",
   },
@@ -163,7 +172,7 @@ export default function LeadsTable({ initialFilter = null }) {
     calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // For calendar navigation
   });
 
-  // Revenue transaction modal state (for Won stage)
+  // Revenue transaction modal state (for Converted stage)
   const [revenueModal, setRevenueModal] = useState({
     isOpen: false,
     leadId: null,
@@ -171,7 +180,7 @@ export default function LeadsTable({ initialFilter = null }) {
     leadName: "",
     amount: "",
     closedDate: "",
-    status: "Won",
+    status: "Converted",
     isSubmitting: false,
     showCalendar: false,
   });
@@ -221,12 +230,14 @@ export default function LeadsTable({ initialFilter = null }) {
   const statusDefinitions = useMemo(
     () => [
       { id: "New", name: "New", style: "border-l-4 border-[#3B82F6]" },
-      { id: "Contacted", name: "Contacted", style: "border-l-4 border-[#10B981]" },
-      { id: "Demo", name: "Demo", style: "border-l-4 border-[#EAB308]" },
-      { id: "Proposal", name: "Proposal", style: "border-l-4 border-[#8B5CF6]" },
-      { id: "Qualified", name: "Qualified", style: "border-l-4 border-[#F97316]" },
-      { id: "Follow-Up", name: "Follow-Up", style: "border-l-4 border-[#0EA5E9]" },
-      { id: "Won", name: "Won", style: "border-l-4 border-[#22C55E]" },
+      { id: "Responded", name: "Responded", style: "border-l-4 border-[#10B981]" },
+      { id: "Not Responded", name: "Not Responded", style: "border-l-4 border-[#6B7280]" },
+      { id: "Demo Scheduled", name: "Demo Scheduled", style: "border-l-4 border-[#EAB308]" },
+      { id: "Demo Completed", name: "Demo Completed", style: "border-l-4 border-[#EAB308]" },
+      { id: "SRS", name: "SRS", style: "border-l-4 border-[#F97316]" },
+      { id: "Converted", name: "Converted", style: "border-l-4 border-[#22C55E]" },
+      { id: "Lost Lead", name: "Lost Lead", style: "border-l-4 border-[#EF4444]" },
+      { id: "Junk Lead", name: "Junk Lead", style: "border-l-4 border-[#EF4444]" },
     ],
     []
   );
@@ -354,9 +365,32 @@ export default function LeadsTable({ initialFilter = null }) {
           
           console.log("✅ Filtered leads count:", result.length);
           break;
+        
+        case "srs":
+          // Filter by status = "SRS" (case insensitive) or status containing "srs"
+          result = result.filter((lead) => {
+            const s = lead.status;
+            if (!s) return false;
+            const normalized = String(s).trim().toLowerCase();
+            return normalized === "srs" || normalized.includes("srs");
+          });
+          break;
+        case "lost_lead":
+          // Filter by various forms of lost status
+          result = result.filter((lead) => {
+            const s = lead.status;
+            if (!s) return false;
+            const normalized = String(s).trim().toLowerCase();
+            return normalized === "lost" || normalized === "lost lead" || normalized === "disqualified";
+          });
+          break;
         case "converted":
-          // Filter by status = "Won"
-          result = result.filter((lead) => lead.status === "Won");
+          // Filter by status = "Converted"
+          result = result.filter((lead) => {
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "converted";
+          });
           break;
         case "junk_lead":
           // Filter by status = "Junk lead" or "Junk Lead" or "Junk"
@@ -367,12 +401,13 @@ export default function LeadsTable({ initialFilter = null }) {
           );
           break;
         default:
-          // No filter applied - show all leads (except junk by default)
+          // No filter applied - show all leads (except lost/junk/disqualified by default)
           result = result.filter((lead) => 
             lead.status !== "Junk Lead" && 
             lead.status !== "Disqualified" &&
             lead.status !== "Junk" &&
-            lead.status !== "Junk lead"
+            lead.status !== "Junk lead" &&
+            lead.status !== "Lost Lead"
           );
           break;
       }
@@ -524,8 +559,8 @@ export default function LeadsTable({ initialFilter = null }) {
 
   // Open status change modal - requires comment
   const handleStatusUpdate = (leadId, newStatus) => {
-    // If changing to "Won", show revenue transaction modal first
-    if (newStatus === "Won") {
+    // If changing to "Converted" (previously "Won"), show revenue transaction modal first
+    if (newStatus === "Converted" || newStatus === "Won") {
       const lead = leadData.find((l) => l.id === leadId);
       if (!lead) {
         toast.error("Lead not found");
@@ -546,7 +581,7 @@ export default function LeadsTable({ initialFilter = null }) {
         leadName: lead.name || lead.lead_name || "Lead",
         amount: "",
         closedDate: new Date().toISOString().split('T')[0], // Default to today
-        status: "Won",
+        status: "Converted",
         isSubmitting: false,
         showCalendar: false,
       });
@@ -615,17 +650,17 @@ export default function LeadsTable({ initialFilter = null }) {
         leadName: "",
         amount: "",
         closedDate: "",
-        status: "Won",
+        status: "Converted",
         isSubmitting: false,
         showCalendar: false,
       });
 
-      // Now proceed with normal status change to "Won"
-      // Open the status change modal with "Won" status
+      // Now proceed with normal status change to "Converted"
+      // Open the status change modal with "Converted" status
       setStatusChangeModal({
         isOpen: true,
         leadId: leadId,
-        newStatus: "Won",
+        newStatus: "Converted",
         comment: "",
         nextTask: "",
         connectThrough: "",
@@ -650,7 +685,7 @@ export default function LeadsTable({ initialFilter = null }) {
       leadName: "",
       amount: "",
       closedDate: "",
-      status: "Won",
+      status: "Converted",
       isSubmitting: false,
       showCalendar: false,
     });

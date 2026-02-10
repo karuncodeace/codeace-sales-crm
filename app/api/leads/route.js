@@ -26,8 +26,13 @@ export async function GET() {
   // Get filtered query based on role
   let query = getFilteredQuery(supabase, "leads_table", crmUser);
   
-  // Exclude disqualified leads from the UI
-  query = query.neq("status", "Disqualified");
+  // Exclude lost / disqualified / junk leads from the UI by default
+  // Keep checks broad to handle legacy values as well
+  query = query
+    .neq("status", "Disqualified")
+    .neq("status", "Lost Lead")
+    .neq("status", "Junk Lead")
+    .neq("status", "Junk");
   
   // Order by created_at (descending to show newest leads first)
   const { data, error } = await query.order("created_at", { ascending: false });
@@ -438,10 +443,13 @@ export async function PATCH(request) {
       (lead_qualification !== undefined && lead_qualification !== previousLeadQualification) ||
       (meeting_status !== undefined && meeting_status !== previousMeetingStatus) ||
       (response_status !== undefined && response_status !== previousResponseStatus) ||
-      (status !== undefined && status !== previousStatus && (
-        String(status).toLowerCase() === "follow up" || 
-        String(status).toLowerCase() === "won"
-      ));
+      (status !== undefined && status !== previousStatus && [
+        "responded",
+        "converted",
+        "srs",
+        "demo completed",
+        "demo scheduled"
+      ].includes(String(status).toLowerCase()));
     
     if (shouldUpdateLastAttempted) {
       updateData.last_attempted_at = new Date().toISOString();
@@ -494,28 +502,25 @@ export async function PATCH(request) {
       const s = String(status).toLowerCase();
       
       // Skip task creation for "New" stage - handled by database trigger
-      if (s !== "new") {
+      if (!(s === "new" || s === "new leads")) {
         let title = `Task for ${leadName}`;
         let type = "Follow-Up";
         
-        if (s === "contacted") {
+        if (s === "responded") {
           title = `Follow-up to ${leadName}`;
           type = "Follow-Up";
-        } else if (s === "follow_up" || s === "follow-up" || s === "follow up") {
-          title = `Follow-up to ${leadName}`;
-          type = "Follow-Up";
+        } else if (s === "not responded" || s === "no response" || s === "not_responded") {
+          title = `Re-attempt contact: ${leadName}`;
+          type = "Call";
         } else if (s === "qualified") {
           title = `Qualification call with ${leadName}`;
           type = "Call";
-        } else if (s === "proposal") {
-          title = `Prepare proposal for ${leadName}`;
+        } else if (s === "srs") {
+          title = `Prepare SRS for ${leadName}`;
           type = "Proposal";
-        } else if (s === "won") {
+        } else if (s === "converted") {
           title = `Closure with ${leadName}`;
           type = "Meeting";
-        } else if (s === "no response" || s === "no_response") {
-          title = `Re-attempt contact: ${leadName}`;
-          type = "Call";
         }
 
         try {
@@ -566,8 +571,8 @@ export async function PATCH(request) {
       if (newStatus === "qualified" && oldStatus !== "qualified") {
         // Lead → Prospect: increment prospects
         await updateDailyMetrics({ prospects: 1 });
-      } else if (newStatus === "proposal" && oldStatus !== "proposal") {
-        // Proposal sent: increment proposals
+      } else if (newStatus === "srs" && oldStatus !== "srs") {
+        // SRS created/sent: increment proposals (SRS stage)
         await updateDailyMetrics({ proposals: 1 });
       } else if ((newStatus === "converted" || newStatus === "won" || newStatus === "closed") && 
                  oldStatus !== "converted" && oldStatus !== "won" && oldStatus !== "closed") {

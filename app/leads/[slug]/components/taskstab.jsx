@@ -116,24 +116,24 @@ function TaskItem({ task, theme, onToggle }) {
   );
 }
 
-// Single source of truth for stage progression
+// Single source of truth for stage progression (updated status labels)
 const NEXT_STAGE_MAP = {
-  "New": "Contacted",
-  "Contacted": "Demo",
-  "Demo": "Proposal",
-  "Proposal": "Follow-Up",
-  "Follow-Up": "Won",
-  "Won": null, // No next stage after Won
+  "New": "Responded",
+  "Responded": "Demo Scheduled",
+  "Demo Scheduled": "Demo Completed",
+  "Demo Completed": "SRS",
+  "SRS": "Converted",
+  "Converted": null, // No next stage after Converted
 };
 
 // Strict stage constants for Demo task completion flow
 // These must match EXACTLY with database values (case-sensitive)
 const STAGE_CONSTANTS = {
   NEW: "New",
-  DEMO: "Demo",
-  SECOND_DEMO: "Second Demo",
-  PROPOSAL: "Proposal",
-  WON: "Won",
+  DEMO_SCHEDULED: "Demo Scheduled",
+  DEMO_COMPLETED: "Demo Completed",
+  SRS: "SRS",
+  CONVERTED: "Converted",
 };
 
 // Helper function to get next stage
@@ -152,7 +152,7 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
   try {
     // For Demo stage, determine if it's first or second demo
     const options = {};
-    if (nextStage === "Demo") {
+    if (nextStage === "Demo Scheduled" || nextStage === "Demo Completed") {
       options.demoCount = getDemoCount(existingTasks);
     }
     
@@ -160,9 +160,10 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
     
     // Determine task type based on stage
     const taskTypes = {
-      "Contacted": "Meeting",
-      "Demo": "Meeting",
-      "Proposal": "Follow-Up",
+      "Responded": "Meeting",
+      "Demo Scheduled": "Meeting",
+      "Demo Completed": "Meeting",
+      "SRS": "Follow-Up",
       "Follow Up": "Call",
     };
     
@@ -178,7 +179,9 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
 // Helper function to check if task is a demo scheduling task
 function isDemoSchedulingTask(task, leadStatus) {
   if (!task || !task.title) return false;
-  if (leadStatus !== "Contacted") return false;
+  if (!leadStatus) return false;
+  const normalizedLeadStatus = String(leadStatus).trim().toLowerCase();
+  if (normalizedLeadStatus !== "responded") return false;
   
   const title = task.title.toLowerCase();
   // Match "Schedule Demo" or "Schedule Product Demo" patterns
@@ -629,8 +632,8 @@ export default function TasksTab({ leadId, leadName }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: leadId,
-            status: "Junk",
-            current_stage: "Junk",
+            status: "Junk Lead",
+            current_stage: "Junk Lead",
             response_status: "Junk Lead",
           }),
         });

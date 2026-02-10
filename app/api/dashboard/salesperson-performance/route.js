@@ -261,8 +261,8 @@ export async function GET() {
             calculatedMetrics[spId].meetings++;
           }
           
-          // Count conversions: status = "Won"
-          if (lead.status === "Won") {
+          // Count conversions: status = "Converted" (include legacy "Won")
+          if (lead.status === "Converted" || lead.status === "Won") {
             calculatedMetrics[spId].conversions++;
           }
         });

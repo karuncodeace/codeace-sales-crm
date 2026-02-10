@@ -54,23 +54,31 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
             light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
             dark: "text-orange-100 bg-orange-900/40 ring-1 ring-inset ring-orange-700",
         },
-        Contacted: {
+        Responded: {
             light: "text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-100",
             dark: "text-amber-500 bg-amber-900/40 ring-1 ring-inset ring-amber-700",
         },
-        "Follow-Up": {
+        "Not Responded": {
+            light: "text-gray-700 bg-gray-50 ring-1 ring-inset ring-gray-100",
+            dark: "text-gray-300 bg-gray-900/20 ring-1 ring-inset ring-gray-700",
+        },
+        "Demo Scheduled": {
             light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
             dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
         },
-        Qualified: {
-            light: "text-emerald-700 bg-emerald-50 ring-1 ring-inset ring-emerald-100",
-            dark: "text-emerald-500 bg-emerald-900/40 ring-1 ring-inset ring-emerald-700",
+        "Demo Completed": {
+            light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
+            dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
         },
-        Proposal: {
+        SRS: {
             light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
             dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
         },
-        Disqualified: {
+        "Lost Lead": {
+            light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-100",
+            dark: "text-red-500 bg-red-900/40 ring-1 ring-inset ring-red-700",
+        },
+        "Junk Lead": {
             light: "text-red-700 bg-red-50 ring-1 ring-inset ring-red-100",
             dark: "text-red-500 bg-red-900/40 ring-1 ring-inset ring-red-700",
         },

@@ -121,28 +121,30 @@ function formatDueDateTime(dueDatetime) {
 
 // Single source of truth for stage progression
 const NEXT_STAGE_MAP = {
-  "New": "Contacted",
-  "Contacted": "Demo",
-  "Demo": "Proposal",
-  "Proposal": "Follow-Up",
-  "Follow-Up": "Won",
-  "Won": null, // No next stage after Won
+  "New": "Responded",
+  "Responded": "Demo Scheduled",
+  "Demo Scheduled": "Demo Completed",
+  "Demo Completed": "SRS",
+  "SRS": "Converted",
+  "Converted": null, // No next stage after Converted
 };
 
 // Strict stage constants for Demo task completion flow
 // These must match EXACTLY with database values (case-sensitive)
 const STAGE_CONSTANTS = {
   NEW: "New",
-  DEMO: "Demo",
-  SECOND_DEMO: "Second Demo",
-  PROPOSAL: "Proposal",
-  WON: "Won",
+  DEMO_SCHEDULED: "Demo Scheduled",
+  DEMO_COMPLETED: "Demo Completed",
+  SRS: "SRS",
+  CONVERTED: "Converted",
 };
 
 // Helper function to check if task is a demo scheduling task
 function isDemoSchedulingTask(task, leadStatus) {
   if (!task || !task.title) return false;
-  if (leadStatus !== "Contacted") return false;
+  if (!leadStatus) return false;
+  const normalizedLeadStatus = String(leadStatus).trim().toLowerCase();
+  if (normalizedLeadStatus !== "responded") return false;
   
   const title = task.title.toLowerCase();
   // Match "Schedule Demo" or "Schedule Product Demo" patterns
@@ -213,9 +215,9 @@ function getTaskDetailsForNextStage(nextStage, leadName, existingTasks = []) {
     
     // Determine task type based on stage
     const taskTypes = {
-      "Contacted": "Meeting",
-      "Demo": "Meeting",
-      "Proposal": "Follow-Up",
+      "Responded": "Meeting",
+      "Demo Scheduled": "Meeting",
+      "SRS": "Follow-Up",
       "Follow Up": "Call",
     };
     
