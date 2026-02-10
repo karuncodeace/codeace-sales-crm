@@ -14,11 +14,8 @@ export async function GET(request) {
   }
   
   const { searchParams } = new URL(request.url);
+  // lead_id is optional: when provided we filter for that lead, otherwise return notes for all accessible leads
   const leadId = searchParams.get("lead_id");
-  
-  if (!leadId) {
-    return Response.json({ error: "lead_id is required" }, { status: 400 });
-  }
   
   // Build query with role-based filtering
   // Try both possible table names to be robust: "leads_notes" and "lead_notes"

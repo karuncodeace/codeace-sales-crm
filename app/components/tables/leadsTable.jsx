@@ -24,6 +24,15 @@ const fetchLeads = async () => {
   return res.json();
 };
 
+// Fetcher to get lead notes (used to show latest note per lead)
+const fetchLeadNotes = async () => {
+  const res = await fetch("/api/lead-notes");
+  if (!res.ok) return [];
+  const data = await res.json();
+  // Ensure array
+  return Array.isArray(data) ? data : (data?.data || []);
+};
+
 // Task title mapping based on lead status (use new labels)
 const taskTitles = {
   "New":             (name) => `Contact ${name} for the first time`,
@@ -229,6 +238,33 @@ export default function LeadsTable({ initialFilter = null }) {
   };
 
   const { theme } = useTheme();
+
+  // Fetch notes and build a map of leadId -> first note (earliest by created_at)
+  const { data: leadNotes = [] } = useSWR("leadNotes", fetchLeadNotes, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+
+  const latestNoteByLead = useMemo(() => {
+    // We intentionally compute the FIRST (earliest) note per lead here.
+    const map = {};
+    if (!Array.isArray(leadNotes)) return map;
+    for (const note of leadNotes) {
+      const lid = note.lead_id || note.leadId || note.lead || note.lead_id;
+      if (!lid) continue;
+      const created = note.created_at || note.createdAt || note.created;
+      if (!map[lid]) {
+        map[lid] = note;
+      } else {
+        const existingCreated = map[lid].created_at || map[lid].createdAt || map[lid].created;
+        // if this note is earlier than existing, replace
+        if (created && (!existingCreated || new Date(created) < new Date(existingCreated))) {
+          map[lid] = note;
+        }
+      }
+    }
+    return map;
+  }, [leadNotes]);
 
   const statusDefinitions = useMemo(
     () => [
@@ -1229,15 +1265,11 @@ export default function LeadsTable({ initialFilter = null }) {
                     </th>
 
                     {[
-                      "Contact Name",
                       "Organization Name",
                       "Contact Info",
-                      
                       "Status",
-                      "Assigned To",
-                     
                       "Priority",
-                      "Score",
+                      "First Note",
                       "Actions",
                     ].map((column) => (
                       <th
@@ -1329,37 +1361,20 @@ export default function LeadsTable({ initialFilter = null }) {
                                   {lead.contactName || "—"}
                                 </span>
                                 <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                  {lead.createdAt || "—"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="size-px whitespace-nowrap cursor-pointer" onClick={() => handleLeadClick(lead.id)}>
-                          <div className="px-6 py-2">
-                            <div className="flex items-center gap-x-3">
-
-                              <div 
-                                className="flex flex-col cursor-pointer"
-                                
-                              >
-                                <span className={`text-sm font-medium hover:text-orange-500 transition-colors truncate max-w-xs ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`} title={lead.name || "—"}>
-                                  {(() => {
+                                {(() => {
                                     if (!lead.name) return '—';
                                     const words = lead.name.trim().split(/\s+/);
                                     if (words.length > 5) {
-                                      return words.slice(0, 4).join(' ') + '...';
+                                      return words.slice(0, 3).join(' ') + '...';
                                     }
                                     return lead.name;
                                   })()}
                                 </span>
-                                <span className={`text-xs  ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`}>
-                                  {lead.id || "—"}
-                                </span>
                               </div>
                             </div>
                           </div>
                         </td>
+                       
                         <td className="size-px whitespace-nowrap cursor-pointer">
                           <div className="px-6 py-2">
                             <div className="flex flex-col ">
@@ -1417,8 +1432,12 @@ export default function LeadsTable({ initialFilter = null }) {
                             </div>
                           </div>
                         </td>
+                       
+                        
+                        
+                     
                         <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
+                        <div className="px-6 py-2">
                             <StatusDropdown
                               value={lead.status}
                               theme={theme}
@@ -1426,15 +1445,7 @@ export default function LeadsTable({ initialFilter = null }) {
                             />
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {lead.assignedTo}
-                            </span>
-                          </div>
-                        </td>
-                        
-                     
+
                         <td className="size-px whitespace-nowrap">
                           <div className="px-6 py-2">
                             <PriorityDropdown
@@ -1444,11 +1455,37 @@ export default function LeadsTable({ initialFilter = null }) {
                             />
                           </div>
                         </td>
-                        <td className="size-px whitespace-nowrap">
-                          <div className="px-6 py-2">
-                            <span className={`text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}>
-                              {lead.totalScore || 0}
-                            </span>
+                        <td className="whitespace-normal align-top">
+                          <div className="px-4 py-3">
+                            {/* First Note (show up to two lines) */}
+                            <div className={`text-xs leading-6 ${theme === "dark" ? "text-gray-300" : "text-black"}`}>
+                              {(() => {
+                                const note = latestNoteByLead[lead.id];
+                                if (!note) {
+                                  return (
+                                    <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                                      No Note has been added
+                                    </span>
+                                  );
+                                }
+                                const text = (note.notes || note.comments || note.activity || note.notes_text || "").replace(/\s+/g, " ").trim();
+                                return (
+                                  <div
+                                    title={text}
+                                    className="max-w-[40ch] md:max-w-[60ch] lg:max-w-[80ch] break-words"
+                                    style={{
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {text}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </td>
                         <td className="size-px whitespace-nowrap">

@@ -2,8 +2,10 @@
 
 import React from "react";
 import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { Edit2 } from "lucide-react";
 import { useTheme } from "../../context/themeContext";
+import "./react-datepicker-overrides.css";
 
 export default function ChangeStatusModal({
   isOpen,
