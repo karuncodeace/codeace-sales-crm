@@ -17,25 +17,18 @@ function NotesTab({ theme, leadId, leadName }) {
     const [newNoteType, setNewNoteType] = useState("general");
     const [activeTab, setActiveTab] = useState("general");
 
-    // Fetch notes from both APIs
-    const { data: activitiesData, error: activitiesError, isLoading: isLoadingActivities, mutate: mutateActivities } = useSWR(
-        leadId ? `/api/task-activities?lead_id=${leadId}` : null,
-        fetcher
-    );
-
-    // Fetch notes from leads_notes table
+    // Fetch notes from leads_notes table only
     const { data: leadNotesData, error: leadNotesError, isLoading: isLoadingLeadNotes, mutate: mutateLeadNotes } = useSWR(
         leadId ? `/api/lead-notes?lead_id=${leadId}` : null,
         fetcher
     );
 
-    // Combine loading states
-    const isLoading = isLoadingActivities || isLoadingLeadNotes;
-    const error = activitiesError || leadNotesError;
+    // Loading / error state
+    const isLoading = isLoadingLeadNotes;
+    const error = leadNotesError;
 
-    // Mutate function to refresh both data sources
+    // Mutate function to refresh notes
     const mutate = () => {
-        mutateActivities();
         mutateLeadNotes();
     };
 
@@ -112,42 +105,25 @@ function NotesTab({ theme, leadId, leadName }) {
         return source;
     };
 
-    // Filter notes from activities
-    const activitiesList = Array.isArray(activitiesData) ? activitiesData : [];
-    const activityNotes = activitiesList
-        .filter(act => act.type === "note")
-        .map(act => ({
-            id: act.id,
-            content: act.comments || act.activity || "",
-            user: getDisplayName(act.source),
-            userInitials: getInitials(act.source),
-            createdAt: act.created_at,
-            dateTime: formatNoteDate(act.created_at),
-            relativeTime: formatRelativeTime(act.created_at),
-            notesType: (act.notes_type || "general").toLowerCase(),
-            source: "task_activities", // Track source for editing/deleting
-        }));
-
-    // Get notes from leads_notes table
+    // Only use notes from leads_notes table (display source single source)
     const leadNotesList = Array.isArray(leadNotesData) ? leadNotesData : [];
-    const leadNotes = leadNotesList.map(note => ({
-        id: note.id,
-        content: note.notes || "",
-        user: "User", // Default user for leads_notes
-        userInitials: "US",
-        createdAt: note.created_at,
-        dateTime: formatNoteDate(note.created_at),
-        relativeTime: formatRelativeTime(note.created_at),
-        notesType: (note.notes_type || "general").toLowerCase(),
-        source: "leads_notes", // Track source for editing/deleting
-    }));
-
-    // Combine all notes and sort by date (most recent first)
-    const notes = [...activityNotes, ...leadNotes].sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0);
-        const dateB = new Date(b.createdAt || 0);
-        return dateB.getTime() - dateA.getTime(); // Most recent first
-    });
+    const notes = leadNotesList
+        .map(note => ({
+            id: note.id,
+            content: note.notes || "",
+            user: "User",
+            userInitials: "US",
+            createdAt: note.created_at,
+            dateTime: formatNoteDate(note.created_at),
+            relativeTime: formatRelativeTime(note.created_at),
+            notesType: (note.notes_type || "general").toLowerCase(),
+            source: "leads_notes",
+        }))
+        .sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0);
+            const dateB = new Date(b.createdAt || 0);
+            return dateB.getTime() - dateA.getTime();
+        });
 
     const noteTabs = [
         { id: "general", label: "General Notes" },
