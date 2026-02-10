@@ -137,6 +137,19 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
         })
         .slice(0, 4); // Show only top 4
 
+    // Fetch recent notes from leads_notes table
+    const { data: leadNotesData } = useSWR(
+        leadId ? `/api/lead-notes?lead_id=${leadId}` : null,
+        fetcher
+    );
+    const recentNotes = (Array.isArray(leadNotesData) ? leadNotesData : [])
+        .sort((a, b) => {
+            const dateA = new Date(a.created_at || 0);
+            const dateB = new Date(b.created_at || 0);
+            return dateB - dateA;
+        })
+        .slice(0, 4);
+
     // Helper functions for formatting dates in Asia/Calcutta timezone
     const formatToCalcuttaTime = (dateString) => {
         if (!dateString) return "—";
@@ -534,33 +547,32 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                 )}
                             </div>
                             <div className="space-y-4">
-                                {recentActivities.length > 0 ? (
-                                    recentActivities.map((activity) => {
-                                        const iconConfig = getActivityIcon(activity.type);
-                                        const Icon = iconConfig.icon;
-                                        const activityTitle = getActivityTitle(activity);
-                                        const activityDesc = activity.comments || activity.activity || "";
+                                {recentNotes && recentNotes.length > 0 ? (() => {
+                                    const note = recentNotes[0];
+                                    const iconConfig = getActivityIcon("note");
+                                    const Icon = iconConfig.icon;
+                                    const noteTitle = note.notes || note.activity || "";
 
-                                        return (
-                                            <div key={activity.id} className="flex gap-3">
-                                                <div className={`p-2 rounded-full h-fit ${iconConfig.bg}`}>
-                                                    <Icon className={`w-3 h-3 ${iconConfig.color}`} />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                                                        <span className="font-medium">{activityTitle}</span>
-                                                        {activityDesc && ` - ${activityDesc.length > 50 ? activityDesc.substring(0, 50) + '...' : activityDesc}`}
-                                                    </p>
-                                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                                        {formatRelativeTime(activity.created_at)}
-                                                    </p>
-                                                </div>
+                                    return (
+                                        <div key={note.id} className="flex gap-3">
+                                            <div className={`p-2 rounded-full h-fit ${iconConfig.bg}`}>
+                                                <Icon className={`w-3 h-3 ${iconConfig.color}`} />
                                             </div>
-                                        );
-                                    })
-                                ) : (
+                                            <div className="flex-1">
+                                                <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
+                                                    <span className="font-medium">
+                                                        {noteTitle.length > 120 ? noteTitle.substring(0, 120) + '...' : noteTitle}
+                                                    </span>
+                                                </p>
+                                                <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                                    {formatRelativeTime(note.created_at)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })() : (
                                     <p className={`text-sm text-center py-4 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                        No recent activity
+                                        No recent notes
                                     </p>
                                 )}
                             </div>
