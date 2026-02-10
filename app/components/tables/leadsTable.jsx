@@ -171,6 +171,8 @@ export default function LeadsTable({ initialFilter = null }) {
     showCalendar: false,
     calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // For calendar navigation
   });
+  // Toggle to use shared modal component instead of inline modal
+  const USE_SHARED_STATUS_MODAL = true;
 
   // Revenue transaction modal state (for Converted stage)
   const [revenueModal, setRevenueModal] = useState({
@@ -2031,7 +2033,21 @@ export default function LeadsTable({ initialFilter = null }) {
       )}
 
       {/* Status Change Comment Modal */}
-      {statusChangeModal.isOpen && (
+      {USE_SHARED_STATUS_MODAL && statusChangeModal.isOpen && (
+        <ChangeStatusModal
+          isOpen={statusChangeModal.isOpen}
+          newStatus={statusChangeModal.newStatus}
+          comment={statusChangeModal.comment}
+          nextTask={statusChangeModal.nextTask}
+          connectThrough={statusChangeModal.connectThrough}
+          dueDate={statusChangeModal.dueDate}
+          isSubmitting={statusChangeModal.isSubmitting}
+          onChange={(field, value) => setStatusChangeModal((prev) => ({ ...prev, [field]: value }))}
+          onClose={handleCancelStatusChange}
+          onConfirm={handleConfirmStatusChange}
+        />
+      )}
+      {!USE_SHARED_STATUS_MODAL && statusChangeModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
           <div
             className={`w-full max-w-md mx-auto my-auto rounded-2xl shadow-2xl transform transition-all ${

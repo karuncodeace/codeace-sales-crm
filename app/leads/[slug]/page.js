@@ -15,6 +15,7 @@ import BookMeetingButton from "../../components/buttons/bookMeetingbtn";
 import EditLeadScoreModal from "../../components/buttons/editLeadScorebtn";
 import PriorityDropdown from "../../components/buttons/priorityTooglebtn";
 import StatusDropdown from "../../components/buttons/statusTooglebtn";
+import ChangeStatusModal from "../../components/modals/ChangeStatusModal";
 import CallBtn from "../../components/buttons/callbtn";
 import toast from "react-hot-toast";
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -571,204 +572,18 @@ function LeadDetailPageContent() {
             
             {/* Status Change Modal - UPDATED: Status changes now require explicit user action with notes */}
             {statusChangeModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div
-                        className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl transform transition-all ${
-                            theme === "dark" ? "bg-[#1f1f1f] text-gray-200" : "bg-white text-gray-900"
-                        }`}
-                    >
-                        {/* Header */}
-                        <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-orange-500/10">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        width="22"
-                                        height="22"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="text-orange-500"
-                                    >
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-semibold">Change Status</h2>
-                                    <p className={`text-xs mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                        Changing to: <span className="font-medium text-orange-500">{statusChangeModal.newStatus}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleCancelStatusChange}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    theme === "dark" ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
-                                }`}
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Body */}
-                        <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
-                            {/* Connect Through */}
-                            <div>
-                                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                    Connect Through (Optional)
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[
-                                        { id: "call", label: "Call", icon: "📞" },
-                                        { id: "email", label: "Email", icon: "✉️" },
-                                        { id: "meeting", label: "Meeting", icon: "🤝" },
-                                        { id: "whatsapp", label: "WhatsApp", icon: "💬" },
-                                    ].map((option) => (
-                                        <button
-                                            key={option.id}
-                                            type="button"
-                                            onClick={() => setStatusChangeModal((prev) => ({ ...prev, connectThrough: option.id }))}
-                                            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
-                                                statusChangeModal.connectThrough === option.id
-                                                    ? "border-orange-500 bg-orange-500/10 text-orange-500"
-                                                    : theme === "dark"
-                                                        ? "border-gray-700 hover:border-gray-600 text-gray-400"
-                                                        : "border-gray-200 hover:border-gray-300 text-gray-500"
-                                            }`}
-                                        >
-                                            <span className="text-lg">{option.icon}</span>
-                                            <span className="text-xs font-medium">{option.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Current Stage Comment (Required) - UPDATED: Saves as note in task_activities */}
-                            <div>
-                                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                    Current Stage Comment <span className="text-red-500">*</span>
-                                </label>
-                                <textarea
-                                    placeholder="Add a comment about this status change..."
-                                    className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
-                                        theme === "dark"
-                                            ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
-                                            : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
-                                    }`}
-                                    rows={3}
-                                    value={statusChangeModal.comment}
-                                    onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, comment: e.target.value }))}
-                                    autoFocus
-                                />
-                                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                    This will be saved as a note in the Notes tab (General category).
-                                </p>
-                            </div>
-
-                            {/* Next Task (Optional) - UPDATED: Creates a task in tasks_table */}
-                            <div>
-                                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                    Next Task (Optional)
-                                </label>
-                                <textarea
-                                    placeholder="Describe the next task to be done (e.g., 'Schedule demo call with client')..."
-                                    className={`w-full p-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none ${
-                                        theme === "dark"
-                                            ? "bg-[#262626] border-gray-700 text-gray-200 placeholder:text-gray-500"
-                                            : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
-                                    }`}
-                                    rows={2}
-                                    value={statusChangeModal.nextTask}
-                                    onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, nextTask: e.target.value }))}
-                                />
-                                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                    If provided, a task will be created in the Tasks tab. Completing this task will NOT change lead status.
-                                </p>
-                            </div>
-
-                            {/* Next Due Date (Optional) */}
-                            <div>
-                                <label className={`block text-sm font-medium mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                                    Next Task Due Date (Optional)
-                                </label>
-                                <input
-                                    type="date"
-                                    className={`w-full px-4 py-3 rounded-xl border-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 ${
-                                        theme === "dark"
-                                            ? "bg-[#262626] border-gray-700 text-gray-200"
-                                            : "bg-white border-gray-200 text-gray-900"
-                                    }`}
-                                    value={statusChangeModal.dueDate}
-                                    onChange={(e) => setStatusChangeModal((prev) => ({ ...prev, dueDate: e.target.value }))}
-                                />
-                                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                                    Set due date for the follow-up task (if created).
-                                </p>
-                            </div>
-                            
-                            {/* Warning if no next task */}
-                            {!statusChangeModal.nextTask && !statusChangeModal.dueDate && (
-                                <div className={`p-3 rounded-xl border ${theme === "dark" ? "bg-amber-500/10 border-amber-500/30" : "bg-amber-50 border-amber-200"}`}>
-                                    <p className={`text-xs ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}>
-                                        ⚠️ No next task added. This lead may go cold without a next action.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className={`flex justify-end gap-3 px-6 py-4 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                            <button
-                                onClick={handleCancelStatusChange}
-                                disabled={statusChangeModal.isSubmitting}
-                                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                                    theme === "dark"
-                                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                } disabled:opacity-50`}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleConfirmStatusChange}
-                                disabled={statusChangeModal.isSubmitting || !statusChangeModal.comment.trim()}
-                                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {statusChangeModal.isSubmitting ? (
-                                    <>
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Updating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        Update Status
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ChangeStatusModal
+                    isOpen={statusChangeModal.isOpen}
+                    newStatus={statusChangeModal.newStatus}
+                    comment={statusChangeModal.comment}
+                    nextTask={statusChangeModal.nextTask}
+                    connectThrough={statusChangeModal.connectThrough}
+                    dueDate={statusChangeModal.dueDate}
+                    isSubmitting={statusChangeModal.isSubmitting}
+                    onChange={(field, value) => setStatusChangeModal((prev) => ({ ...prev, [field]: value }))}
+                    onClose={handleCancelStatusChange}
+                    onConfirm={handleConfirmStatusChange}
+                />
             )}
         </div>
     );
