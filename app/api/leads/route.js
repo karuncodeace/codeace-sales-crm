@@ -596,6 +596,24 @@ export async function PATCH(request) {
         // Deal closed-won: increment converted
         await updateDailyMetrics({ converted: 1 });
       }
+      
+      // If status changed to Proposal, ensure the lead is added to prospects_table
+      try {
+        if (newStatus === "proposal") {
+          const admin = supabaseAdmin();
+          // check if already present
+          const { data: existingProspect, error: prospectCheckError } = await admin
+            .from("prospects_table")
+            .select("id")
+            .eq("lead_id", id)
+            .single();
+          if (!existingProspect) {
+            await admin.from("prospects_table").insert({ lead_id: id, created_at: new Date().toISOString() });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to add lead to prospects_table on status=Proposal:", err);
+      }
     }
 
     // Map the updated lead to frontend format

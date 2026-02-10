@@ -30,6 +30,10 @@ const StatusDropdown = ({ value = "New", onChange = () => { }, theme: themeProp 
       light: "text-purple-700 bg-purple-50 ring-1 ring-inset ring-purple-100",
       dark: "text-purple-500 bg-purple-900/40 ring-1 ring-inset ring-purple-700",
     },
+    "Proposal": {
+      light: "text-orange-700 bg-orange-50 ring-1 ring-inset ring-orange-100",
+      dark: "text-orange-500 bg-orange-900/40 ring-1 ring-inset ring-orange-700",
+    },
     "SRS": {
       light: "text-yellow-700 bg-yellow-50 ring-1 ring-inset ring-yellow-100",
       dark: "text-yellow-500 bg-yellow-900/40 ring-1 ring-inset ring-yellow-700",
@@ -98,22 +102,20 @@ const StatusDropdown = ({ value = "New", onChange = () => { }, theme: themeProp 
               "Not Responded",
               "Demo Scheduled",
               "Demo Completed",
+              "Proposal",
               "SRS",
               "Converted",
               "Lost Lead",
               "Junk Lead",
-            ].map((label) => (
+            ].map((status) => (
               <li
-                key={label}
-            onClick={() => {
-                  // Use the display label directly as the status value across the app/backend
-                  onSelect(label);
-                }}
+                key={status}
+                onClick={() => onSelect(status)}
                 className={`cursor-pointer px-3 py-1
                   ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
                   `}
               >
-                {label}
+                {status}
               </li>
             ))}
           </ul>

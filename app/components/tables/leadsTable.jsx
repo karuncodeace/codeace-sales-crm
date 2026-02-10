@@ -15,6 +15,7 @@ import FilterBtn from "../buttons/filterbtn";
 import AddLeadModal from "../buttons/addLeadModal";
 import EditLeadModal from "../buttons/editLeadModal";
 import EmailModal from "../ui/email-modal";
+import ChangeStatusModal from "../modals/ChangeStatusModal";
 
 // Fetcher function for SWR - calls the API route
 const fetchLeads = async () => {
