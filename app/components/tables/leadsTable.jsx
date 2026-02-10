@@ -1375,8 +1375,8 @@ export default function LeadsTable({ initialFilter = null }) {
                           </div>
                         </td>
                        
-                        <td className="size-px whitespace-nowrap cursor-pointer">
-                          <div className="px-6 py-2">
+                        <td className="size-px whitespace-normal max-w-[220px] md:max-w-[300px] cursor-pointer">
+                          <div className="px-4 py-2">
                             <div className="flex flex-col ">
                               {lead.phone ? (
                                 <a
@@ -1384,7 +1384,7 @@ export default function LeadsTable({ initialFilter = null }) {
                                     /[^0-9+]/g,
                                     ""
                                   )}`}
-                                  className={`text-sm font-medium hover:text-orange-500 transition-colors ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}
+                                  className={`text-sm font-medium hover:text-orange-500 transition-colors truncate ${theme === "dark" ? "text-gray-300" : "text-gray-900"}`}
                                 >
                                   {lead.phone}
                                 </a>
@@ -1393,7 +1393,7 @@ export default function LeadsTable({ initialFilter = null }) {
                               )}
                               {lead.email ? (
                                 <div className="flex items-center gap-2 group">
-                                  <span className={`text-xs font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`} title={lead.email}>
+                                  <span className={`text-xs font-medium truncate max-w-[16ch] md:max-w-xs ${theme === "dark" ? "text-gray-400/80" : "text-gray-500"}`} title={lead.email}>
                                     {(() => {
                                       if (!lead.email) return '';
                                       // For email, truncate by characters (emails can be long)
