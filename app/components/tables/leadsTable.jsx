@@ -1588,58 +1588,7 @@ export default function LeadsTable({ initialFilter = null }) {
                                     Email
                                   </button>
                                   <div className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></div>
-                                  <div className="relative group">
-                                    <button
-                                      type="button"
-                                      className={`flex w-full items-center justify-between gap-2 px-4 py-2 transition-colors
-                                      ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
-                                    `}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Qualification Status
-                                      </div>
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    </button>
-                                    <div className={`absolute right-full top-0 mr-1 w-48 rounded-lg border text-sm font-medium shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20
-                                    ${theme === "dark" ? "bg-gray-800 text-gray-200 border-gray-700" : "bg-white text-gray-700 border-gray-200"}
-                                    `}>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleQualificationStatus(lead.id, "qualified");
-                                          setOpenActions(null);
-                                        }}
-                                        className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
-                                        ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
-                                      `}
-                                      >
-                                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                        Qualified Lead
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleQualificationStatus(lead.id, "notQualified");
-                                          setOpenActions(null);
-                                        }}
-                                        className={`flex w-full items-center gap-2 px-4 py-2 transition-colors
-                                        ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}
-                                      `}
-                                      >
-                                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                        Not Qualified Lead
-                                      </button>
-                                    </div>
-                                  </div>
+                                  {/* Qualification actions removed per request */}
                                   <div className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></div>
                                   <button
                                     type="button"

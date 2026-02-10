@@ -190,6 +190,14 @@ export async function POST(request) {
     assigned_to: finalAssignedTo,
     is_manual: true,         // 🔥 BLOCKS AUTO ASSIGN TRIGGER
     status: status || "New",
+    // Set lead_qualification based on initial priority (Hot -> Qualified, Cold -> Unqualified)
+    lead_qualification: (function(p) {
+      if (!p) return null;
+      const pp = String(p).trim().toLowerCase();
+      if (pp === "hot") return "Qualified";
+      if (pp === "cold") return "Unqualified";
+      return null;
+    })(priority),
 
     // Optional fields
     contact_name: contactName || null,
@@ -435,6 +443,15 @@ export async function PATCH(request) {
     if (lead_qualification !== undefined) updateData.lead_qualification = lead_qualification;
     if (meeting_status !== undefined) updateData.meeting_status = meeting_status;
     if (response_status !== undefined) updateData.response_status = response_status;
+    // If priority is being updated, also set lead_qualification accordingly:
+    if (priority !== undefined) {
+      const p = String(priority || "").trim().toLowerCase();
+      if (p === "hot") {
+        updateData.lead_qualification = "Qualified";
+      } else if (p === "cold") {
+        updateData.lead_qualification = "Unqualified";
+      }
+    }
     
     // Track when specific fields are updated for dashboard metrics
     // Update last_attempted_at when these fields change
