@@ -162,6 +162,40 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
       
       // The API already returns the lead in frontend format
       onUpdate(updatedLead);
+
+      // Log the lead update in task_activities
+      try {
+        // Determine changed fields for comment
+        const changed = [];
+        if (lead.name !== payload.name) changed.push(`name: "${lead.name}" → "${payload.name}"`);
+        if (lead.phone !== payload.phone) changed.push(`phone: "${lead.phone}" → "${payload.phone}"`);
+        if (lead.email !== payload.email) changed.push(`email: "${lead.email}" → "${payload.email}"`);
+        if (lead.contactName !== payload.contactName) changed.push(`contactName: "${lead.contactName}" → "${payload.contactName}"`);
+        if (lead.source !== payload.source) changed.push(`source: "${lead.source}" → "${payload.source}"`);
+        if (lead.status !== payload.status) changed.push(`status: "${lead.status}" → "${payload.status}"`);
+        if (lead.priority !== payload.priority) changed.push(`priority: "${lead.priority}" → "${payload.priority}"`);
+        if (lead.companySize !== payload.companySize) changed.push(`companySize: "${lead.companySize}" → "${payload.companySize}"`);
+        if (lead.turnover !== payload.turnover) changed.push(`turnover: "${lead.turnover}" → "${payload.turnover}"`);
+        if (lead.industryType !== payload.industryType) changed.push(`industryType: "${lead.industryType}" → "${payload.industryType}"`);
+
+        const comment = changed.length > 0 ? `Lead updated: ${changed.join("; ")}` : "Lead updated";
+
+        await fetch("/api/task-activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: lead.id,
+            activity: "Lead Updated",
+            type: "activity",
+            comments: comment,
+            source: "ui",
+            created_at: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to log lead update to task_activities", err);
+      }
+
       onClose();
     } catch (error) {
       setErrors({ submit: error.message });

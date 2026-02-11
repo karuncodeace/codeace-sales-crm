@@ -237,6 +237,25 @@ function NotesTab({ theme, leadId, leadName }) {
                 setEditingNoteId(null);
                 setEditNoteText("");
                 mutate();
+                // Also log this update in task_activities for audit
+                try {
+                    await fetch("/api/task-activities", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            lead_id: leadId,
+                            activity: "Note Updated",
+                            type: "note",
+                            comments: editNoteText.trim(),
+                            notes_type: note.notesType || "general",
+                            source: "ui",
+                            created_at: new Date().toISOString(),
+                        }),
+                    });
+                } catch (err) {
+                    // non-fatal
+                    console.warn("Failed to log note update to task_activities", err);
+                }
                 toast.success("Note updated successfully");
             } else {
                 toast.error("Failed to update note");
@@ -285,8 +304,26 @@ function NotesTab({ theme, leadId, leadName }) {
                                     if (!response.ok) {
                                         throw new Error("Failed to delete note");
                                     }
-                                    await mutate();
-                                    toast.success("Note deleted successfully");
+                            // Log deletion in task_activities
+                            try {
+                                await fetch("/api/task-activities", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                        lead_id: leadId,
+                                        activity: "Note Deleted",
+                                        type: "note",
+                                        comments: note.content || note.activity || "",
+                                        notes_type: note.notesType || "general",
+                                        source: "ui",
+                                        created_at: new Date().toISOString(),
+                                    }),
+                                });
+                            } catch (err) {
+                                console.warn("Failed to log note deletion to task_activities", err);
+                            }
+                            await mutate();
+                            toast.success("Note deleted successfully");
                                 } catch (error) {
                                     toast.error("Failed to delete note");
                                 } finally {

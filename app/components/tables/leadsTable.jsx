@@ -955,6 +955,23 @@ export default function LeadsTable({ initialFilter = null }) {
       if (!res.ok) {
         throw new Error("Failed to update priority");
       }
+      // Log priority change in task_activities
+      try {
+        await fetch("/api/task-activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            activity: "Priority Changed",
+            type: "activity",
+            comments: `Priority set to ${newPriority}`,
+            source: "ui",
+            created_at: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to log priority change to task_activities", err);
+      }
     } catch (error) {
       // Revalidate to restore correct state on error
       mutate();
@@ -982,6 +999,23 @@ export default function LeadsTable({ initialFilter = null }) {
       setOpenActions(null);
       // Revalidate to ensure consistency
       mutate();
+      // Log move to junk in task_activities
+      try {
+        await fetch("/api/task-activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            activity: "Moved to Junk",
+            type: "status",
+            comments: "Lead moved to Junk via actions menu",
+            source: "ui",
+            created_at: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to log move to junk to task_activities", err);
+      }
     } catch (error) {
       // Revalidate to restore correct state on error
       mutate();
@@ -1591,6 +1625,23 @@ export default function LeadsTable({ initialFilter = null }) {
                                         toast.success("Lead moved to prospects successfully");
                                         setOpenActions(null);
                                         mutate(); // Refresh leads list
+                                    // Log move to prospects in task_activities
+                                    try {
+                                      await fetch("/api/task-activities", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          lead_id: lead.id,
+                                          activity: "Moved to Prospects",
+                                          type: "activity",
+                                          comments: "Lead moved to prospects via actions menu",
+                                          source: "ui",
+                                          created_at: new Date().toISOString(),
+                                        }),
+                                      });
+                                    } catch (err) {
+                                      console.warn("Failed to log move to prospects to task_activities", err);
+                                    }
                                       } catch (error) {
                                         toast.error(error.message || "Failed to move to prospects");
                                       }
