@@ -11,7 +11,6 @@ import { SidebarProvider, useSidebar } from "./context/sidebarContext";
 import { KeyboardShortcutsProvider } from "./context/keyboardShortcutsContext";
 import { Toaster } from "react-hot-toast";
 import { supabaseBrowser } from "../lib/supabase/browserClient";
-import ChatBot from "./components/ui/ChatBot";
 
 function MainContent({ children }) {
   const { isCollapsed } = useSidebar();
@@ -42,7 +41,6 @@ function LayoutStructure({ children, fonts }) {
   const isLoginPage = pathname === "/login";
   const isLogoutPage = pathname === "/logout";
   const isAuthCallbackPage = pathname === "/auth/callback";
-  const isLyraPage = pathname === "/loria-ai-bot";
 
   // Auto-logout after 24 hours
   useEffect(() => {
@@ -87,7 +85,7 @@ function LayoutStructure({ children, fonts }) {
             },
           }}
         />
-        {isLoginPage || isLogoutPage || isAuthCallbackPage || isLyraPage ? (
+        {isLoginPage || isLogoutPage || isAuthCallbackPage ? (
           children
         ) : (
           <SidebarProvider>
@@ -97,7 +95,6 @@ function LayoutStructure({ children, fonts }) {
               </Suspense>
               <TopBar2 />
               <MainContent>{children}</MainContent>
-              <ChatBot />
             </div>
           </SidebarProvider>
         )}

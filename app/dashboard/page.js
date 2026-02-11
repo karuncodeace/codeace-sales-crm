@@ -27,27 +27,11 @@ const dashboardEndpoints = [
 
 export default function DashboardPage() {
   const { mutate } = useSWRConfig();
-  const [userRole, setUserRole] = useState(null);
-  const [isLoadingRole, setIsLoadingRole] = useState(true);
+  // Role lookup removed — render admin view by default for now.
+  const userRole = "admin";
 
   // Check user role on mount
-  useEffect(() => {
-    const checkUserRole = async () => {
-      try {
-        const response = await fetch("/api/user/role");
-        if (response.ok) {
-          const data = await response.json();
-          setUserRole(data.role); // "admin" or "sales"
-        }
-      } catch (error) {
-        console.error("Failed to fetch user role:", error);
-      } finally {
-        setIsLoadingRole(false);
-      }
-    };
-
-    checkUserRole();
-  }, []);
+  // No role check necessary in this instance.
 
   // Pre-fetch all dashboard data on mount to populate cache
   useEffect(() => {
@@ -128,6 +112,7 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+      
     </>
   );
 }
