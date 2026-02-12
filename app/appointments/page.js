@@ -481,7 +481,7 @@ export default function BookingsPage() {
                             </div>
                             <div>
                               <h3 className={`text-md font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                                Meeting with {(() => {
+                                {(() => {
                                   const name = booking.invitiee_contact_name || booking.invitee_name || "N/A";
                                   return name.length > 15 ? name.substring(0, 15) + "..." : name;
                                 })()}
