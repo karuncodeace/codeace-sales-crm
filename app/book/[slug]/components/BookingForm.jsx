@@ -248,6 +248,13 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         lead_id: formData.lead_id || null,
         invitiee_contact_name: contactName,
         is_email_required: formData.is_email_required,
+        // Include host_user_id (salesperson) when available. Support multiple possible field names.
+        host_user_id:
+          selectedLead.assigned_to ||
+          selectedLead.assignedTo ||
+          selectedLead.sales_person_id ||
+          selectedLead.salesperson_id ||
+          null,
       };
 
       // Log booking details before sending
