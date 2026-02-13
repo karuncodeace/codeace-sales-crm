@@ -227,8 +227,9 @@ export async function GET(request) {
     let qualifiedLeadsIds = [];
     if (qualifiedLeadsResult.data && Array.isArray(qualifiedLeadsResult.data)) {
       const filteredLeads = qualifiedLeadsResult.data.filter(lead => {
-        const qualification = String(lead.lead_qualification || "").toLowerCase();
-        if (!qualification.includes("qualified")) return false;
+        // Strictly read from lead_qualification column and match "qualified" (case-insensitive)
+        const qualification = String(lead.lead_qualification || "").toLowerCase().trim();
+        if (qualification !== "qualified") return false;
 
         // Use last_attempted_at if available, otherwise fallback to created_at
         const dateStr = lead.last_attempted_at || lead.created_at;
