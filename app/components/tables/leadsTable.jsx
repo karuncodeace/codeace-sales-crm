@@ -305,108 +305,51 @@ export default function LeadsTable({ initialFilter = null }) {
 
     // Apply sidebar filter first (if set)
     if (advancedFilters.filter) {
-      switch (advancedFilters.filter) {
+      const filterKey = String(advancedFilters.filter || "").toLowerCase().trim();
+      switch (filterKey) {
         case "new_leads":
-          // Filter leads that have not done the first call
-          // Match: first_call_done = 'Not Done' (case insensitive)
-          // Also handle: null, false, "", "false", 0, undefined
+        case "new":
+          // Filter by status = "New"
           result = result.filter((lead) => {
-            const firstCallDone = lead.first_call_done;
-            
-            // Check for "Not Done" (case insensitive)
-            if (firstCallDone) {
-              const normalized = String(firstCallDone).trim().toLowerCase();
-              if (normalized === "not done" || normalized === "'not done'::text") {
-                return true;
-              }
-            }
-            
-            // Also include null, false, empty, undefined values
-            return (
-              firstCallDone === null ||
-              firstCallDone === false ||
-              firstCallDone === "" ||
-              firstCallDone === "false" ||
-              firstCallDone === 0 ||
-              firstCallDone === undefined
-            );
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "new";
           });
           break;
         case "responded":
-          // Filter by response_status = "Responded" or "responded" (case insensitive)
-          // Debug: Log all leads with response_status before filtering
-          const allLeadsBeforeFilter = [...result];
-          const leadsWithResponseStatus = allLeadsBeforeFilter.filter(lead => lead.response_status);
-          console.log("🔍 Responded Filter Debug - BEFORE:", {
-            totalLeads: allLeadsBeforeFilter.length,
-            leadsWithResponseStatus: leadsWithResponseStatus.length,
-            sampleLeads: allLeadsBeforeFilter.slice(0, 5).map(lead => ({
-              id: lead.id,
-              name: lead.name,
-              response_status: lead.response_status,
-              response_status_type: typeof lead.response_status,
-            })),
-            allUniqueResponseStatuses: [...new Set(allLeadsBeforeFilter.map(l => l.response_status).filter(Boolean))],
-          });
-          
+          // Filter by status = "Responded"
           result = result.filter((lead) => {
-            const responseStatus = lead.response_status;
-            if (!responseStatus) return false;
-            // Handle multiple formats: "Responded", "responded", "RESPONDED", etc.
-            const normalizedStatus = String(responseStatus).trim().toLowerCase();
-            return normalizedStatus === "responded";
-          });
-          
-          console.log("✅ Responded Filter Debug - AFTER:", {
-            filteredCount: result.length,
-            filteredLeadIDs: result.map(l => l.id),
-            filteredLeadNames: result.map(l => l.name),
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "responded";
           });
           break;
         case "not_responded":
-          // Filter by response_status = "Not Responded" (case insensitive)
+        case "notresponded":
+          // Filter by status = "Not Responded"
           result = result.filter((lead) => {
-            const responseStatus = lead.response_status;
-            if (!responseStatus) return false;
-            const normalizedStatus = String(responseStatus).trim();
-            // Match "Not Responded" (case insensitive)
-            return normalizedStatus.toLowerCase() === "not responded";
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "not responded";
           });
           break;
         case "demo_scheduled":
-          // Filter by meeting_status = "Scheduled" (case insensitive)
+        case "demo scheduled":
           result = result.filter((lead) => {
-            const meetingStatus = lead.meeting_status;
-            return meetingStatus && String(meetingStatus).trim().toLowerCase() === "scheduled";
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "demo scheduled";
           });
           break;
         case "demo_completed":
-          // Filter by meeting_status = "Completed" (case insensitive)
-          // First, log all leads with meeting_status for debugging
-          const leadsWithMeetingStatus = result.filter(lead => lead.meeting_status);
-          console.log("🔍 Demo Completed Filter Debug:", {
-            totalLeads: result.length,
-            leadsWithMeetingStatus: leadsWithMeetingStatus.length,
-            sampleLeads: leadsWithMeetingStatus.slice(0, 5).map(lead => ({
-              id: lead.id,
-              name: lead.name,
-              meeting_status: lead.meeting_status,
-              meeting_status_type: typeof lead.meeting_status,
-            })),
-          });
-          
+        case "demo completed":
           result = result.filter((lead) => {
-            const meetingStatus = lead.meeting_status;
-            if (!meetingStatus) return false;
-            const normalizedStatus = String(meetingStatus).trim().toLowerCase();
-            return normalizedStatus === "completed";
+            const s = lead.status;
+            if (!s) return false;
+            return String(s).trim().toLowerCase() === "demo completed";
           });
-          
-          console.log("✅ Filtered leads count:", result.length);
           break;
-        
         case "srs":
-          // Filter by status = "SRS" (case insensitive) or status containing "srs"
           result = result.filter((lead) => {
             const s = lead.status;
             if (!s) return false;
@@ -415,16 +358,19 @@ export default function LeadsTable({ initialFilter = null }) {
           });
           break;
         case "lost_lead":
-          // Filter by various forms of lost status
+        case "lost lead":
           result = result.filter((lead) => {
             const s = lead.status;
             if (!s) return false;
             const normalized = String(s).trim().toLowerCase();
-            return normalized === "lost" || normalized === "lost lead" || normalized === "disqualified";
+            return (
+              normalized === "lost" ||
+              normalized === "lost lead" ||
+              normalized === "disqualified"
+            );
           });
           break;
         case "converted":
-          // Filter by status = "Converted"
           result = result.filter((lead) => {
             const s = lead.status;
             if (!s) return false;
@@ -432,33 +378,24 @@ export default function LeadsTable({ initialFilter = null }) {
           });
           break;
         case "junk_lead":
-          // Filter by status = "Junk lead" or "Junk Lead" or "Junk"
-          result = result.filter((lead) => 
-            lead.status === "Junk lead" || 
-            lead.status === "Junk Lead" || 
-            lead.status === "Junk"
-          );
+        case "junk lead":
+          result = result.filter((lead) => {
+            const s = lead.status;
+            if (!s) return false;
+            const normalized = String(s).trim().toLowerCase();
+            return normalized === "junk lead" || normalized === "junk" || normalized === "disqualified";
+          });
           break;
         default:
-          // No filter applied - show all leads (except lost/junk/disqualified by default)
-          result = result.filter((lead) => 
-            lead.status !== "Junk Lead" && 
-            lead.status !== "Disqualified" &&
-            lead.status !== "Junk" &&
-            lead.status !== "Junk lead" &&
-            lead.status !== "Lost Lead"
-          );
+          // No specific sidebar filter selected - apply default behavior below
           break;
       }
     } else {
-      // By default, show all leads (excluding junk leads for cleaner view)
-      result = result.filter((lead) => 
-        lead.status !== "Junk Lead" && 
-        lead.status !== "Disqualified" &&
-        lead.status !== "Junk" &&
-        lead.status !== "Junk lead"
-      );
+      // No sidebar filter active; default behavior applied later
     }
+
+    // Determine normalized status filter (if provided)
+    const normalizedStatusFilter = String(advancedFilters.status || "").toLowerCase().trim();
 
     // Apply response_status filter (for backward compatibility with other filters)
     // Note: This is only used when sidebar filter is NOT active
@@ -481,7 +418,15 @@ export default function LeadsTable({ initialFilter = null }) {
         result = result.filter((lead) => lead.source === advancedFilters.source);
       }
       if (advancedFilters.status) {
-        result = result.filter((lead) => lead.status === advancedFilters.status);
+        const raw = String(advancedFilters.status || "").trim();
+        const normalizedFilter = raw.toLowerCase();
+        // If user selected "All", don't filter by status (show all leads)
+        if (normalizedFilter !== "all") {
+          result = result.filter((lead) => {
+            const leadStatus = String(lead.status || "").toLowerCase().trim();
+            return leadStatus === normalizedFilter;
+          });
+        }
       }
       if (advancedFilters.assignedTo) {
         result = result.filter((lead) => lead.assignedTo === advancedFilters.assignedTo);
@@ -492,6 +437,24 @@ export default function LeadsTable({ initialFilter = null }) {
       if (advancedFilters.meeting_status) {
         result = result.filter((lead) => lead.meeting_status === advancedFilters.meeting_status);
       }
+    }
+
+    // If neither sidebar filter nor a specific status filter set to 'all' is present,
+    // apply the default exclusion of junk/disqualified/lost leads for cleaner view.
+    const isShowingAllStatuses = normalizedStatusFilter === "all";
+    if (!advancedFilters.filter && !isShowingAllStatuses) {
+      result = result.filter((lead) => {
+        const s = String(lead.status || "").trim();
+        const normalized = s.toLowerCase();
+        return (
+          normalized !== "junk lead" &&
+          normalized !== "disqualified" &&
+          normalized !== "junk" &&
+          normalized !== "junk lead" &&
+          normalized !== "lost lead" &&
+          normalized !== "lost"
+        );
+      });
     }
 
     // Apply search
@@ -530,7 +493,11 @@ export default function LeadsTable({ initialFilter = null }) {
 
   const groupedLeads = useMemo(() => {
     return kanbanStatuses.reduce((acc, status) => {
-      acc[status] = filteredLeads.filter((lead) => lead.status === status);
+      const normalizedStatusKey = String(status || "").toLowerCase().trim();
+      acc[status] = filteredLeads.filter((lead) => {
+        const leadStatus = String(lead.status || "").toLowerCase().trim();
+        return leadStatus === normalizedStatusKey;
+      });
       return acc;
     }, {});
   }, [kanbanStatuses, filteredLeads]);

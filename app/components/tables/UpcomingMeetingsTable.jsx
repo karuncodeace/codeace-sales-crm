@@ -228,9 +228,7 @@ export default function UpcomingMeetingsTable() {
                           <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
                             {startTime.date}
                           </p>
-                          <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                            {startTime.day}
-                          </p>
+                          
                         </div>
                       </div>
                     </td>
