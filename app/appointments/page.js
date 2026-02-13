@@ -5,7 +5,7 @@ import React from "react";
 import useSWR from "swr";
 import { useTheme } from "../context/themeContext";
 import toast from "react-hot-toast";
-import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink } from "lucide-react";
+import { Calendar, Clock, User, Mail, Filter, CheckCircle2, XCircle, AlertCircle, CalendarClock, X, Video, ExternalLink, Copy } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 import { useRouter } from "next/navigation";
 
@@ -20,6 +20,20 @@ export default function BookingsPage() {
   const [cancelModal, setCancelModal] = useState({ isOpen: false, appointment: null });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [hoveredBookingId, setHoveredBookingId] = useState(null);
+
+  const handleCopy = async (e, url, id) => {
+    e.stopPropagation();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1800);
+    } catch (err) {
+      // ignore
+    }
+  };
 
   // Fetch all bookings (no status filter on server)
   const { data: bookings, error, isLoading, mutate } = useSWR(
@@ -465,7 +479,7 @@ export default function BookingsPage() {
                     <div
                       key={booking.id}
                       onClick={() => router.push(`/appointments/${booking.id}`)}
-                      className={`p-6 rounded-lg border transition-all hover:shadow-lg cursor-pointer ${
+                      className={`group p-6 rounded-lg border transition-all hover:shadow-lg cursor-pointer ${
                         isDark
                           ? "bg-[#262626] border-gray-700 hover:border-gray-600"
                           : "bg-white border-gray-200 hover:border-gray-300"
@@ -566,17 +580,35 @@ export default function BookingsPage() {
                           {booking.meeting_link && (
                             <div className="flex items-center gap-3">
                               <Video className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
-                              <a
-                                href={booking.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`text-sm flex items-center gap-1 hover:underline ${
-                                  isDark ? "text-orange-400" : "text-orange-600"
+                          <div className="flex items-center gap-2 group">
+                            <a
+                              href={booking.meeting_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseEnter={() => setHoveredBookingId(booking.id)}
+                              onMouseLeave={() => setHoveredBookingId((id) => (id === booking.id ? null : id))}
+                              className={`text-sm flex items-center gap-1 hover:underline ${
+                                isDark ? "text-orange-400" : "text-orange-600"
+                              }`}
+                            >
+                              Join the meet
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                            {hoveredBookingId === booking.id && (
+                              <button
+                                onClick={(e) => handleCopy(e, booking.meeting_link, booking.id)}
+                                title="Copy meeting link"
+                                className={`ml-1 p-1 rounded-md text-sm inline-flex items-center justify-center transition-colors ${
+                                  isDark ? "text-gray-400 hover:bg-gray-800/30" : "text-gray-500 hover:bg-gray-100"
                                 }`}
+                                onMouseDown={(e) => e.preventDefault()}
                               >
-                                Join the meet
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                                <Copy className="w-4 h-4 opacity-90" />
+                                {copiedId === booking.id && <span className="ml-1 text-[11px] opacity-90">Copied</span>}
+                              </button>
+                            )}
+                          </div>
                             </div>
                           )}
                         </div>

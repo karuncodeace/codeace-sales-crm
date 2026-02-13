@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import useSWR from "swr";
 import { useTheme } from "../../context/themeContext";
-import { Calendar, Clock, User, Video, ChevronRight } from "lucide-react";
+import { Calendar, Clock, User, Video, ChevronRight, Copy } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -63,6 +64,38 @@ export default function UpcomingMeetingsTable() {
   const getContactName = (booking) => {
     const name = booking.invitiee_contact_name || booking.invitee_name || "Guest";
     return name.length > 20 ? name.substring(0, 20) + "..." : name;
+  };
+
+  // Copy link state & handler
+  const [copiedId, setCopiedId] = useState(null);
+  const [hoveredBookingId, setHoveredBookingId] = useState(null);
+  const handleCopy = async (e, url, id) => {
+    e.stopPropagation();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1800);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const CopyButton = ({ meetingLink, bookingId, isDark, visible }) => {
+    if (!visible) return null;
+    return (
+      <button
+        onClick={(e) => handleCopy(e, meetingLink, bookingId)}
+        title="Copy meeting link"
+        className={`ml-2 p-1 rounded-md text-xs inline-flex items-center justify-center transition-colors ${
+          isDark ? "text-gray-400 hover:bg-gray-800/30" : "text-gray-500 hover:bg-gray-100"
+        }`}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        <Copy className="w-4 h-4 opacity-90" />
+        {copiedId === bookingId && <span className="ml-1 text-[11px] opacity-90">{`Copied`}</span>}
+      </button>
+    );
   };
 
   return (
@@ -184,7 +217,7 @@ export default function UpcomingMeetingsTable() {
                   <tr
                     key={booking.id}
                     onClick={() => router.push(`/appointments/${booking.id}`)}
-                    className={`transition-colors cursor-pointer align-middle ${
+                    className={`group transition-colors cursor-pointer align-middle ${
                       isDark
                         ? "hover:bg-gray-800/50 text-gray-300"
                         : "hover:bg-gray-50 text-gray-700"
@@ -250,20 +283,32 @@ export default function UpcomingMeetingsTable() {
                     {/* Action - Meeting Link */}
                     <td className="px-4 py-4 text-center align-middle">
                       {booking.meeting_link ? (
-                        <a
-                          href={booking.meeting_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            isDark
-                              ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                              : "bg-green-100 text-green-700 hover:bg-green-200"
-                          }`}
+                        <div
+                          className="inline-flex items-center justify-center"
                         >
-                          <Video className="w-3.5 h-3.5" />
-                          Join
-                        </a>
+                          <a
+                            href={booking.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseEnter={() => setHoveredBookingId(booking.id)}
+                            onMouseLeave={() => setHoveredBookingId((id) => (id === booking.id ? null : id))}
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              isDark
+                                ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                                : "bg-green-100 text-green-700 hover:bg-green-200"
+                            }`}
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            Join
+                          </a>
+                          <CopyButton
+                            meetingLink={booking.meeting_link}
+                            bookingId={booking.id}
+                            isDark={isDark}
+                            visible={hoveredBookingId === booking.id}
+                          />
+                        </div>
                       ) : (
                         <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`}>
                           No link
