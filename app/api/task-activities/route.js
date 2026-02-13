@@ -70,10 +70,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const leadId = searchParams.get("lead_id");
 
+    // Fetch all activities (include user and system) unless a specific source filter is provided
     let query = supabase
       .from("task_activities")
-      .select("id, lead_id, activity, type, comments, connect_through, due_date, source, notes_type, created_at")
-      .eq("source", "user"); // Only fetch user activities
+      .select("id, lead_id, activity, type, comments, connect_through, due_date, source, notes_type, created_at");
 
     if (leadId) {
       query = query.eq("lead_id", leadId);

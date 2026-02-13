@@ -16,6 +16,7 @@ export default function ActivityTab({ leadId }) {
     const [showDueDatePicker, setShowDueDatePicker] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [showAllActivities, setShowAllActivities] = useState(false);
     
     // Fetch activities from API
     const { data: rawActivities, error: fetchError, isLoading, mutate } = useSWR(
@@ -156,6 +157,8 @@ export default function ActivityTab({ leadId }) {
     const filteredActivities = filter === "all" 
         ? activities 
         : activities.filter(a => a.contactedThrough?.toLowerCase() === filter);
+
+    const displayedActivities = showAllActivities ? filteredActivities : filteredActivities.slice(0, 4);
 
     // Handle adding new activity
     const handleAddActivity = async () => {
@@ -464,7 +467,7 @@ export default function ActivityTab({ leadId }) {
 
                     {/* Activity Items */}
                     <div className="space-y-6">
-                        {filteredActivities.map((activity, index) => {
+                        {displayedActivities.map((activity, index) => {
                             const iconConfig = getActivityIcon(activity.type);
                             const IconComponent = iconConfig.icon;
                             
@@ -599,11 +602,14 @@ export default function ActivityTab({ leadId }) {
                     </div>
                 )}
 
-                {/* Load More */}
-                {filteredActivities.length > 0 && (
+                {/* Load More / Show Less */}
+                {filteredActivities.length > 4 && (
                     <div className="mt-6 text-center">
-                        <button className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${theme === "dark" ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                            Load More Activities
+                        <button
+                            onClick={() => setShowAllActivities((v) => !v)}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${theme === "dark" ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                        >
+                            {showAllActivities ? "Show Less" : `Load More Activities (${filteredActivities.length - 4} more)`}
                         </button>
                     </div>
                 )}
