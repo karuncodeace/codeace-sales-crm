@@ -235,6 +235,30 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       const leadName = selectedLead.name || selectedLead.lead_name || "Guest";
       const contactName = selectedLead.contactName || selectedLead.contact_name || null;
 
+      // Determine event title & description based on slug (use trimmed lowercase)
+      const normalizedSlug = String(slug || "").trim().toLowerCase();
+      const eventMetaMap = {
+        "discovery-call": {
+          title: "Discovery Call – Understanding Your Requirements",
+          description:
+            "This session is intended to gain a comprehensive understanding of your business objectives, operational processes, and key challenges. The discussion will focus on identifying requirements, defining success criteria, and aligning expectations to determine the most suitable solution approach.",
+        },
+        "demo-call": {
+          title: "Live Demo – Solution Walkthrough",
+          description:
+            "This session will include a live demonstration of our platform and its core features. We will walk you through the functionality, workflows, and answer any questions you may have.",
+        },
+        "discussion-call": {
+          title: "Solution Discussion & Clarifications",
+          description:
+            "This meeting is scheduled to discuss feedback, clarify questions, and align on next steps. We will review key points from previous discussions and finalize action items.",
+        },
+      };
+      const eventMeta = eventMetaMap[normalizedSlug] || {
+        title: eventType?.title || slugToTitle(slug),
+        description: "",
+      };
+
       const bookingPayload = {
         eventTypeId: eventType.id,
         start: selectedSlot.start,
@@ -255,6 +279,9 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           selectedLead.sales_person_id ||
           selectedLead.salesperson_id ||
           null,
+        // Event metadata (use requested field names)
+        "event-title": eventMeta.title,
+        "event-description": eventMeta.description,
       };
 
       // Log booking details before sending

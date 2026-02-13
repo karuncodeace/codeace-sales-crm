@@ -15,12 +15,14 @@ export async function GET(request) {
 
     const supabase = await supabaseServer();
 
+    // Allow matching slugs that may have trailing whitespace in DB by matching prefix.
+    // Use ILIKE with a prefix to tolerate minor data inconsistencies (e.g., "discussion-call ").
     const { data, error } = await supabase
       .from("event_types")
       .select("*")
-      .eq("slug", slug)
+      .ilike("slug", `${slug}%`)
       .eq("active", true)
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === "PGRST116") {

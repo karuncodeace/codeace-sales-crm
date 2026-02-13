@@ -13,7 +13,8 @@ export function useEventType(slug) {
                 setLoading(true);
                 setError(null);
 
-                const response = await fetch(`/api/event-types?slug=${slug}`);
+                const normalized = String(slug || "").trim();
+                const response = await fetch(`/api/event-types?slug=${encodeURIComponent(normalized)}`);
 
                 if (!response.ok) {
                     const errorData = await response.json();

@@ -20,8 +20,9 @@ export default function BookMeetingButton({ lead }) {
   }, []);
 
   const callTypes = [
-    { id: "demo-call", label: "Demo Meeting", duration: "It's a Demo Meeting", slug: "demo-call" },
-    { id: "discussion-call", label: "Discussion Meeting", duration: "It's a Discussion Meeting", slug: "discussion-call" },
+    { id: "discovery-call", label: "Discovery Call", duration: "It's a Discovery Call", slug: "discovery-call" },
+    { id: "demo-call", label: "Demo Call", duration: "It's a Demo Call", slug: "demo-call" },
+    { id: "discussion-call", label: "Discussion Call", duration: "It's a Discussion Call", slug: "discussion-call" },
   ];
 
   const handleBook = () => {
@@ -31,8 +32,9 @@ export default function BookMeetingButton({ lead }) {
   const handleCallTypeSelect = (callType) => {
     setSelectedCallType(callType);
     // Navigate to the corresponding booking page using slug
-    const slug = callType.slug || callType.id;
-    router.push(`/book/${slug}`);
+    const raw = callType.slug || callType.id;
+    const slug = String(raw || "").trim();
+    router.push(`/book/${encodeURIComponent(slug)}`);
     handleClose();
   };
 
