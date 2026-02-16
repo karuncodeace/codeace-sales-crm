@@ -49,9 +49,19 @@ export async function GET() {
     
     return NextResponse.json(data || []);
   } catch (err) {
-    console.error("Bookings GET exception:", err);
+    console.error("Bookings GET exception:", {
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack,
+    });
+
+    // Handle client-abort/AbortError separately to avoid noisy 500s
+    if (err && (err.name === "AbortError" || err.type === "aborted")) {
+      return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+    }
+
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: err?.message || "Internal server error" },
       { status: 500 }
     );
   }
@@ -59,7 +69,24 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    // Safely parse JSON and handle client aborts explicitly
+    let body;
+    try {
+      body = await request.json();
+    } catch (err) {
+      // request.json() can throw an AbortError if the client disconnected
+      if (err && (err.name === "AbortError" || err.type === "aborted")) {
+        console.warn("POST request aborted by client while reading body");
+        return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+      }
+      throw err;
+    }
+
+    // Double-check signal after parsing
+    if (request.signal && request.signal.aborted) {
+      console.warn("POST request signal already aborted after parsing body");
+      return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+    }
 
     if (!body || typeof body !== "object") {
       return NextResponse.json(
@@ -72,7 +99,16 @@ export async function POST(request) {
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
-    console.error("Bookings API error:", error);
+    console.error("Bookings API error:", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+    });
+
+    // Client-abort handling
+    if (error && (error.name === "AbortError" || error.type === "aborted")) {
+      return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+    }
 
     if (
       error.message === "Selected slot is no longer available" ||
@@ -103,7 +139,23 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const body = await request.json();
+    // Parse body safely to handle client disconnects / AbortError
+    let body;
+    try {
+      body = await request.json();
+    } catch (err) {
+      if (err && (err.name === "AbortError" || err.type === "aborted")) {
+        console.warn("PATCH request aborted by client while reading body");
+        return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+      }
+      throw err;
+    }
+
+    if (request.signal && request.signal.aborted) {
+      console.warn("PATCH request signal already aborted after parsing body");
+      return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+    }
+
     const { bookingId, meeting_completion_status, is_email_required } = body;
 
     if (!bookingId) {
@@ -184,9 +236,18 @@ export async function PATCH(request) {
 
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (err) {
-    console.error("Bookings PATCH exception:", err);
+    console.error("Bookings PATCH exception:", {
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack,
+    });
+
+    if (err && (err.name === "AbortError" || err.type === "aborted")) {
+      return NextResponse.json({ error: "Request aborted by client" }, { status: 499 });
+    }
+
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: err?.message || "Internal server error" },
       { status: 500 }
     );
   }
