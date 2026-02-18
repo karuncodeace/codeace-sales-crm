@@ -285,14 +285,14 @@ export default function UpcomingMeetingsTable() {
                       {booking.meeting_link ? (
                         <div
                           className="inline-flex items-center justify-center"
+                          onMouseEnter={() => setHoveredBookingId(booking.id)}
+                          onMouseLeave={() => setHoveredBookingId((id) => (id === booking.id ? null : id))}
                         >
                           <a
                             href={booking.meeting_link}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            onMouseEnter={() => setHoveredBookingId(booking.id)}
-                            onMouseLeave={() => setHoveredBookingId((id) => (id === booking.id ? null : id))}
                             className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               isDark
                                 ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"

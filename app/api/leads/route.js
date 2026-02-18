@@ -58,6 +58,7 @@ export async function GET() {
       id: lead.id,
       name: lead.lead_name,
       phone: lead.phone || "",
+    alternative_phone_number: lead.alternative_phone_number || null,
       email: lead.email || "",
       contactName: lead.contact_name || "",
       source: lead.lead_source,
@@ -121,6 +122,7 @@ export async function POST(request) {
   const {
     name,
     phone,
+    alternative_phone_number,
     email,
     contactName,
     source,
@@ -186,6 +188,7 @@ export async function POST(request) {
     lead_name: name,
     email,
     phone,
+    alternative_phone_number: alternative_phone_number || null,
     lead_source: source,     // meta_ads / google_ads / referral etc
     assigned_to: finalAssignedTo,
     is_manual: true,         // 🔥 BLOCKS AUTO ASSIGN TRIGGER
@@ -373,6 +376,7 @@ export async function POST(request) {
       id: data.id,
       name: data.lead_name,
       phone: data.phone || "",
+      alternative_phone_number: data.alternative_phone_number || null,
       email: data.email || "",
       contactName: data.contact_name || "",
       source: data.lead_source,
@@ -399,7 +403,7 @@ export async function PATCH(request) {
     }
     
     const body = await request.json();
-    const { id, name, phone, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes, first_call_done, lead_qualification, meeting_status, response_status } = body;
+    const { id, name, phone, alternative_phone_number, email, contactName, source, status, priority, companySize, turnover, industryType, assignedTo, current_stage, next_stage_notes, first_call_done, lead_qualification, meeting_status, response_status } = body;
 
     if (!id) {
       return Response.json({ error: "Lead ID is required" }, { status: 400 });
@@ -427,6 +431,7 @@ export async function PATCH(request) {
     const updateData = {};
     if (name !== undefined) updateData.lead_name = name;
     if (phone !== undefined) updateData.phone = phone;
+    if (alternative_phone_number !== undefined) updateData.alternative_phone_number = alternative_phone_number;
     if (email !== undefined) updateData.email = email;
     if (contactName !== undefined) updateData.contact_name = contactName;
     if (source !== undefined) updateData.lead_source = source;
@@ -621,6 +626,7 @@ export async function PATCH(request) {
       id: updatedLead.id,
       name: updatedLead.lead_name,
       phone: updatedLead.phone || "",
+      alternative_phone_number: updatedLead.alternative_phone_number || null,
       email: updatedLead.email || "",
       contactName: updatedLead.contact_name || "",
       source: updatedLead.lead_source,

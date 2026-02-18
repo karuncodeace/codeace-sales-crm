@@ -12,6 +12,7 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    alternative_phone_number: "",
     email: "",
     contactName: "",
     source: "",
@@ -43,6 +44,7 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
       setFormData({
         name: lead.name || "",
         phone: lead.phone || "",
+        alternative_phone_number: lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone || "",
         email: lead.email || "",
         contactName: lead.contactName || "",
         source: lead.source || "",
@@ -137,6 +139,7 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
         id: lead.id,
         name: formData.name,
         phone: formData.phone,
+          alternative_phone_number: formData.alternative_phone_number || null,
         email: formData.email,
         contactName: formData.contactName,
         source: formData.source,
@@ -315,6 +318,18 @@ export default function EditLeadModal({ open, onClose, lead, onUpdate }) {
                 onChange={(e) => updateField("phone", e.target.value)}
               />
               {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
+            </div>
+            
+            {/* Alternative Phone */}
+            <div>
+              <label className={labelClass}>Alternative Phone</label>
+              <input
+                type="tel"
+                placeholder="Optional"
+                className={inputClass("alternative_phone_number")}
+                value={formData.alternative_phone_number}
+                onChange={(e) => updateField("alternative_phone_number", e.target.value)}
+              />
             </div>
 
             {/* Email */}

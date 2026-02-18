@@ -479,6 +479,7 @@ function LeadDetailPageContent() {
                                     <CallBtn 
                                         leadId={lead.id || lead.lead_id}
                                         phone={lead.phone || lead.lead_phone}
+                                        altPhone={lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone}
                                         name={lead.name || lead.lead_name}
                                         email={lead.email || lead.lead_email}
                                     />

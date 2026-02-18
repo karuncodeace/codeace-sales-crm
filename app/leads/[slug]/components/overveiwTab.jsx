@@ -343,6 +343,16 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                     <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.phone || "—"}</p>
                                 </div>
                             </div>
+                            {/* Alternative phone number */}
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                    <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
+                                </div>
+                                <div>
+                                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Alternative Number</p>
+                                    <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone || "Null"}</p>
+                                </div>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                                     <Mail className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />

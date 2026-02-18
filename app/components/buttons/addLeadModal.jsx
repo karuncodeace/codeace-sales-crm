@@ -10,6 +10,7 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    alternative_phone_number: "",
     email: "",
     contactName: "",
     source: "",
@@ -82,6 +83,7 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
         body: JSON.stringify({
           name: formData.name,
           phone: formData.phone,
+            alternative_phone_number: formData.alternative_phone_number || null,
           email: formData.email,
           contactName: formData.contactName,
           source: formData.source,
@@ -235,6 +237,18 @@ export default function AddLeadModal({ open, onClose, onAdd }) {
                 onChange={(e) => updateField("phone", e.target.value)}
               />
               {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
+            </div>
+
+            {/* Alternative Phone */}
+            <div>
+              <label className={labelClass}>Alternative Phone</label>
+              <input
+                type="tel"
+                placeholder="Optional"
+                className={inputClass("alternative_phone_number")}
+                value={formData.alternative_phone_number}
+                onChange={(e) => updateField("alternative_phone_number", e.target.value)}
+              />
             </div>
 
             {/* Email */}
