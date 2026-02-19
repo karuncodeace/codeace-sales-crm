@@ -56,6 +56,7 @@ import { useRouter } from "next/navigation";
   const itemsPerPage = pageSize;
   const [processingId, setProcessingId] = useState(null);
   const [refreshingMeetings, setRefreshingMeetings] = useState(false);
+  const [openActionId, setOpenActionId] = useState(null);
   // compute counts for header pills
   const statusCounts = {
     all: Array.isArray(bookings) ? bookings.length : 0,
@@ -136,6 +137,30 @@ import { useRouter } from "next/navigation";
       globalMutate("leads");
     } catch (err) {
       toast.error(err.message || "Failed to cancel booking");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleMarkCompleted = async (e, booking) => {
+    e.stopPropagation();
+    if (!booking?.id && !booking?._id) return;
+    if (processingId) return;
+    setProcessingId(booking.id || booking._id);
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id || booking._id, meeting_completion_status: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to mark completed");
+      toast.success("Meeting marked as completed");
+      setOpenActionId(null);
+      mutate();
+      globalMutate("leads");
+    } catch (err) {
+      toast.error(err.message || "Failed to mark meeting completed");
     } finally {
       setProcessingId(null);
     }
@@ -268,23 +293,24 @@ import { useRouter } from "next/navigation";
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Invitee Info</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Timing</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Mode</th>
+              {/* <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Mode</th> */}
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Meeting Link</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-200"}`}>
               {bookingsLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-500">Loading meetings…</td>
+                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">Loading meetings…</td>
                 </tr>
               ) : bookingsError ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-red-500">Error loading meetings.</td>
+                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-red-500">Error loading meetings.</td>
                 </tr>
               ) : bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-500">No meetings found.</td>
+                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">No meetings found.</td>
                 </tr>
               ) : (
                 meetingsToRender.map((b) => {
@@ -306,7 +332,7 @@ import { useRouter } from "next/navigation";
                       tabIndex={0}
                       className={`cursor-pointer ${isDark ? "dark:hover:bg-gray-100/5 hover:bg-gray-100/50" : "hover:bg-gray-100/50"}`}
                     >
-                      <td className="px-6 py-3 align-top">
+                      <td className="px-6 py-3 align-middle">
                         <div className="flex flex-col">
                           <span className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-900"}`}>{b.invitiee_contact_name || b.name || "—"}</span>
                           { (b.invitee_name || b.organizer_name || b.inviter_name || "") ? (
@@ -314,12 +340,12 @@ import { useRouter } from "next/navigation";
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-6 py-3 align-top">
+                      <td className="px-6 py-3 align-middle">
                         <div className="text-sm font-medium">{dt.date}</div>
                         <div className="text-xs text-gray-400">{dt.time}</div>
                       </td>
-                      <td className="px-6 py-3 align-top text-sm">Gmeet</td>
-                      <td className="px-6 py-3 align-top text-sm">
+                      {/* <td className="px-6 py-3 align-top text-sm">Gmeet</td> */}
+                      <td className="px-6 py-3 align-middle text-sm">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${
                             status === "conducted"
@@ -336,65 +362,10 @@ import { useRouter } from "next/navigation";
                           {displayStatus}
                         </span>
                       </td>
-                      <td className="px-6 py-3 align-top text-sm text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <>
-                            {/* Reschedule button */}
-                            <button
-                              onClick={(e) => openRescheduleModal(e, b)}
-                              title="Reschedule"
-                              className={`p-2 rounded-full border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
-                            >
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10h-6l-2-2-2 2H3"/></svg>
-                            </button>
+                      <td className="px-6 py-3 align-middle text-sm text-right">
+                        <div className="flex items-center justify-end gap-2 relative">
+                         
 
-                            {/* Cancel button */}
-                            <button
-                              onClick={(e) => handleCancelBooking(e, b)}
-                              title="Cancel booking"
-                              className={`p-2 rounded-full border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
-                            >
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-
-                            {/* Mark completed button */}
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (processingId) return;
-                                const urlId = b.id || b._id;
-                                setProcessingId(urlId);
-                                try {
-                                  const res = await fetch("/api/bookings", {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ bookingId: b.id || b._id, meeting_completion_status: true }),
-                                  });
-                                  const result = await res.json();
-                                  if (!res.ok) throw new Error(result.error || "Failed to mark completed");
-                                  toast.success("Meeting marked as completed");
-                                  // refresh bookings and leads
-                                  mutate();
-                                  globalMutate("leads");
-                                } catch (err) {
-                                  toast.error(err.message || "Failed to mark meeting completed");
-                                } finally {
-                                  setProcessingId(null);
-                                }
-                              }}
-                              title="Mark as completed"
-                              className={`p-2 rounded-full border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
-                            >
-                              {processingId === (b.id || b._id) ? (
-                                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                </svg>
-                              ) : (
-                                <Check className="w-4 h-4" />
-                              )}
-                            </button>
-                          </>
                           {(() => {
                             const url = b.join_url || b.url || b.meeting_link || "";
                             return (
@@ -412,6 +383,54 @@ import { useRouter } from "next/navigation";
                               </div>
                             );
                           })()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 align-middle text-sm text-right">
+                        <div className="flex items-center justify-end gap-2 relative">
+                        <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionId(openActionId === (b.id || b._id) ? null : (b.id || b._id));
+                              }}
+                              title="Actions"
+                              className={`p-2 rounded-md border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+                            </button>
+
+                            {openActionId === (b.id || b._id) && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className={`absolute right-0 mt-2 w-40 z-50 rounded-md shadow-lg ${isDark ? "bg-[#262626] border border-gray-700 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}
+                              >
+                                <button
+                                  onClick={(e) => handleMarkCompleted(e, b)}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                >
+                                  Mark as completed
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    handleCancelBooking(e, b);
+                                    setOpenActionId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                >
+                                  Cancel meeting
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    openRescheduleModal(e, b);
+                                    setOpenActionId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                >
+                                  Reschedule
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
