@@ -44,6 +44,25 @@ import { useRouter } from "next/navigation";
   const { theme } = useTheme();
    const isDark = theme === "dark";
   const router = useRouter();
+ 
+  // Small component to show latest meeting-type note for a lead
+  function NotePreview({ leadId }) {
+    const fetcher = async (url) => {
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : data?.data || [];
+    };
+    const { data: notes = [] } = useSWR(leadId ? `/api/lead-notes?lead_id=${leadId}` : null, fetcher, { revalidateOnFocus: false });
+    const meetingNotes = Array.isArray(notes) ? notes.filter((n) => String(n.notes_type || n.notes_type === n.notes_type).toLowerCase() === "meeting" || String(n.notes_type || "").toLowerCase() === "meeting") : [];
+    const latest = meetingNotes && meetingNotes.length > 0 ? meetingNotes[0] : null;
+    if (!leadId) return null;
+    return (
+      <div className={`max-w-[220px] text-right ${isDark ? "text-gray-300" : "text-gray-600"} text-xs`}>
+        {latest ? <div className="truncate">{latest.notes}</div> : <div className="opacity-60">No meeting notes</div>}
+      </div>
+    );
+  }
   const { data: bookings = [], error: bookingsError, isLoading: bookingsLoading, mutate } = useSWR(
     "bookings",
     fetchBookings,
@@ -57,6 +76,20 @@ import { useRouter } from "next/navigation";
   const [processingId, setProcessingId] = useState(null);
   const [refreshingMeetings, setRefreshingMeetings] = useState(false);
   const [openActionId, setOpenActionId] = useState(null);
+ 
+  useEffect(() => {
+    if (!openActionId) return;
+    const handleOutsideClick = (e) => {
+      // if click is not inside the opened action root, close it
+      const target = e.target;
+      if (!target) return;
+      if (!target.closest || !document) return;
+      const inside = target.closest(`[data-action-root="${openActionId}"]`);
+      if (!inside) setOpenActionId(null);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [openActionId]);
   // compute counts for header pills
   const statusCounts = {
     all: Array.isArray(bookings) ? bookings.length : 0,
@@ -296,6 +329,7 @@ import { useRouter } from "next/navigation";
               {/* <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Mode</th> */}
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Meeting Link</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Meeting Notes</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Actions</th>
               </tr>
             </thead>
@@ -387,14 +421,27 @@ import { useRouter } from "next/navigation";
                       </td>
                       <td className="px-6 py-3 align-middle text-sm text-right">
                         <div className="flex items-center justify-end gap-2 relative">
-                        <div className="relative">
+                         
+
+                         {(() => {
+                          return (
+                            <div>
+                              <NotePreview leadId={b.lead_id} />
+                            </div>
+                          );
+                         })()}  
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 align-middle text-sm text-right">
+                        <div className="flex items-center justify-end gap-2 relative">
+                          <div className="relative" data-action-root={b.id || b._id}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenActionId(openActionId === (b.id || b._id) ? null : (b.id || b._id));
                               }}
                               title="Actions"
-                              className={`p-2 rounded-md border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
+                              className={`p-2 rounded-full border ${isDark ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"} flex items-center justify-center`}
                             >
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
                             </button>
@@ -406,7 +453,7 @@ import { useRouter } from "next/navigation";
                               >
                                 <button
                                   onClick={(e) => handleMarkCompleted(e, b)}
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  className={`w-full text-left px-3 py-2 text-sm rounded-t-md ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                 >
                                   Mark as completed
                                 </button>
@@ -415,7 +462,7 @@ import { useRouter } from "next/navigation";
                                     handleCancelBooking(e, b);
                                     setOpenActionId(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  className={`w-full text-left px-3 py-2 text-sm ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                 >
                                   Cancel meeting
                                 </button>
@@ -424,13 +471,14 @@ import { useRouter } from "next/navigation";
                                     openRescheduleModal(e, b);
                                     setOpenActionId(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  className={`w-full text-left px-3 py-2 text-sm rounded-b-md ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                                 >
                                   Reschedule
                                 </button>
                               </div>
                             )}
                           </div>
+                         
                         </div>
                       </td>
                     </tr>
