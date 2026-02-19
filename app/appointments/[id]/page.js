@@ -10,7 +10,8 @@ import {
   User, 
   Mail, 
   ArrowLeft, 
-  CheckCircle2, 
+  CheckCircle2,
+  Check,
   XCircle, 
   AlertCircle, 
   Video, 
@@ -204,376 +205,212 @@ export default function BookingDetailPage() {
   const startTime = formatDateTime(booking.start_time);
   const endTime = formatDateTime(booking.end_time);
   const displayStatus = getDisplayStatus(booking);
+  // Handler: mark booking as completed (updates booking and leading to lead update via API)
+  const handleMarkCompleted = async (bookingId) => {
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, meeting_completion_status: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to mark completed");
+      toast.success("Meeting marked as completed");
+      mutate();
+      globalMutate("leads");
+    } catch (err) {
+      toast.error(err.message || "Failed to mark completed");
+    }
+  };
 
   return (
-    <div className={`min-h-screen`}>
-      <div className="pl-5 md:pl-0 2xl:pl-0 w-full mt-8">
-        {/* Professional Header */}
-        <div className={`pb-6`}>
+    <div className={`min-h-screen ${isDark ? "bg-[#0b0b0b]" : "bg-gray-50"} py-8`}>
+      <div className="container mx-auto px-4">
+        <div className="mb-6">
           <button
             onClick={() => router.push("/appointments")}
-            className={`flex items-center gap-2 mb-6 text-sm font-medium transition-colors hover:gap-3 ${
-              isDark ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
-            }`}
+            className={`inline-flex items-center gap-2 text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} hover:underline`}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Bookings
           </button>
-          
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        </div>
+
+        <div className="bg-transparent rounded-md">
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6`}>
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`p-2 rounded-xl ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
                   <Calendar className={`w-6 h-6 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
                 </div>
                 <div>
-                  <h1 className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                    Meeting with {(() => {
-                      const name = booking.invitiee_contact_name || booking.invitee_name || "Guest";
-                      return name.length > 1 ? name.substring(0, 1) + "..." : name;
+                  <h1 className={`text-3xl font-extrabold leading-tight ${isDark ? "text-white" : "text-gray-900"}`}>
+                    {(() => {
+                      const explicitTitle = booking.title || booking.event_title || booking.meeting_title;
+                      const invitee = booking.invitee_name || booking.invitiee_contact_name || "Guest";
+                      return explicitTitle ? explicitTitle : `Meeting with ${invitee}`;
                     })()}
                   </h1>
-                  <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                    Booking ID: {booking.id}
-                  </p>
+                  <div className="mt-1 text-sm text-gray-500">
+                    Booking ID: <span className="font-medium text-gray-700">{booking.id}</span>
+                  </div>
                 </div>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
               <span className={getStatusBadge(displayStatus)}>
                 {getStatusIcon(displayStatus)}
-                {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1) || "Unknown"}
+                <span className="ml-2">{displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1) || "Unknown"}</span>
               </span>
+
+              <button
+                onClick={() => handleMarkCompleted(booking.id)}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md font-semibold ${isDark ? "bg-gray-800 text-white" : "bg-white text-gray-800 border border-gray-200"}`}
+              >
+                <Check className="w-4 h-4" />
+                Mark Completed
+              </button>
+
+              {booking.meeting_link && (
+                <a
+                  href={booking.meeting_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-orange-500 text-white font-semibold shadow"
+                >
+                  <Video className="w-4 h-4" />
+                  Join
+                </a>
+              )}
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Meeting Schedule Card */}
-            <div className={`rounded-xl border ${isDark ? "bg-[#262626] border-gray-700/50" : "bg-white border-gray-200"} shadow-sm overflow-hidden`}>
-              <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700/50 bg-gray-800/30" : "border-gray-200 bg-gray-50/50"}`}>
-                <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                  Meeting Schedule
-                </h2>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Start Time */}
-                  <div className={`p-4 rounded-lg ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <main className="lg:col-span-2 space-y-6">
+              {/* Schedule */}
+              <section className={`rounded-xl ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} p-6 shadow-sm`}>
+                <h3 className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>Meeting Schedule</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={`${isDark ? "bg-gray-800/40" : "bg-gray-50"} p-4 rounded-lg`}>
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`p-2 rounded-lg ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
                         <Clock className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
                       </div>
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                        Start Time
-                      </span>
+                      <div className="text-xs font-semibold text-gray-500 uppercase">Start</div>
                     </div>
-                    <p className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                      {startTime.time}
-                    </p>
-                    <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                      {startTime.day}, {startTime.date}
-                    </p>
+                    <div className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{startTime.time}</div>
+                    <div className="text-sm text-gray-500 mt-1">{startTime.day}, {startTime.date}</div>
                   </div>
 
-                  {/* End Time */}
                   {endTime.full !== "N/A" && (
-                    <div className={`p-4 rounded-lg ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}>
+                    <div className={`${isDark ? "bg-gray-800/40" : "bg-gray-50"} p-4 rounded-lg`}>
                       <div className="flex items-center gap-3 mb-2">
                         <div className={`p-2 rounded-lg ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
                           <Clock className={`w-4 h-4 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
                         </div>
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          End Time
-                        </span>
+                        <div className="text-xs font-semibold text-gray-500 uppercase">End</div>
                       </div>
-                      <p className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                        {endTime.time}
-                      </p>
-                      <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                        {endTime.date}
-                      </p>
+                      <div className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{endTime.time}</div>
+                      <div className="text-sm text-gray-500 mt-1">{endTime.date}</div>
                     </div>
                   )}
                 </div>
 
-                {/* Timezone */}
                 {booking.timezone && (
-                  <div className={`mt-4 pt-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                    <div className="flex items-center gap-2">
-                      <Globe className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                      <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                        Timezone: <span className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{booking.timezone}</span>
-                      </span>
-                    </div>
+                  <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Timezone: <span className="font-medium text-gray-700 ml-1">{booking.timezone}</span>
                   </div>
                 )}
-              </div>
-            </div>
+              </section>
 
-            {/* Attendee Information Card */}
-            {(booking.invitee_name || booking.invitee_email) && (
-              <div className={`rounded-xl border ${isDark ? "bg-[#262626] border-gray-700/50" : "bg-white border-gray-200"} shadow-sm overflow-hidden`}>
-                <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700/50 bg-gray-800/30" : "border-gray-200 bg-gray-50/50"}`}>
-                  <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                    Attendee Information
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-xl ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
-                      <UserCircle className={`w-6 h-6 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+              {/* Attendee */}
+              {(booking.invitee_name || booking.invitee_email) && (
+                <section className={`rounded-xl ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} p-6 shadow-sm`}>
+                  <h3 className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>Attendee</h3>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-full ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                      <UserCircle className={`w-8 h-8 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
                     </div>
                     <div className="flex-1">
-                      {booking.invitee_name && (
-                        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                          {booking.invitee_name}
-                        </h3>
-                      )}
+                      {booking.invitee_name && <div className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{booking.invitee_name}</div>}
+                      { (booking.company || booking.organization || booking.company_name) && <div className="text-sm text-gray-500 mt-1">{booking.company || booking.organization || booking.company_name}</div>}
                       {booking.invitee_email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-500"}`} />
-                          <a
-                            href={`mailto:${booking.invitee_email}`}
-                            className={`text-sm font-medium hover:underline ${isDark ? "text-orange-400 hover:text-orange-300" : "text-orange-600 hover:text-orange-700"}`}
-                          >
-                            {booking.invitee_email}
-                          </a>
-                        </div>
+                        <a href={`mailto:${booking.invitee_email}`} className="text-sm text-orange-600 hover:underline mt-2 inline-block">
+                          {booking.invitee_email}
+                        </a>
                       )}
                     </div>
-                  </div>
-
-                  {/* Meeting Link */}
-                  {booking.meeting_link && (
-                    <div className={`mt-6 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                      <a
-                        href={booking.meeting_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-lg font-semibold transition-all ${
-                          isDark
-                            ? "bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20"
-                            : "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20"
-                        }`}
-                      >
-                        <Video className="w-5 h-5" />
-                        Join Meeting
-                        <ExternalLink className="w-4 h-4" />
+                    {booking.meeting_link && (
+                      <a href={booking.meeting_link} target="_blank" rel="noreferrer" className="ml-4 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-orange-500 text-white font-semibold">
+                        <Video className="w-4 h-4" /> Join Meeting
                       </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Lead Information Card (if available) */}
-            {lead && (
-              <div className={`rounded-xl border ${isDark ? "bg-[#262626] border-gray-700/50" : "bg-white border-gray-200"} shadow-sm overflow-hidden`}>
-                <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700/50 bg-gray-800/30" : "border-gray-200 bg-gray-50/50"}`}>
-                  <div className="flex items-center justify-between">
-                    <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                      Lead Information
-                    </h2>
-                    {lead.status && (
-                      <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
-                        isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
-                      }`}>
-                        {lead.status}
-                      </span>
                     )}
                   </div>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Company Name */}
+                </section>
+              )}
+
+              {/* Lead Info */}
+              {lead && (
+                <section className={`rounded-xl ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} p-6 shadow-sm`}>
+                  <h3 className={`text-lg font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>Lead Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {lead.lead_name && (
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Building2 className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                          <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            Company
-                          </span>
-                        </div>
-                        <p className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                          {lead.lead_name}
-                        </p>
+                        <div className="text-xs text-gray-500 uppercase mb-1">Company</div>
+                        <div className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{lead.lead_name}</div>
                       </div>
                     )}
-
-                    {/* Contact Name */}
                     {lead.contact_name && (
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <User className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                          <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            Contact
-                          </span>
-                        </div>
-                        <p className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                          {lead.contact_name}
-                        </p>
+                        <div className="text-xs text-gray-500 uppercase mb-1">Contact</div>
+                        <div className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{lead.contact_name}</div>
                       </div>
                     )}
-
-                    {/* Phone */}
                     {lead.phone && (
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Phone className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                          <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            Phone
-                          </span>
-                        </div>
-                        <a
-                          href={`tel:${lead.phone.replace(/[^0-9+]/g, "")}`}
-                          className={`text-base font-semibold hover:underline ${isDark ? "text-orange-400 hover:text-orange-300" : "text-orange-600 hover:text-orange-700"}`}
-                        >
-                          {lead.phone}
-                        </a>
+                        <div className="text-xs text-gray-500 uppercase mb-1">Phone</div>
+                        <a href={`tel:${lead.phone.replace(/[^0-9+]/g, "")}`} className={`font-semibold ${isDark ? "text-orange-400" : "text-orange-600"}`}>{lead.phone}</a>
                       </div>
                     )}
-
-                    {/* Email */}
                     {lead.email && (
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Mail className={`w-4 h-4 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                          <span className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            Email
-                          </span>
-                        </div>
-                        <a
-                          href={`mailto:${lead.email}`}
-                          className={`text-base font-semibold hover:underline ${isDark ? "text-orange-400 hover:text-orange-300" : "text-orange-600 hover:text-orange-700"}`}
-                        >
-                          {lead.email}
-                        </a>
+                        <div className="text-xs text-gray-500 uppercase mb-1">Email</div>
+                        <a href={`mailto:${lead.email}`} className={`font-semibold ${isDark ? "text-orange-400" : "text-orange-600"}`}>{lead.email}</a>
                       </div>
                     )}
                   </div>
+                  {lead.id && <div className="mt-6"><button onClick={() => router.push(`/leads/${lead.id}`)} className={`px-4 py-2 rounded-md ${isDark ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-900"}`}>View Full Lead Details</button></div>}
+                </section>
+              )}
 
-                  {/* View Lead Button */}
-                  {lead.id && (
-                    <div className={`mt-6 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                      <button
-                        onClick={() => router.push(`/leads/${lead.id}`)}
-                        className={`w-full px-4 py-3 rounded-lg font-semibold transition-all ${
-                          isDark
-                            ? "bg-gray-700 hover:bg-gray-600 text-white"
-                            : "bg-gray-100 hover:bg-gray-200 text-gray-900"
-                        }`}
-                      >
-                        View Full Lead Details
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            </main>
 
-            {/* Metadata Card */}
-            <div className={`rounded-xl border ${isDark ? "bg-[#262626] border-gray-700/50" : "bg-white border-gray-200"} shadow-sm overflow-hidden`}>
-              <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700/50 bg-gray-800/30" : "border-gray-200 bg-gray-50/50"}`}>
-                <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                  Additional Information
-                </h2>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {booking.created_at && (
-                    <div className="flex items-center gap-3">
-                      <CalendarClock className={`w-5 h-5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
-                      <div>
-                        <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          Created
-                        </p>
-                        <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
-                          {formatDateTime(booking.created_at).full}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+            {/* Sidebar */}
+            <aside className="lg:col-span-1">
+              <div className={`rounded-xl ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"} p-6 shadow-sm sticky top-6`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Latest Notes</h3>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar - Latest Notes */}
-          <div className="lg:col-span-1">
-            <div className={`rounded-xl border ${isDark ? "bg-[#262626] border-gray-700/50" : "bg-white border-gray-200"} shadow-sm overflow-hidden sticky top-6`}>
-              <div className={`px-6 py-4 border-b ${isDark ? "border-gray-700/50 bg-gray-800/30" : "border-gray-200 bg-gray-50/50"}`}>
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 rounded-lg ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
-                    <MessageSquare className={`w-5 h-5 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
-                  </div>
-                  <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                    Latest Notes
-                  </h2>
-                </div>
-              </div>
-              <div className="p-6">
                 {latestNotes.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className={`p-4 rounded-full mx-auto mb-4 w-fit ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-                      <MessageSquare className={`w-8 h-8 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
-                    </div>
-                    <p className={`text-sm font-medium ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                      No notes available
-                    </p>
-                    <p className={`text-xs mt-1 ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                      Notes will appear here once added
-                    </p>
-                  </div>
+                  <div className="text-center py-8 text-sm text-gray-500">No notes available</div>
                 ) : (
                   <div className="space-y-3">
                     {latestNotes.map((note) => (
-                      <div
-                        key={note.id}
-                        className={`p-4 rounded-lg border transition-all ${
-                          isDark 
-                            ? "bg-gray-800/50 border-gray-700/50 hover:border-gray-600" 
-                            : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <span
-                            className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
-                              isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
-                            }`}
-                          >
-                            {note.type}
-                          </span>
-                          <span className={`text-xs font-medium ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                            {formatDateTime(note.createdAt).date}
-                          </span>
+                      <div key={note.id} className={`p-3 rounded-lg ${isDark ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">{note.type}</span>
+                          <span className="text-xs text-gray-500">{formatDateTime(note.createdAt).date}</span>
                         </div>
-                        <p className={`text-sm leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                          {note.content || "No content"}
-                        </p>
+                        <div className="text-sm text-gray-600">{note.content || "No content"}</div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {leadId && latestNotes.length > 0 && (
-                  <div className={`mt-6 pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                    <button
-                      onClick={() => router.push(`/leads/${leadId}`)}
-                      className={`w-full px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                        isDark
-                          ? "bg-gray-700 hover:bg-gray-600 text-white"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-900"
-                      }`}
-                    >
-                      View All Notes
-                    </button>
-                  </div>
-                )}
+                {leadId && latestNotes.length > 0 && <button onClick={() => router.push(`/leads/${leadId}`)} className={`mt-4 w-full px-4 py-2 rounded-md ${isDark ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-900"}`}>View All Notes</button>}
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       </div>

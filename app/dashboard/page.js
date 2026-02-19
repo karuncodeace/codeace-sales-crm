@@ -13,6 +13,7 @@ import Header from "../components/ui/header";
 import { fetcher } from "../../lib/swr/fetcher";
 import DashboardHeader from "../components/ui/dashboardHeader";
 import UpcomingMeetingsTable from "../components/tables/UpcomingMeetingsTable";
+import { useRouter } from "next/navigation";
 
 // Dashboard API endpoints to pre-fetch
 const dashboardEndpoints = [
@@ -113,6 +114,23 @@ export default function DashboardPage() {
         )}
       </div>
       
+      {/* Floating quick access button to AI chat */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => {
+            const url = "/ai-chat";
+            // navigate using location to ensure full page load under minimal layout
+            window.location.href = url;
+          }}
+          aria-label="Open AI Chat"
+          className="flex items-center justify-center gap-2 w-44 px-4 py-3 rounded-full shadow-lg bg-orange-500 text-white hover:bg-orange-600 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-5-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-5 4z" />
+          </svg>
+          <span className="font-medium">AI Chat</span>
+        </button>
+      </div>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import "./globals.css";
+import "@crayonai/react-ui/styles/index.css";
 import { Manrope, Geist_Mono, DynaPuff, Instrument_Serif } from "next/font/google";
 import LayoutClient from "./layout-client";
 

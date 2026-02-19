@@ -102,7 +102,7 @@ export default function UpcomingMeetingsTable() {
     <div
       className={`rounded-xl border ${
         isDark ? "bg-[#262626] border-gray-700" : "bg-white border-gray-200"
-      } shadow-sm overflow-hidden flex flex-col h-[430px] md:h-[390px] 2xl:h-[410px]`}
+      } shadow-sm overflow-hidden flex flex-col h-[430px] md:h-[390px] 2xl:h-[515px]`}
     >
       {/* Header */}
       <div
