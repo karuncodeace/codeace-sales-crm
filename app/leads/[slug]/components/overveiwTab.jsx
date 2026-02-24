@@ -18,6 +18,8 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
         recipientName: "",
     });
     const [copiedEmail, setCopiedEmail] = useState(false);
+    const [copiedPhone, setCopiedPhone] = useState(false);
+    const [copiedAltPhone, setCopiedAltPhone] = useState(false);
     const [isEditLeadModalOpen, setIsEditLeadModalOpen] = useState(false);
 
     // Fetch tasks for this lead
@@ -338,9 +340,33 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                 <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                                     <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Phone</p>
-                                    <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.phone || "—"}</p>
+                                    {lead.phone ? (
+                                        <div className="flex items-center gap-2 group">
+                                            <span className={`font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`} title={lead.phone}>
+                                                {lead.phone}
+                                            </span>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    try {
+                                                        await navigator.clipboard.writeText(lead.phone);
+                                                        setCopiedPhone(true);
+                                                        setTimeout(() => setCopiedPhone(false), 2000);
+                                                    } catch (err) {
+                                                        // ignore
+                                                    }
+                                                }}
+                                                className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`}
+                                                title="Copy phone"
+                                            >
+                                                {copiedPhone ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>—</p>
+                                    )}
                                 </div>
                             </div>
                             {/* Alternative phone number */}
@@ -348,9 +374,34 @@ export default function OverveiwTab({ lead, leadId, setTab, onEditScores, onUpda
                                 <div className={`p-2 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                                     <Phone className={`w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Alternative Number</p>
-                                    <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>{lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone || "Null"}</p>
+                                    {lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone ? (
+                                        <div className="flex items-center gap-2 group">
+                                            <span className={`font-medium truncate max-w-xs ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`} title={lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone}>
+                                                {lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone}
+                                            </span>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    const alt = lead.alternative_phone_number || lead.alternativePhone || lead.alt_phone;
+                                                    try {
+                                                        await navigator.clipboard.writeText(alt);
+                                                        setCopiedAltPhone(true);
+                                                        setTimeout(() => setCopiedAltPhone(false), 2000);
+                                                    } catch (err) {
+                                                        // ignore
+                                                    }
+                                                }}
+                                                className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${theme === "dark" ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`}
+                                                title="Copy alternative phone"
+                                            >
+                                                {copiedAltPhone ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <p className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>—</p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
