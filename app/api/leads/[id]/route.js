@@ -53,6 +53,7 @@ export async function GET(request, { params }) {
     id: lead.id,
     name: lead.lead_name,
     phone: lead.phone || "",
+      alternative_phone_number: lead.alternative_phone_number || null,
     email: lead.email || "",
     contactName: lead.contact_name || "",
     source: lead.lead_source,
