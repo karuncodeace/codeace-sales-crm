@@ -20,7 +20,7 @@ export async function PATCH(request) {
 
     if (
       error.message === "Booking not found" ||
-      error.message === "Only scheduled bookings can be cancelled" ||
+      error.message === "Only scheduled or rescheduled bookings can be cancelled" ||
       error.message.includes("required") ||
       error.message.includes("must be")
     ) {

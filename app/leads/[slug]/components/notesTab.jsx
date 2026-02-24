@@ -501,11 +501,11 @@ function NotesTab({ theme, leadId, leadName }) {
 
             {/* Notes Grid Layout */}
             {filteredNotes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="flex flex-wrap items-start gap-4">
                     {filteredNotes.map((note) => (
                         <div
                             key={note.id}
-                            className={`group relative rounded-xl p-5 transition-all duration-200 hover:shadow-xl border ${theme === "dark"
+                            className={`group relative rounded-xl p-5 transition-all duration-200 hover:shadow-xl border w-auto max-w-[32rem] ${theme === "dark"
                                     ? "bg-[#262626] border-gray-700 hover:border-orange-500/30 hover:bg-[#2a2a2a]"
                                     : "bg-white border-gray-200 hover:border-orange-200 hover:shadow-md"
                                 }`}
@@ -602,7 +602,7 @@ function NotesTab({ theme, leadId, leadName }) {
                                      
   {/* Note Content */}
   <div className="mb-4">
-                                        <p className={`text-sm leading-relaxed whitespace-pre-wrap line-clamp-4 ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
+                                        <p className={`text-sm leading-relaxed whitespace-pre-wrap ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
                                             {note.content}
                                         </p>
                                     </div>

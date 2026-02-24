@@ -30,15 +30,23 @@ import { useRouter } from "next/navigation";
    }
  }
 
- function getBookingDisplayStatus(booking) {
-   const completion =
-     booking.meeting_completion_status === true ||
-     String(booking.meeting_completion_status || "").toLowerCase() === "completed";
-   if (completion) return "conducted";
-   if (booking.is_rescheduled) return "rescheduled";
-   if (booking.status === "scheduled") return "booked";
-   return booking.status || "unknown";
- }
+function getBookingDisplayStatus(booking) {
+  const rawStatus = String(booking.status || "").toLowerCase();
+  const completion =
+    booking.meeting_completion_status === true ||
+    String(booking.meeting_completion_status || "").toLowerCase() === "completed";
+
+  // Hard overrides: once completed or cancelled, that is the truth,
+  // even if is_rescheduled is still true.
+  if (completion) return "conducted";
+  if (rawStatus === "cancelled") return "cancelled";
+
+  // Scheduled variants
+  if (rawStatus === "scheduled" && booking.is_rescheduled) return "rescheduled";
+  if (rawStatus === "scheduled") return "booked";
+
+  return rawStatus || "unknown";
+}
 
  export default function MeetingTable() {
   const { theme } = useTheme();
@@ -451,30 +459,63 @@ import { useRouter } from "next/navigation";
                                 onClick={(e) => e.stopPropagation()}
                                 className={`absolute right-0 mt-2 w-40 z-50 rounded-md shadow-lg ${isDark ? "bg-[#262626] border border-gray-700 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}
                               >
-                                <button
-                                  onClick={(e) => handleMarkCompleted(e, b)}
-                                  className={`w-full text-left px-3 py-2 text-sm rounded-t-md ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                >
-                                  Mark as completed
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    handleCancelBooking(e, b);
-                                    setOpenActionId(null);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-sm ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                >
-                                  Cancel meeting
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    openRescheduleModal(e, b);
-                                    setOpenActionId(null);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-sm rounded-b-md ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                >
-                                  Reschedule
-                                </button>
+                                {(() => {
+                                  const effectiveStatus = getBookingDisplayStatus(b);
+                                  const canMutate =
+                                    effectiveStatus === "booked" || effectiveStatus === "rescheduled";
+
+                                  return (
+                                    <>
+                                      <button
+                                        onClick={(e) => handleMarkCompleted(e, b)}
+                                        disabled={!canMutate}
+                                        className={`w-full text-left px-3 py-2 text-sm rounded-t-md ${
+                                          canMutate
+                                            ? isDark
+                                              ? "hover:bg-gray-700"
+                                              : "hover:bg-gray-100"
+                                            : "opacity-50 cursor-not-allowed"
+                                        }`}
+                                      >
+                                        Mark as completed
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          if (!canMutate) return;
+                                          handleCancelBooking(e, b);
+                                          setOpenActionId(null);
+                                        }}
+                                        disabled={!canMutate}
+                                        className={`w-full text-left px-3 py-2 text-sm ${
+                                          canMutate
+                                            ? isDark
+                                              ? "hover:bg-gray-700"
+                                              : "hover:bg-gray-100"
+                                            : "opacity-50 cursor-not-allowed"
+                                        }`}
+                                      >
+                                        Cancel meeting
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          if (!canMutate) return;
+                                          openRescheduleModal(e, b);
+                                          setOpenActionId(null);
+                                        }}
+                                        disabled={!canMutate}
+                                        className={`w-full text-left px-3 py-2 text-sm rounded-b-md ${
+                                          canMutate
+                                            ? isDark
+                                              ? "hover:bg-gray-700"
+                                              : "hover:bg-gray-100"
+                                            : "opacity-50 cursor-not-allowed"
+                                        }`}
+                                      >
+                                        Reschedule
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             )}
                           </div>
