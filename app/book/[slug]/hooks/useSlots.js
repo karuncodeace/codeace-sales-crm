@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { getUserTimeZone, getDateRangeForNextDays, getLocalDateKey } from "../utils/dateUtils";
 
 const DAYS_TO_FETCH = 25;
@@ -8,43 +8,43 @@ export function useSlots(eventType, selectedDate) {
     const [loading, setSlotsLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Fetch slots for next N days when event type is loaded
-    useEffect(() => {
-        async function fetchSlotsForNextDays() {
-            if (!eventType) return;
+    const fetchSlots = useCallback(async () => {
+        if (!eventType) return;
 
-            try {
-                setSlotsLoading(true);
-                setError(null);
+        try {
+            setSlotsLoading(true);
+            setError(null);
 
-                const userTimeZone = getUserTimeZone();
-                const { startDateISO, endDateISO } = getDateRangeForNextDays(DAYS_TO_FETCH);
+            const userTimeZone = getUserTimeZone();
+            const { startDateISO, endDateISO } = getDateRangeForNextDays(DAYS_TO_FETCH);
 
-                const slotsUrl =
-                    `/api/slots?eventTypeId=${eventType.id}` +
-                    `&startDate=${encodeURIComponent(startDateISO)}` +
-                    `&endDate=${encodeURIComponent(endDateISO)}` +
-                    `&timezone=${encodeURIComponent(userTimeZone)}`;
+            const slotsUrl =
+                `/api/slots?eventTypeId=${eventType.id}` +
+                `&startDate=${encodeURIComponent(startDateISO)}` +
+                `&endDate=${encodeURIComponent(endDateISO)}` +
+                `&timezone=${encodeURIComponent(userTimeZone)}`;
 
-                const response = await fetch(slotsUrl);
+            const response = await fetch(slotsUrl);
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || "Failed to fetch slots");
-                }
-
-                const slotsData = await response.json();
-                setSlots(slotsData);
-            } catch (err) {
-                setError(err.message);
-                setSlots([]);
-            } finally {
-                setSlotsLoading(false);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to fetch slots");
             }
-        }
 
-        fetchSlotsForNextDays();
+            const slotsData = await response.json();
+            setSlots(slotsData);
+        } catch (err) {
+            setError(err.message);
+            setSlots([]);
+        } finally {
+            setSlotsLoading(false);
+        }
     }, [eventType]);
+
+    // Fetch slots when event type is loaded
+    useEffect(() => {
+        fetchSlots();
+    }, [fetchSlots]);
 
     // Filter slots by selected date using useMemo
     const filteredSlots = useMemo(() => {
@@ -71,7 +71,8 @@ export function useSlots(eventType, selectedDate) {
         filteredSlots,
         loading, 
         error,
-        removeBookedSlot
+        removeBookedSlot,
+        refetchSlots: fetchSlots,
     };
 }
 

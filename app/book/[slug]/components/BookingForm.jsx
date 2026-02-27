@@ -7,7 +7,7 @@ import { Search, X } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-export default function BookingForm({ eventType, selectedSlot, onBookingSuccess, slug }) {
+export default function BookingForm({ eventType, selectedSlot, onBookingSuccess, onSlotUnavailable, slug }) {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
     email: "",
@@ -330,7 +330,14 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       if (!response.ok) {
         const errorData = await response.json();
         console.error("❌ Booking Error:", errorData);
-        throw new Error(errorData.error || "Failed to create booking");
+        const message = errorData.error || "Failed to create booking";
+        if (message === "Selected slot is no longer available") {
+          onSlotUnavailable?.();
+          setSubmitError("This time was just taken. We’ve refreshed the list — please pick another slot.");
+          setLoading(false);
+          return;
+        }
+        throw new Error(message);
       }
 
       const bookingData = await response.json();

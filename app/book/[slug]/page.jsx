@@ -30,7 +30,7 @@ export default function BookingPage() {
 
     // Custom hooks for data fetching
     const { eventType, loading, error } = useEventType(slug);
-    const { filteredSlots, loading: slotsLoading, error: slotsError, removeBookedSlot } = useSlots(eventType, selectedDate);
+    const { filteredSlots, loading: slotsLoading, error: slotsError, removeBookedSlot, refetchSlots } = useSlots(eventType, selectedDate);
 
     const handleBookingSuccess = (data) => {
         // Remove the booked slot immediately from the slots array
@@ -46,6 +46,11 @@ export default function BookingPage() {
         setBookingSuccess(false);
         setBookingData(null);
         // Reset form state if needed
+        setSelectedSlot(null);
+    };
+
+    const handleSlotUnavailable = () => {
+        refetchSlots();
         setSelectedSlot(null);
     };
 
@@ -133,6 +138,7 @@ export default function BookingPage() {
                                             eventType={eventType}
                                             selectedSlot={selectedSlot}
                                             onBookingSuccess={handleBookingSuccess}
+                                            onSlotUnavailable={handleSlotUnavailable}
                                             slug={slug}
                                         />
                                     </div>
