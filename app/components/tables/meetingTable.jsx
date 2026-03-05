@@ -333,6 +333,7 @@ function getBookingDisplayStatus(booking) {
             <thead className={`${isDark ? "bg-[#262626] text-gray-300" : "bg-gray-50"}`}>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Invitee Info</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Owner</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Timing</th>
               {/* <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Meeting Mode</th> */}
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Status</th>
@@ -344,15 +345,15 @@ function getBookingDisplayStatus(booking) {
             <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-200"}`}>
               {bookingsLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">Loading meetings…</td>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-gray-500">Loading meetings…</td>
                 </tr>
               ) : bookingsError ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-red-500">Error loading meetings.</td>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-red-500">Error loading meetings.</td>
                 </tr>
               ) : bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">No meetings found.</td>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-gray-500">No meetings found.</td>
                 </tr>
               ) : (
                 meetingsToRender.map((b) => {
@@ -381,6 +382,9 @@ function getBookingDisplayStatus(booking) {
                             <span className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{b.invitee_name || b.organizer_name || b.inviter_name || ""}</span>
                           ) : null}
                         </div>
+                      </td>
+                      <td className="px-6 py-3 align-middle">
+                        <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>{b.host_user_id || "—"}</span>
                       </td>
                       <td className="px-6 py-3 align-middle">
                         <div className="text-sm font-medium">{dt.date}</div>
