@@ -13,6 +13,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     email: "",
     phone: "",
     lead_id: "",
+    guest_mailid: "",
     is_email_required: false,
   });
   const [leadSearchTerm, setLeadSearchTerm] = useState("");
@@ -205,6 +206,17 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       newErrors.lead_id = "Lead selection is required";
     }
 
+    if (formData.guest_mailid && formData.guest_mailid.trim()) {
+      const guestEmails = formData.guest_mailid
+        .split(/[,\n]/)
+        .map((e) => e.trim())
+        .filter(Boolean);
+      const invalidGuest = guestEmails.find((email) => !validateEmail(email));
+      if (invalidGuest) {
+        newErrors.guest_mailid = "One or more guest emails are invalid";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -259,6 +271,14 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         description: "",
       };
 
+      let guestEmails = null;
+      if (formData.guest_mailid && formData.guest_mailid.trim()) {
+        guestEmails = formData.guest_mailid
+          .split(/[,\n]/)
+          .map((e) => e.trim())
+          .filter(Boolean);
+      }
+
       const bookingPayload = {
         eventTypeId: eventType.id,
         start: selectedSlot.start,
@@ -272,6 +292,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         lead_id: formData.lead_id || null,
         invitiee_contact_name: contactName,
         is_email_required: formData.is_email_required,
+        guest_mailid: guestEmails,
         // Include host_user_id (salesperson) when available. Support multiple possible field names.
         host_user_id:
           selectedLead.assigned_to ||
@@ -368,6 +389,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         email: "",
         phone: "",
         lead_id: "",
+        guest_mailid: "",
         is_email_required: false,
       });
       setErrors({});
@@ -596,6 +618,49 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
           />
           {errors.email && (
             <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.email}</p>
+          )}
+        </div>
+
+        {/* Guest Emails - Optional */}
+        <div>
+          <label
+            htmlFor="guest_mailid"
+            className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
+          >
+            Guest email(s) <span className={`${theme === "light" ? "text-gray-400" : "text-gray-500"}`}>(optional, comma separated)</span>
+          </label>
+          <input
+            type="text"
+            id="guest_mailid"
+            name="guest_mailid"
+            value={formData.guest_mailid || ""}
+            onChange={handleChange}
+            disabled={!selectedSlot}
+            className={`
+              w-full px-4 py-2 border rounded-md focus:outline-none ${theme === "light" ? "focus:ring-gray-800" : "focus:ring-gray-500"} focus:border-transparent
+              ${
+                errors.guest_mailid
+                  ? theme === "light"
+                    ? "border-red-300"
+                    : "border-red-500"
+                  : theme === "light"
+                  ? "border-gray-200"
+                  : "border-gray-700"
+              }
+              ${
+                !selectedSlot
+                  ? theme === "light"
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : "bg-[#262626] cursor-not-allowed"
+                  : theme === "light"
+                  ? "bg-white"
+                  : "bg-[#262626]"
+              }
+            `}
+            placeholder="guest1@example.com, guest2@example.com"
+          />
+          {errors.guest_mailid && (
+            <p className={`mt-1 text-sm ${theme === "light" ? "text-red-600" : "text-red-500"}`}>{errors.guest_mailid}</p>
           )}
         </div>
 
