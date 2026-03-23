@@ -8,6 +8,7 @@ import { Copy, Video, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { mutate as globalMutate } from "swr";
 import { useRouter } from "next/navigation";
+import RescheduleBookingModal from "../booking/RescheduleBookingModal";
 
  // Minimal bookings-only meetings table component.
  // Shows: Invitee Info, Meeting Timing, Meeting Type, Status, Meeting Link.
@@ -207,47 +208,12 @@ function getBookingDisplayStatus(booking) {
     }
   };
 
-  // Reschedule modal state & handlers
-  const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, booking: null, start: "", end: "" });
+  // Reschedule modal: calendar + slots + prefilled form (see RescheduleBookingModal)
+  const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, booking: null });
 
   const openRescheduleModal = (e, booking) => {
     e.stopPropagation();
-    const tz = booking.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const startVal = booking.start_time ? new Date(booking.start_time) : booking.start ? new Date(booking.start) : null;
-    const endVal = booking.end_time ? new Date(booking.end_time) : booking.end ? new Date(booking.end) : null;
-    const toInput = (d) => {
-      if (!d) return "";
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0, 16);
-    };
-    setRescheduleModal({ isOpen: true, booking, start: toInput(startVal), end: toInput(endVal) });
-  };
-
-  const submitReschedule = async (e) => {
-    e.preventDefault();
-    const { booking, start, end } = rescheduleModal;
-    if (!booking || !start || !end) {
-      toast.error("Please select start and end times");
-      return;
-    }
-    setProcessingId(booking.id);
-    try {
-      const res = await fetch("/api/bookings/reschedule", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, start: new Date(start).toISOString(), end: new Date(end).toISOString(), timezone: booking.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to reschedule booking");
-      toast.success("Booking rescheduled");
-      setRescheduleModal({ isOpen: false, booking: null, start: "", end: "" });
-      mutate();
-      globalMutate("leads");
-    } catch (err) {
-      toast.error(err.message || "Failed to reschedule booking");
-    } finally {
-      setProcessingId(null);
-    }
+    setRescheduleModal({ isOpen: true, booking });
   };
 
   return (
@@ -534,30 +500,16 @@ function getBookingDisplayStatus(booking) {
           </table>
         </div>
 
-        {/* Reschedule Modal */}
         {rescheduleModal.isOpen && rescheduleModal.booking && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className={`w-full max-w-md rounded-lg shadow-xl ${isDark ? "bg-[#262626] border border-gray-700" : "bg-white border border-gray-200"}`}>
-              <div className={`p-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Reschedule Meeting</h3>
-                <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>Select new start and end times</p>
-              </div>
-              <form onSubmit={submitReschedule} className="p-4 space-y-3">
-                <div>
-                  <label className={`block text-sm mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>New Start</label>
-                  <input type="datetime-local" value={rescheduleModal.start} onChange={(e) => setRescheduleModal((p) => ({ ...p, start: e.target.value }))} required className="w-full p-2 rounded-md border" />
-                </div>
-                <div>
-                  <label className={`block text-sm mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>New End</label>
-                  <input type="datetime-local" value={rescheduleModal.end} onChange={(e) => setRescheduleModal((p) => ({ ...p, end: e.target.value }))} required className="w-full p-2 rounded-md border" />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button type="button" onClick={() => setRescheduleModal({ isOpen: false, booking: null, start: "", end: "" })} className="px-3 py-2 rounded-md border">{isDark ? "Cancel" : "Cancel"}</button>
-                  <button type="submit" className="px-3 py-2 rounded-md bg-orange-500 text-white">Reschedule</button>
-                </div>
-              </form>
-            </div>
-          </div>
+          <RescheduleBookingModal
+            booking={rescheduleModal.booking}
+            isDark={isDark}
+            onClose={() => setRescheduleModal({ isOpen: false, booking: null })}
+            onRescheduled={() => {
+              mutate();
+              globalMutate("leads");
+            }}
+          />
         )}
 
         {/* Footer - pagination */}

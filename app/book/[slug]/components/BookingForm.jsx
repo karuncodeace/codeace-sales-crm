@@ -7,7 +7,17 @@ import { Search, X } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-export default function BookingForm({ eventType, selectedSlot, onBookingSuccess, onSlotUnavailable, slug }) {
+export default function BookingForm({
+  eventType,
+  selectedSlot,
+  onBookingSuccess,
+  onSlotUnavailable,
+  slug,
+  /** When set, form is in reschedule mode: fields prefilled, submit calls PATCH /api/bookings/reschedule */
+  bookingToReschedule = null,
+  /** Hide duplicate title when form is embedded (e.g. reschedule modal already has a header) */
+  embeddedInModal = false,
+}) {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
     email: "",
@@ -23,14 +33,19 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
   // Fetch leads for dropdown
   const { data: leadsData, error: leadsError, isLoading: leadsLoading } = useSWR("/api/leads", fetcher);
-  // Filter out disqualified leads from the UI
-  const leads = Array.isArray(leadsData) 
-    ? leadsData.filter((lead) => 
-        lead.status !== "Disqualified" && 
-        lead.status !== "Junk" && 
-        lead.status !== "Junk Lead"
-      )
-    : [];
+  // Full list for matching booking.lead_id (filtered list may exclude the linked lead → empty search label)
+  const leadsAll = useMemo(() => (Array.isArray(leadsData) ? leadsData : []), [leadsData]);
+  // Filter out disqualified leads from the dropdown only
+  const leads = useMemo(
+    () =>
+      leadsAll.filter(
+        (lead) =>
+          lead.status !== "Disqualified" &&
+          lead.status !== "Junk" &&
+          lead.status !== "Junk Lead"
+      ),
+    [leadsAll]
+  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -89,7 +104,8 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       .join(" ");
   };
 
-  const title = slugToTitle(slug);
+  const slugForTitle = slug || eventType?.slug || "";
+  const title = slugToTitle(slugForTitle);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -126,7 +142,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
 
     // Auto-fill email and phone from selected lead
     if (leadId) {
-      const selectedLead = leads.find(lead => lead.id === leadId);
+      const selectedLead = leads.find((lead) => String(lead.id) === String(leadId));
       if (selectedLead) {
         setFormData((prev) => ({
           ...prev,
@@ -160,17 +176,15 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     return `${leadId}, ${contactName}, ${leadName}`;
   };
 
-  // Update search term when formData.lead_id changes (e.g., from external source)
-  // Use a ref to track if user is actively typing to prevent interference
+  // Update search term when formData.lead_id changes (create flow only; reschedule prefill sets label separately)
   useEffect(() => {
-    // Don't update if user is currently typing
+    if (bookingToReschedule) return;
     if (isTypingRef.current) return;
-    
+
     if (formData.lead_id && leads.length > 0) {
-      const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+      const selectedLead = leads.find((lead) => String(lead.id) === String(formData.lead_id));
       if (selectedLead) {
         const formatted = formatLeadDisplay(selectedLead);
-        // Only update if search term is empty or matches the formatted display
         setLeadSearchTerm((prev) => {
           if (!prev || prev === formatted) {
             return formatted;
@@ -179,7 +193,6 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         });
       }
     } else if (!formData.lead_id) {
-      // Only clear if no lead is selected and user is not typing
       setLeadSearchTerm((prev) => {
         if (!isTypingRef.current) {
           return "";
@@ -187,7 +200,44 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         return prev;
       });
     }
-  }, [formData.lead_id, leads]);
+  }, [formData.lead_id, leads, bookingToReschedule]);
+
+  // Prefill form + lead search label when rescheduling (re-run when full leads list loads)
+  useEffect(() => {
+    if (!bookingToReschedule) return;
+    const b = bookingToReschedule;
+    const gm = b.guest_mailid;
+    const guestStr = Array.isArray(gm)
+      ? gm.join(", ")
+      : typeof gm === "string"
+        ? gm
+        : gm && typeof gm === "object"
+          ? JSON.stringify(gm)
+          : "";
+    const lid = b.lead_id != null && b.lead_id !== "" ? String(b.lead_id) : "";
+    setFormData({
+      email: b.invitee_email || "",
+      phone: b.invitee_phone || "",
+      lead_id: lid,
+      guest_mailid: guestStr,
+      is_email_required: !!b.is_email_required,
+    });
+    let label = "";
+    if (lid) {
+      const match = leadsAll.find((l) => String(l.id) === lid);
+      if (match) label = formatLeadDisplay(match);
+      else {
+        const contact = b.invitiee_contact_name || b.invitee_contact_name || "";
+        const name = b.invitee_name || "";
+        label = [lid, contact, name].filter(Boolean).join(", ");
+      }
+    } else {
+      const contact = b.invitiee_contact_name || b.invitee_contact_name || "";
+      const name = b.invitee_name || "";
+      label = [contact, name].filter(Boolean).join(" · ");
+    }
+    if (label) setLeadSearchTerm(label);
+  }, [bookingToReschedule, leadsAll]);
 
   const validate = () => {
     const newErrors = {};
@@ -202,8 +252,10 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       newErrors.phone = "Please enter a valid phone number";
     }
 
-    if (!formData.lead_id || !formData.lead_id.trim()) {
-      newErrors.lead_id = "Lead selection is required";
+    if (!bookingToReschedule) {
+      if (!formData.lead_id || !formData.lead_id.trim()) {
+        newErrors.lead_id = "Lead selection is required";
+      }
     }
 
     if (formData.guest_mailid && formData.guest_mailid.trim()) {
@@ -237,10 +289,46 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     setSubmitError(null);
 
     try {
+      // Reschedule: same validation, but PATCH instead of POST create
+      if (bookingToReschedule) {
+        const tz =
+          bookingToReschedule.timezone ||
+          Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const response = await fetch("/api/bookings/reschedule", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookingId: bookingToReschedule.id,
+            start: selectedSlot.start,
+            end: selectedSlot.end,
+            timezone: tz,
+          }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("❌ Reschedule Error:", errorData);
+          const message = errorData.error || "Failed to reschedule booking";
+          if (message === "New slot is not available") {
+            onSlotUnavailable?.();
+            setSubmitError(
+              "That time is no longer available. Please pick another slot."
+            );
+            setLoading(false);
+            return;
+          }
+          throw new Error(message);
+        }
+        const bookingData = await response.json();
+        onBookingSuccess(bookingData);
+        return;
+      }
+
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       // Get the selected lead's name and contact name
-      const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+      const selectedLead = leads.find(
+        (lead) => String(lead.id) === String(formData.lead_id)
+      );
       if (!selectedLead) {
         throw new Error("Selected lead not found");
       }
@@ -248,7 +336,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
       const contactName = selectedLead.contactName || selectedLead.contact_name || null;
 
       // Determine event title & description based on slug (use trimmed lowercase)
-      const normalizedSlug = String(slug || "").trim().toLowerCase();
+      const normalizedSlug = String(slugForTitle || "").trim().toLowerCase();
       const eventMetaMap = {
         "discovery-call": {
           title: "Discovery Call – Understanding Your Requirements",
@@ -267,7 +355,7 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
         },
       };
       const eventMeta = eventMetaMap[normalizedSlug] || {
-        title: eventType?.title || slugToTitle(slug),
+        title: eventType?.title || slugToTitle(slugForTitle),
         description: "",
       };
 
@@ -418,14 +506,34 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
     }).format(new Date(isoString));
   };
 
-  const isFormValid = formData.email.trim() && validateEmail(formData.email) && formData.lead_id && formData.lead_id.trim();
+  const isFormValid = bookingToReschedule
+    ? formData.email.trim() && validateEmail(formData.email)
+    : formData.email.trim() &&
+      validateEmail(formData.email) &&
+      formData.lead_id &&
+      formData.lead_id.trim();
   const isDisabled = !selectedSlot || !isFormValid || loading;
 
   return (
-    <div className={`${theme === "light" ? "bg-white border border-gray-200" : "bg-[#262626] border border-gray-700"} rounded-lg p-6`}>
-      <h2 className={`text-lg font-semibold ${theme === "light" ? "text-gray-800" : "text-white"} mb-4`}>
-        Booking Details
-      </h2>
+    <div
+      className={`${theme === "light" ? "bg-white border border-gray-200" : "bg-[#262626] border border-gray-700"} rounded-lg ${
+        embeddedInModal ? "p-5 shadow-sm" : "p-6"
+      }`}
+    >
+      {!embeddedInModal && (
+        <h2
+          className={`text-lg font-semibold ${theme === "light" ? "text-gray-800" : "text-white"} mb-4`}
+        >
+          {bookingToReschedule ? "Reschedule meeting" : "Booking Details"}
+        </h2>
+      )}
+      {embeddedInModal && bookingToReschedule && (
+        <h3
+          className={`mb-4 text-sm font-semibold uppercase tracking-wide ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}
+        >
+          Attendee &amp; lead
+        </h3>
+      )}
 
       {title && (
         <div className={`mb-4 p-3 ${theme === "light" ? "bg-gray-50" : "bg-[#1f1f1f]"} border ${theme === "light" ? "border-gray-200" : "border-gray-700"} rounded-md`}>
@@ -461,7 +569,12 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
             htmlFor="lead_search"
             className={`block text-sm font-medium ${theme === "light" ? "text-gray-700" : "text-white"} mb-1`}
           >
-            Lead <span className="text-red-500">*</span>
+            Lead{" "}
+            {bookingToReschedule ? (
+              <span className={`${theme === "light" ? "text-gray-400" : "text-gray-500"}`}>(optional)</span>
+            ) : (
+              <span className="text-red-500">*</span>
+            )}
           </label>
           <div className="relative">
             <div className="relative">
@@ -482,7 +595,9 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
                   
                   // Clear lead_id if user is typing something different from the selected lead
                   if (formData.lead_id) {
-                    const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+                    const selectedLead = leads.find(
+                      (lead) => String(lead.id) === String(formData.lead_id)
+                    );
                     if (selectedLead) {
                       const formatted = formatLeadDisplay(selectedLead);
                       // If typed value doesn't match the selected lead's display, clear the selection
@@ -506,7 +621,9 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
                   setIsLeadDropdownOpen(true);
                   // If a lead is selected and search term is empty, populate it
                   if (formData.lead_id && !leadSearchTerm) {
-                    const selectedLead = leads.find(lead => lead.id === formData.lead_id);
+                    const selectedLead = leads.find(
+                      (lead) => String(lead.id) === String(formData.lead_id)
+                    );
                     if (selectedLead) {
                       const formatted = formatLeadDisplay(selectedLead);
                       setLeadSearchTerm(formatted);
@@ -752,7 +869,13 @@ export default function BookingForm({ eventType, selectedSlot, onBookingSuccess,
             }
           `}
         >
-          {loading ? "Booking..." : "Confirm Booking"}
+          {loading
+            ? bookingToReschedule
+              ? "Rescheduling..."
+              : "Booking..."
+            : bookingToReschedule
+              ? "Reschedule meeting"
+              : "Confirm Booking"}
         </button> 
        </div>
       </form>
