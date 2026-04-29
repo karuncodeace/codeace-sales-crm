@@ -31,6 +31,12 @@ export async function POST(request) {
       return Response.json({ error: "closed_date is required" }, { status: 400 });
     }
 
+    // Validate status is valid
+    const validStatuses = ["pending", "closed", "cancelled"];
+    if (!validStatuses.includes(status)) {
+      return Response.json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` }, { status: 400 });
+    }
+
     // Validate amount is a valid number
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum < 0) {

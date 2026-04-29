@@ -412,13 +412,13 @@ export async function GET(request) {
       { data: [] }
     );
 
-    let convertedLeads = 0;
-    let convertedLeadsIds = [];
-    if (allLeadsForConversion.data && Array.isArray(allLeadsForConversion.data)) {
-      const filteredLeads = allLeadsForConversion.data.filter(lead => {
-        // Case-insensitive check for "Won" status
-        const status = String(lead.status || "").toLowerCase();
-        if (status !== "won") return false;
+     let convertedLeads = 0;
+     let convertedLeadsIds = [];
+     if (allLeadsForConversion.data && Array.isArray(allLeadsForConversion.data)) {
+       const filteredLeads = allLeadsForConversion.data.filter(lead => {
+         // Case-insensitive check for "Won" or "Converted" status
+         const status = String(lead.status || "").toLowerCase();
+         if (status !== "won" && status !== "converted") return false;
 
         // Use last_attempted_at if available, otherwise fallback to created_at
         const dateStr = lead.last_attempted_at || lead.created_at;

@@ -110,12 +110,12 @@ export async function GET() {
       });
     }
 
-    // Fetch conversions: leads with status = "Won"
-    // Get all leads with status = "Won" and group by created_at
-    const { data: conversionsData, error: conversionsError } = await supabase
-      .from("leads_table")
-      .select("created_at, status")
-      .eq("status", "Won");
+     // Fetch conversions: leads with status = "Won" or "Converted"
+     // Get all leads with status = "Won" or "Converted" and group by created_at
+     const { data: conversionsData, error: conversionsError } = await supabase
+       .from("leads_table")
+       .select("created_at, status")
+       .in("status", ["Won", "Converted"]);
 
     if (!conversionsError && conversionsData) {
       conversionsData.forEach((lead) => {

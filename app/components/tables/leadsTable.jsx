@@ -192,7 +192,7 @@ export default function LeadsTable({ initialFilter = null }) {
     leadName: "",
     amount: "",
     closedDate: "",
-    status: "Converted",
+    status: "closed",
     isSubmitting: false,
     showCalendar: false,
   });
@@ -587,7 +587,7 @@ export default function LeadsTable({ initialFilter = null }) {
         leadName: lead.name || lead.lead_name || "Lead",
         amount: "",
         closedDate: new Date().toISOString().split('T')[0], // Default to today
-        status: "Converted",
+        status: "closed",
         isSubmitting: false,
         showCalendar: false,
       });
@@ -656,7 +656,7 @@ export default function LeadsTable({ initialFilter = null }) {
         leadName: "",
         amount: "",
         closedDate: "",
-        status: "Converted",
+        status: "closed",
         isSubmitting: false,
         showCalendar: false,
       });
@@ -691,7 +691,7 @@ export default function LeadsTable({ initialFilter = null }) {
       leadName: "",
       amount: "",
       closedDate: "",
-      status: "Converted",
+      status: "closed",
       isSubmitting: false,
       showCalendar: false,
     });
