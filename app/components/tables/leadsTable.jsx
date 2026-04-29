@@ -661,20 +661,50 @@ export default function LeadsTable({ initialFilter = null }) {
         showCalendar: false,
       });
 
-      // Now proceed with normal status change to "Converted"
-      // Open the status change modal with "Converted" status
-      setStatusChangeModal({
-        isOpen: true,
-        leadId: leadId,
-        newStatus: "Converted",
-        comment: "",
-        nextTask: "",
-        connectThrough: "",
-        dueDate: "",
-        outcome: "Success",
-        isSubmitting: false,
-        showCalendar: false,
-      });
+      // Directly update lead status to "Converted" without showing status change modal
+      try {
+        // Get lead to get assigned salesperson
+        const lead = leadData.find((l) => l.id === leadId);
+        const assignedSalespersonId = lead?.assignedTo || lead?.assigned_to;
+
+        // Save activity log
+        await fetch("/api/task-activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            activity: "Status changed to Converted",
+            type: "status",
+            comments: "Deal closed successfully",
+            connect_through: null,
+            source: "ui",
+            assigned_to: assignedSalespersonId,
+          }),
+        });
+
+        // Update lead status directly
+        const updateRes = await fetch("/api/leads", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            id: leadId, 
+            status: "Converted",
+            current_stage: "Converted",
+          }),
+        });
+
+        if (!updateRes.ok) {
+          throw new Error("Failed to update lead status");
+        }
+
+        // Refetch leads data to update UI
+        mutate();
+
+        toast.success("Lead marked as Converted");
+      } catch (updateError) {
+        console.error("Error updating lead status:", updateError);
+        toast.error("Revenue saved but failed to update lead status");
+      }
     } catch (error) {
       console.error("Revenue transaction error:", error);
       toast.error(error.message || "Failed to save revenue transaction. Please try again.");
